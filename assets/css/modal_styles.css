@@ -1,0 +1,44 @@
+/* =========================================
+   NEW: MODAL DISPLAY & Z-INDEX FIX
+   ========================================= */
+
+/* HIGHLY AGGRESSIVE VISIBILITY FIX */
+.modal-content {
+    /* Ensures the actual box content is opaque and visible */
+    background-color: #ffffff !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    /* Ensure no transforms are collapsing it */
+    transform: none !important;
+    height: auto !important;
+    min-height: 200px; /* Ensure minimum height */
+}
+
+/* Ensure the wrapper dialog is positioned correctly */
+.modal-dialog {
+    z-index: 1060 !important;
+    transition: transform 0.3s ease-out;
+    margin: 1.75rem auto; /* Default Bootstrap spacing */
+}
+
+/* Ensure that the view/edit modals open correctly */
+#viewEmployeeModal.show .modal-dialog,
+#editEmployeeModal.show .modal-dialog {
+    transform: none !important;
+}
+
+/* Fix: Input Group Gap Removal (High Specificity) */
+/* Targets elements inside the modal content directly to be most specific */
+
+.modal-content .input-group-text:first-child:not(:last-child) {
+    /* Ensures the icon box is flat on the right edge where it meets the input */
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+.modal-content .input-group-text + .form-control {
+    border-left: 0 !important; /* Removes the double border line */
+    /* Removes the left corner rounding on the input field */
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+}

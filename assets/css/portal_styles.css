@@ -1,0 +1,589 @@
+/*
+ * LOPISv2 Modern Theme
+ * Consolidated: Soft UI + Floating Pill Sidebar + Teal Theme
+ */
+
+/* =========================================
+   1. GLOBAL & LAYOUT
+   ========================================= */
+body {
+    font-family: 'Nunito', sans-serif;
+    background-color: #f8f9fc;
+    overflow-x: hidden;
+}
+
+#wrapper {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+}
+
+#content-wrapper {
+    width: 100%;
+    flex-grow: 1;
+    transition: margin-left 0.3s ease-in-out; /* Use margin transition */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* =========================================
+   2. SIDEBAR (Modern Gradient & Pills)
+   ========================================= */
+.sidebar {
+    width: 280px; 
+    min-height: 100vh;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0; 
+    padding-top: 1rem;
+
+    /* Theme Color: Teal Gradient */
+    background-color: #0CC0DF; 
+    background-image: linear-gradient(180deg, #0CC0DF 10%, #55c4d8 100%);
+    background-size: cover;
+}
+
+/* --- Sidebar Header / Logo Container --- */
+.sidebar-brand-icon {
+    /* Box styling for your logo */
+    background: rgb(255, 255, 255); 
+    border-radius: 0.5rem; 
+    width: auto;
+    height: auto;
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px auto;
+    padding: 0.5rem; /* Padding inside the white box */
+    transition: all 0.3s ease;
+}
+
+/* --- LOGO SWAPPING LOGIC --- */
+.sidebar-brand-icon .logo-large {
+    display: block;
+    max-height: 60px;
+    max-width: 100%;
+    object-fit: contain;
+}
+.sidebar-brand-icon .logo-small {
+    display: none;
+}
+/* --- End Logo Logic --- */
+
+
+/* --- Sidebar Links (Pill Style) --- */
+.sidebar .nav-item {
+    margin: 4px 12px; /* Spacing between pills */
+}
+
+.sidebar .nav-item .nav-link {
+    border-radius: 10px; /* Rounded Pill Shape */
+    padding: 0.85rem 1rem;
+    display: flex;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.85);
+    transition: all 0.2s ease-in-out;
+}
+
+.sidebar .nav-item .nav-link i {
+    margin-right: 12px;
+    font-size: 0.9rem;
+    width: 20px; 
+    text-align: center;
+    transition: color 0.2s;
+}
+
+.sidebar .nav-item .nav-link span {
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: opacity 0.3s; /* For tooltip logic */
+}
+
+/* Hover State */
+.sidebar .nav-item .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    transform: translateX(4px); /* Slight subtle movement */
+}
+
+/* ACTIVE STATE (The White Pill) */
+.sidebar .nav-item.active .nav-link {
+    background-color: #ffffff !important;
+    color: #0CC0DF !important; /* Teal Text */
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.sidebar .nav-item.active .nav-link i {
+    color: #0CC0DF !important; /* Teal Icon */
+}
+
+/* Section Headings */
+.sidebar .sidebar-heading {
+    padding: 1rem 1.5rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar hr.sidebar-divider {
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin: 1rem 1.5rem;
+    transition: opacity 0.3s ease;
+}
+
+/* =========================================
+   3. DASHBOARD CONTENT (Soft UI)
+   ========================================= */
+
+/* Card Styling: Soft Shadows & Round Corners */
+.card {
+    background-color: #fff;
+    border: none;
+    border-radius: 1rem; /* 16px rounded corners */
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.05) !important;
+    transition: transform 0.2s ease-in-out;
+}
+.card:hover {
+    transform: translateY(-3px); /* Slight lift on hover */
+}
+.card-header {
+    background-color: transparent; /* Cleaner look */
+    border-bottom: 1px solid #f0f2f5;
+    padding: 1.25rem 1.5rem;
+    font-weight: 700;
+}
+
+/* Welcome Banner */
+.welcome-banner {
+    background: linear-gradient(135deg, #0CC0DF 0%, #55c4d8 100%);
+    border-radius: 1rem;
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0.5rem 1.5rem rgba(12, 192, 223, 0.25);
+}
+.welcome-banner::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+}
+
+/* Modern Icon Boxes (Colorful circles) */
+.icon-box {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+.bg-soft-primary { background-color: rgba(78, 115, 223, 0.1); color: #4e73df; }
+.bg-soft-success { background-color: rgba(28, 200, 138, 0.1); color: #1cc88a; }
+.bg-soft-warning { background-color: rgba(246, 194, 62, 0.1); color: #f6c23e; }
+.bg-soft-info    { background-color: rgba(54, 185, 204, 0.1); color: #36b9cc; }
+
+/* Teal Theme Utilities */
+.text-teal {
+    color: #0CC0DF !important;
+}
+.bg-soft-teal {
+    background-color: rgba(12, 192, 223, 0.1) !important;
+    color: #0CC0DF !important;
+}
+.btn-teal {
+    background-color: #0CC0DF;
+    color: white;
+    border: none;
+}
+.btn-teal:hover {
+    background-color: #0abad8; /* Slightly darker for hover */
+    color: white;
+}
+
+/* Typography */
+.text-label {
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    font-weight: 700;
+    color: #8898aa;
+    text-transform: uppercase;
+}
+.text-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #2d3436;
+}
+.text-xs { font-size: 0.7rem; }
+.text-gray-300 { color: #dddfeb !important; }
+.text-gray-600 { color: #858796 !important; }
+.text-gray-800 { color: #5a5c69 !important; }
+
+/* =========================================
+   4. MODERN TOPBAR
+   ========================================= */
+.topbar {
+    height: 4.5rem; /* Slightly taller */
+    background-color: #ffffff;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.03) !important; /* Softer shadow */
+    z-index: 10;
+}
+
+/* User Avatar (Circle with Initials) */
+.topbar-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(12, 192, 223, 0.1); /* Soft Teal Background */
+    color: #0CC0DF; /* Teal Text */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.nav-link:hover .topbar-avatar {
+    background-color: #0CC0DF;
+    color: #ffffff;
+}
+
+/* Notification Badge */
+.badge-counter {
+    position: absolute;
+    transform: scale(0.7);
+    transform-origin: top right;
+    top: .25rem;
+    right: .25rem;
+    background-color: #e74a3b; /* Red */
+    color: white;
+    border-radius: 50%;
+    padding: 0.25em 0.6em;
+}
+
+/* Toggler Icons (Hamburger) */
+#sidebarToggleTop i, #sidebarToggle i,
+.fa-bars { 
+    color: #0CC0DF; /* Make hamburger Teal */
+    font-size: 1.2rem;
+}
+
+/* =========================================
+   5. SIDEBAR TOGGLE LOGIC (Desktop)
+   ========================================= */
+body.sidebar-toggled .sidebar {
+    width: 6.5rem; /* Wider for icons */
+}
+
+/* Hide text elements */
+body.sidebar-toggled .sidebar .nav-item .nav-link span,
+body.sidebar-toggled .sidebar .sidebar-heading,
+body.sidebar-toggled .sidebar .sidebar-brand-text,
+body.sidebar-toggled .sidebar hr.sidebar-divider {
+    display: none;
+    opacity: 0;
+}
+
+/* Center icons */
+body.sidebar-toggled .sidebar .nav-item .nav-link {
+    justify-content: center;
+    padding: 1rem;
+}
+body.sidebar-toggled .sidebar .nav-item .nav-link i {
+    margin-right: 0;
+    font-size: 1.2rem;
+}
+body.sidebar-toggled .sidebar-brand-icon {
+    margin-bottom: 0;
+    padding: 0.5rem; /* Padding for mini logo box */
+}
+
+/* Toggled Logo Swap */
+body.sidebar-toggled .sidebar .sidebar-brand-icon .logo-large {
+    display: none;
+}
+body.sidebar-toggled .sidebar .sidebar-brand-icon .logo-small {
+    display: block;
+    max-height: 40px;
+    width: auto;
+    animation: fadeIn 0.3s;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* =========================================
+   6. SIDEBAR TOOLTIPS (Hover Names)
+   ========================================= */
+body.sidebar-toggled .sidebar {
+    overflow: visible !important; 
+    z-index: 1000; 
+}
+body.sidebar-toggled .sidebar .nav-item {
+    position: relative;
+}
+body.sidebar-toggled .sidebar .nav-item:hover .nav-link span {
+    display: block !important; 
+    opacity: 1 !important; /* Ensure it's visible */
+    position: absolute;
+    left: calc(100% + 10px); 
+    top: 50%;
+    transform: translateY(-50%); 
+    
+    /* Tooltip Styling */
+    background-color: #2d3436; 
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    white-space: nowrap;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    z-index: 1001;
+    pointer-events: none; 
+}
+/* Tooltip Arrow */
+body.sidebar-toggled .sidebar .nav-item:hover .nav-link span::before {
+    content: '';
+    position: absolute;
+    left: -6px; 
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0; 
+    height: 0; 
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent; 
+    border-right: 6px solid #2d3436; 
+}
+
+/* =========================================
+   7. SCROLL-TO-TOP BUTTON (Teal Theme)
+   ========================================= */
+.scroll-to-top {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    display: none;
+    width: 2.75rem;
+    height: 2.75rem;
+    text-align: center;
+    color: #fff;
+    /* Themed with Teal color */
+    background: #0CC0DF;
+    line-height: 46px;
+    border-radius: 0.35rem;
+    transition: background-color 0.2s ease;
+}
+.scroll-to-top:hover {
+    color: white;
+    /* Darker Teal on hover */
+    background: #0abad8;
+}
+.scroll-to-top i {
+    font-weight: 800;
+}
+
+/* =========================================
+   8. MOBILE RESPONSIVENESS (Push Content)
+   ========================================= */
+@media (max-width: 767.98px) {
+    .sidebar {
+        margin-left: -280px; /* Start hidden off-screen */
+        transition: margin-left 0.3s ease-in-out;
+        /* Make it float */
+        position: fixed;
+        z-index: 1000;
+        height: 100%;
+    }
+    
+    body.sidebar-toggled .sidebar {
+        margin-left: 0; /* Slide in */
+    }
+
+    /* When mobile sidebar is open, PUSH the content wrapper */
+    body.sidebar-toggled #content-wrapper {
+        margin-left: 280px;
+    }
+    
+    .topbar .dropdown-menu {
+        position: absolute;
+    }
+}
+
+/* =========================================
+   SIDEBAR TOGGLE BUTTONS (The Fix)
+   ========================================= */
+
+/* --- 1. The Sidebar Footer Button (Round Arrow) --- */
+/* Only target #sidebarToggle if it is inside .sidebar */
+.sidebar #sidebarToggle {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none; /* Remove default border */
+    transition: all 0.2s;
+}
+
+/* The Arrow Icon (Generated via CSS) */
+.sidebar #sidebarToggle::after {
+    content: '\f104'; /* FontAwesome Angle Left */
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    font-size: 1.5rem;
+}
+
+/* Sidebar Toggle Hover */
+.sidebar #sidebarToggle:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Flip arrow when toggled */
+body.sidebar-toggled .sidebar #sidebarToggle::after {
+    content: '\f105'; /* FontAwesome Angle Right */
+}
+
+
+/* --- 2. The Topbar Button (Hamburger) --- */
+/* Only target #sidebarToggle if it is inside .topbar */
+.topbar #sidebarToggle, 
+.topbar #sidebarToggleTop {
+    background-color: transparent; /* No background */
+    width: auto;
+    height: auto;
+    border: none;
+    padding: 0.5rem; /* Give it a click area */
+}
+
+/* Ensure the arrow DOES NOT appear in the topbar */
+.topbar #sidebarToggle::after {
+    content: none !important; 
+}
+
+/* Make the 'Bars' Icon Bigger */
+.topbar #sidebarToggle i,
+.topbar #sidebarToggleTop i {
+    font-size: 1.5rem; /* Make the hamburger larger */
+    color: #0CC0DF; /* Teal Color */
+}
+
+.topbar #sidebarToggle:hover i,
+.topbar #sidebarToggleTop:hover i {
+    color: #0abad8; /* Darker Teal on hover */
+}
+
+/* Hover effect for Quick Action Cards */
+.transition-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.transition-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.08) !important;
+}
+
+/* =========================================
+   NEW: MODERN DATATABLES STYLING
+   ========================================= */
+
+/* General Wrapper Styling (Adds space around controls) */
+.dataTables_wrapper {
+    padding: 1rem;
+}
+
+/* --- Table Header & Rows --- */
+
+#employeesTable thead th {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    color: #5a5c69;
+    /* Highlight the divider with the theme color */
+    border-bottom: 3px solid #0CC0DF; 
+}
+
+/* Subtle Row Hover Effect */
+#employeesTable tbody tr:hover {
+    background-color: #f5f5f5;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.03);
+    cursor: pointer;
+}
+
+/* --- Search Input (.dataTables_filter) --- */
+
+div.dataTables_wrapper div.dataTables_filter input {
+    /* Soft round corners for the input field */
+    border-radius: 0.5rem; 
+    border: 1px solid #e0e0e0;
+    padding: 0.5rem 1rem;
+    transition: all 0.2s;
+    width: 15rem; 
+}
+/* Teal focus highlight */
+div.dataTables_wrapper div.dataTables_filter input:focus {
+    border-color: #0CC0DF; 
+    box-shadow: 0 0 0 0.2rem rgba(12, 192, 223, 0.25);
+}
+
+/* --- Pagination Controls --- */
+
+/* Base Pagination Button Styling (Bootstrap 5 standard) */
+.dataTables_wrapper .pagination .page-item .page-link {
+    border-radius: 0.5rem;
+    margin: 0 0.2rem;
+    color: #5a5c69; 
+    transition: all 0.2s;
+}
+
+/* Active Page Button (Teal Theme) */
+.dataTables_wrapper .pagination .page-item.active .page-link {
+    background-color: #0CC0DF !important; /* Theme Teal */
+    border-color: #0CC0DF !important;
+    color: white !important;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(12, 192, 223, 0.4);
+}
+
+/* Hover Effect for Pagination */
+.dataTables_wrapper .pagination .page-item .page-link:hover {
+    background-color: #f0f8ff; 
+    border-color: #0CC0DF; 
+    color: #0CC0DF;
+}
+
+/* Custom styles for smaller Dropify text */
+.dropify-wrapper .dropify-message p {
+    /* Targets the main "Drag and drop or click" text */
+    font-size: 0.85rem; /* Adjust this value (e.g., 0.8rem or 12px) */
+    font-weight: 500;
+}
+
+.dropify-wrapper .dropify-infos .dropify-infos-inner p {
+    /* Targets the file size/format error messages */
+    font-size: 0.75rem; /* Makes error/info text slightly smaller */
+}
+
+.dropify-wrapper .dropify-filename-inner {
+    /* Targets the file name text when a file is uploaded */
+    font-size: 0.9rem;
+}
