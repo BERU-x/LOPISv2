@@ -1,14 +1,14 @@
 </div>
-            </div>
-        <footer class="sticky-footer bg-white">
-            <div class="container my-auto">
-                <div class="copyright text-center my-auto">
-                    <span>Copyright &copy; LOPISv2 <?php echo date('Y'); ?></span>
-                </div>
-            </div>
-        </footer>
         </div>
+    <footer class="sticky-footer bg-white">
+        <div class="container my-auto">
+            <div class="copyright text-center my-auto">
+                <span>Copyright &copy; LOPISv2 <?php echo date('Y'); ?></span>
+            </div>
+        </div>
+    </footer>
     </div>
+</div>
 <a class="scroll-to-top rounded" href="#page-top">
     <i class="fas fa-angle-up"></i>
 </a>
@@ -30,14 +30,15 @@
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/2.1.2/sweetalert.min.js"></script>
+<script src="../assets/js/jquery-3.7.1.min.js"></script>
 <script src="../assets/vendor/bs5/js/bootstrap.bundle.min.js"></script>
-
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="../assets/js/dataTables.min.js"></script>
+<script src="../assets/js/dataTables.bootstrap5.min.js"></script> 
 
 <script>
     $(document).ready(function() {
+        // Sidebar Toggle Logic
         $("#sidebarToggle, #sidebarToggleTop").on('click', function(e) {
             $("body").toggleClass("sidebar-toggled");
             $(".sidebar").toggleClass("toggled");
@@ -81,6 +82,40 @@
             setTimeout(updateProgress, 10);
         }
     });
+</script>
+
+<script>
+$(document).ready(function() {
+    
+    // --- 1. INITIALIZE DATATABLES ---
+    // This runs AFTER DataTables and jQuery have loaded.
+    var usersTable = $('#usersTable').DataTable({
+        "dom": 'rtip', 
+        "pageLength": 10,
+        "language": {
+            "info": "Showing _START_ to _END_ of _TOTAL_ users",
+            "infoEmpty": "Showing 0 to 0 of 0 users",
+            "infoFiltered": "(filtered from _MAX_ total users)"
+        },
+        "columnDefs": [
+            { "orderable": false, "targets": 4 } 
+        ],
+        "order": [
+            [2, "asc"], // Sort by Role (Column 2) Ascending
+            [0, "asc"]  // Then sort by Employee ID (Column 0) Ascending
+        ]
+    });
+
+    // --- 2. CUSTOM SEARCH HANDLER ---
+    $('#searchInput').on('keyup', function() {
+        usersTable.search(this.value).draw();
+    });
+
+    // Adjust table width on modal/sidebar interactions
+    $('#addUserModal').on('shown.bs.modal', function () {
+        usersTable.columns.adjust();
+    });
+});
 </script>
 
 </body>

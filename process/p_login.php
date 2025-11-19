@@ -1,38 +1,48 @@
 <?php
 session_start();
+
+// --- DATABASE CONNECTION & USER MODEL ---
 require '../db_connection.php'; // Your DB connection file
 
 // Set response header to JSON
 header('Content-Type: application/json');
 
-// Get POST data
-$email = $_POST['email'] ?? '';
+// Get POST data (renamed from 'email' to 'login_id' in index.php)
+$login_id = $_POST['login_id'] ?? ''; // Expects email or employee_id
 $password = $_POST['password'] ?? '';
-// --- 1. ADDED: Check for 'remember me' ---
 $remember_me = isset($_POST['remember']);
 
 // Basic validation
-if (empty($email) || empty($password)) {
+if (empty($login_id) || empty($password)) {
     http_response_code(400); 
-    echo json_encode(['status' => 'error', 'message' => 'Email and password are required.']);
+    echo json_encode(['status' => 'error', 'message' => 'Login ID and password are required.']);
     exit;
 }
 
 try {
-    // Find the user
-    $stmt = $pdo->prepare(
-        "SELECT u.*, CONCAT(e.firstname, ' ', e.lastname) AS fullname 
-         FROM tbl_users u
-         LEFT JOIN tbl_employees e ON u.employee_id = e.id
-         WHERE u.email = ?"
-    );
+    // 1. DETERMINE LOGIN FIELD
+    // Assume Employee IDs are exactly 3 digits (VARCHAR(3) in tbl_employees)
+    if (preg_match('/^[0-9]{3}$/', $login_id)) { 
+        $login_field = 'u.employee_id';
+    } else {
+        $login_field = 'u.email';
+    }
+
+    // 2. FETCH USER DATA (Flexible Query)
+    $sql = "SELECT 
+                u.*, 
+                CONCAT(e.firstname, ' ', e.lastname) AS fullname 
+            FROM tbl_users u
+            LEFT JOIN tbl_employees e ON u.employee_id = e.employee_id -- 🔥 FIX: Join on employee_id = employee_id
+            WHERE {$login_field} = ?";
     
-    $stmt->execute([$email]);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$login_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     $is_password_correct = $user && password_verify($password, $user['password']);
 
-    // Verify user exists and password is correct
+    // 3. Verify user exists and password is correct
     if ($is_password_correct) {
         
         // Check if account is active
@@ -50,11 +60,11 @@ try {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['employee_id'] = $user['employee_id'];
         $_SESSION['email'] = $user['email'];
-        $_SESSION['fullname'] = $user['fullname'] ?? $user['email'];
+        $_SESSION['fullname'] = $user['fullname'] ?? $user['employee_id']; // Use employee_id as fallback name
         $_SESSION['usertype'] = $user['usertype'];
         $_SESSION['show_loader'] = true;
 
-        // --- 2. ADDED: "Remember Me" Logic ---
+        // --- "Remember Me" Logic ---
         if ($remember_me) {
             // Generate secure tokens
             $selector = bin2hex(random_bytes(16));
@@ -68,29 +78,33 @@ try {
             
             // Store in the database
             try {
+                // NOTE: This assumes tbl_auth_tokens table exists with correct columns
                 $stmt_token = $pdo->prepare(
                     "INSERT INTO tbl_auth_tokens (selector, hashed_token, user_id, expires_at) 
-                     VALUES (?, ?, ?, ?)"
+                    VALUES (?, ?, ?, ?)"
                 );
                 $stmt_token->execute([$selector, $hashed_token, $user['id'], $expires_at]);
                 
                 // Set cookies (httponly = true for security)
-                // Set 'secure' to true if you are on HTTPS
+                // Adjust cookie options based on your environment
                 $cookie_options = [
                     'expires' => time() + (86400 * 30),
                     'path' => '/',
-                    'domain' => 'lendell.ph', // Set your domain if needed
-                    'secure' => true, // !! SET TO TRUE FOR PRODUCTION (HTTPS) !!
+                    // 'domain' => 'lendell.ph', // Remove if running locally or not setting a specific domain
+                    'secure' => false, // !! CHANGE TO TRUE FOR PRODUCTION (HTTPS) !!
                     'httponly' => true,
                     'samesite' => 'Lax' // Or 'Strict'
                 ];
+                
+                // Set 'secure' based on environment
+                if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
+                    $cookie_options['secure'] = true;
+                }
                 
                 setcookie('remember_selector', $selector, $cookie_options);
                 setcookie('remember_token', $token, $cookie_options);
                 
             } catch (PDOException $e) {
-                // It's okay if this fails, the user is still logged in for the session.
-                // Just log the error.
                 error_log('Remember Me cookie token insert failed: ' . $e->getMessage());
             }
         }
@@ -114,7 +128,7 @@ try {
     } else {
         // Invalid credentials
         http_response_code(401); // Unauthorized
-        echo json_encode(['status' => 'error', 'message' => 'Invalid email or password.']);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid Login ID or password.']);
     }
 
 } catch (PDOException $e) {

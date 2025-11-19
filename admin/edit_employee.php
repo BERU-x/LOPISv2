@@ -13,6 +13,21 @@ require_once 'models/employee_model.php';
 $genders = [0 => 'Male', 1 => 'Female'];
 $employment_statuses = [0 => 'Probationary', 1 => 'Regular', 2 => 'Part-time', 3 => 'Contractual', 4 => 'OJT', 5 => 'Resigned', 6 => 'Terminated'];
 
+// 🔥 ADDED: Hardcoded Department Lookup Array
+$departments = [
+    'I.T. Department',
+    'Operations Department',
+    'Field Department',
+    'Management Department',
+    'CI Department',
+    'Finance Department',
+    'Compliance Department',
+    'HR Department',
+    'Training Department',
+    'Marketing Department',
+    'Corporate Department',
+];
+
 
 $employee = null;
 $error = '';
@@ -49,7 +64,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_employee'])) {
             'contact_info' => trim($_POST['contact_info'] ?? null),
             'gender' => (int)$_POST['gender'],
             'position' => trim($_POST['position']),
-            'department' => trim($_POST['department']),
+            'department' => trim($_POST['department']), // Department is now a selected string
             'employment_status' => (int)$_POST['employment_status'],
             'salary' => (int)$_POST['salary'],
             'food' => (int)($_POST['food'] ?? 0),
@@ -152,8 +167,8 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-fingerprint"></i></span>
                                     <input type="text" name="employee_id" id="employee_id" class="form-control border-start-0 rounded-start-0" 
-                                           maxlength="3" required pattern="[0-9]{3}" placeholder="ID #"
-                                           value="<?php echo htmlspecialchars($employee['employee_id'] ?? ''); ?>">
+                                            maxlength="3" required pattern="[0-9]{3}" placeholder="ID #"
+                                            value="<?php echo htmlspecialchars($employee['employee_id'] ?? ''); ?>">
                                 </div>
                             </div>
                             <div class="col-md-8">
@@ -161,8 +176,8 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-user-edit"></i></span>
                                     <input type="text" name="firstname" id="firstname" class="form-control border-start-0 rounded-start-0" 
-                                           oninput="this.value=this.value.charAt(0).toUpperCase()+this.value.slice(1)" required placeholder="John"
-                                           value="<?php echo htmlspecialchars($employee['firstname'] ?? ''); ?>">
+                                            oninput="this.value=this.value.charAt(0).toUpperCase()+this.value.slice(1)" required placeholder="John"
+                                            value="<?php echo htmlspecialchars($employee['firstname'] ?? ''); ?>">
                                 </div>
                             </div>
                             
@@ -171,8 +186,8 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-user-edit"></i></span>
                                     <input type="text" name="lastname" id="lastname" class="form-control border-start-0 rounded-start-0" 
-                                           oninput="this.value=this.value.charAt(0).toUpperCase()+this.value.slice(1)" required placeholder="Doe"
-                                           value="<?php echo htmlspecialchars($employee['lastname'] ?? ''); ?>">
+                                            oninput="this.value=this.value.charAt(0).toUpperCase()+this.value.slice(1)" required placeholder="Doe"
+                                            value="<?php echo htmlspecialchars($employee['lastname'] ?? ''); ?>">
                                 </div>
                             </div>
                             <div class="col-md-4">
@@ -180,8 +195,8 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-user-tag"></i></span>
                                     <input type="text" name="suffix" id="suffix" class="form-control border-start-0 rounded-start-0" 
-                                           placeholder="(Jr., III)"
-                                           value="<?php echo htmlspecialchars($employee['suffix'] ?? ''); ?>">
+                                            placeholder="(Jr., III)"
+                                            value="<?php echo htmlspecialchars($employee['suffix'] ?? ''); ?>">
                                 </div>
                             </div>
 
@@ -190,8 +205,8 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
                                     <input type="date" name="birthdate" id="birthdate" class="form-control border-start-0 rounded-start-0" 
-                                           required
-                                           value="<?php echo htmlspecialchars($employee['birthdate'] ?? ''); ?>">
+                                            required
+                                            value="<?php echo htmlspecialchars($employee['birthdate'] ?? ''); ?>">
                                 </div>
                             </div>
                             <div class="col-md-4">
@@ -214,8 +229,8 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-mobile-alt"></i></span>
                                     <input type="tel" name="contact_info" id="contact_info" class="form-control border-start-0 rounded-start-0" 
-                                           maxlength="11" pattern="^09[0-9]{9}$" title="Must be 11 digits starting with 09" placeholder="Mobile (09xxxxxxxxx)"
-                                           value="<?php echo htmlspecialchars($employee['contact_info'] ?? ''); ?>">
+                                            maxlength="11" pattern="^09[0-9]{9}$" title="Must be 11 digits starting with 09" placeholder="Mobile (09xxxxxxxxx)"
+                                            value="<?php echo htmlspecialchars($employee['contact_info'] ?? ''); ?>">
                                 </div>
                             </div>
                             
@@ -224,7 +239,7 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-home"></i></span>
                                     <textarea name="address" id="address" class="form-control border-start-0 rounded-start-0" 
-                                              rows="3" required><?php echo htmlspecialchars($employee['address'] ?? ''); ?></textarea>
+                                             rows="3" required><?php echo htmlspecialchars($employee['address'] ?? ''); ?></textarea>
                                 </div>
                             </div>
                             
@@ -235,9 +250,9 @@ require 'template/topbar.php';
                                 <hr class="mt-1 mb-3">
                                 <label class="text-label" for="photo">Upload Image (Max 2MB, JPG/PNG)</label>
                                 <?php $default_photo_path = '../assets/images/' . htmlspecialchars($employee['photo'] ?? ''); ?>
-                                <input type="file" name="photo" id="photo" class="dropify" data-height="100" 
-                                       data-allowed-file-extensions="jpg jpeg png" data-max-file-size="2M" 
-                                       data-default-file="<?php echo !empty($employee['photo']) && file_exists($default_photo_path) ? $default_photo_path : ''; ?>">
+                                <input type="file" name="photo" id="photo" class="dropify" data-height="300" 
+                                        data-allowed-file-extensions="jpg jpeg png" data-max-file-size="2M" 
+                                        data-default-file="<?php echo !empty($employee['photo']) && file_exists($default_photo_path) ? $default_photo_path : ''; ?>">
                             </div>
                         </div>
                     </div>
@@ -257,17 +272,24 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-sitemap"></i></span>
                                     <input type="text" name="position" id="position" class="form-control border-start-0 rounded-start-0" 
-                                           required placeholder="Job Title"
-                                           value="<?php echo htmlspecialchars($employee['position'] ?? ''); ?>">
+                                            required placeholder="Job Title"
+                                            value="<?php echo htmlspecialchars($employee['position'] ?? ''); ?>">
                                 </div>
                             </div>
+                            
                             <div class="col-12">
                                 <label for="department" class="text-label mb-1">Department</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-building"></i></span>
-                                    <input type="text" name="department" id="department" class="form-control border-start-0 rounded-start-0" 
-                                           required placeholder="e.g. Operation Department"
-                                           value="<?php echo htmlspecialchars($employee['department'] ?? ''); ?>">
+                                    <select name="department" id="department" class="form-select border-start-0 rounded-start-0" required>
+                                        <option value="">Select Department</option>
+                                        <?php $current_department = $employee['department'] ?? null; ?>
+                                        <?php foreach ($departments as $name): ?>
+                                            <option value="<?php echo htmlspecialchars($name); ?>" <?php echo ($current_department === $name) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($name); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
                                 </div>
                             </div>
                             <div class="col-12">
@@ -285,16 +307,14 @@ require 'template/topbar.php';
                                     </select>
                                 </div>
                             </div>
-                            
-                            <h6 class="text-label mt-4 mb-1 col-12">Compensation Details</h6>
-                            
+                                                     
                             <div class="col-12">
                                 <label for="salary" class="text-label mb-1">Base Salary (Monthly)</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-hand-holding-dollar"></i></span>
                                     <input type="number" name="salary" id="salary" class="form-control border-start-0 rounded-start-0" 
-                                           min="0" required placeholder="₱"
-                                           value="<?php echo htmlspecialchars($employee['salary'] ?? ''); ?>">
+                                            min="0" required placeholder="₱"
+                                            value="<?php echo htmlspecialchars($employee['salary'] ?? ''); ?>">
                                 </div>
                             </div>
                             <div class="col-12">
@@ -302,8 +322,8 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-bowl-food"></i></span>
                                     <input type="number" name="food" id="food" class="form-control border-start-0 rounded-start-0" 
-                                           min="0" placeholder="₱"
-                                           value="<?php echo htmlspecialchars($employee['food'] ?? 0); ?>">
+                                            min="0" placeholder="₱"
+                                            value="<?php echo htmlspecialchars($employee['food'] ?? 0); ?>">
                                 </div>
                             </div>
                             <div class="col-12">
@@ -311,8 +331,8 @@ require 'template/topbar.php';
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="fas fa-route"></i></span>
                                     <input type="number" name="travel" id="travel" class="form-control border-start-0 rounded-start-0" 
-                                           min="0" placeholder="₱"
-                                           value="<?php echo htmlspecialchars($employee['travel'] ?? 0); ?>">
+                                            min="0" placeholder="₱"
+                                            value="<?php echo htmlspecialchars($employee['travel'] ?? 0); ?>">
                                 </div>
                             </div>
                         
@@ -326,8 +346,8 @@ require 'template/topbar.php';
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="fas fa-university"></i></span>
                                         <input type="text" name="bank_name" id="bank_name" class="form-control border-start-0 rounded-start-0" 
-                                               placeholder="e.g. Security Bank"
-                                               value="<?php echo htmlspecialchars($employee['bank_name'] ?? ''); ?>">
+                                                placeholder="e.g. Security Bank"
+                                                value="<?php echo htmlspecialchars($employee['bank_name'] ?? ''); ?>">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -335,17 +355,17 @@ require 'template/topbar.php';
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="fas fa-credit-card"></i></span>
                                         <input type="text" name="account_type" id="account_type" class="form-control border-start-0 rounded-start-0" 
-                                               placeholder="e.g. Savings"
-                                               value="<?php echo htmlspecialchars($employee['account_type'] ?? ''); ?>">
+                                                placeholder="e.g. Savings"
+                                                value="<?php echo htmlspecialchars($employee['account_type'] ?? ''); ?>">
                                     </div>
                                 </div>
                                 <div class="col-12">
-                                     <label for="account_number" class="text-label mb-1">Bank Account Number</label>
+                                       <label for="account_number" class="text-label mb-1">Bank Account Number</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
                                         <input type="text" name="account_number" id="account_number" class="form-control border-start-0 rounded-start-0" 
-                                               placeholder="Account Number"
-                                               value="<?php echo htmlspecialchars($employee['account_number'] ?? ''); ?>">
+                                                placeholder="Account Number"
+                                                value="<?php echo htmlspecialchars($employee['account_number'] ?? ''); ?>">
                                     </div>
                                 </div>
                             </div>

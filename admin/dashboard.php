@@ -4,14 +4,32 @@ $page_title = 'Admin Dashboard - LOPISv2';
 $current_page = 'dashboard';
 
 require 'template/header.php';
+
+// --- ADDED: DATA FETCHING LOGIC ---
+// ASSUMPTION: $pdo is available and $_SESSION['company_id'] is set.
+$company_id = $_SESSION['company_id'] ?? 1; // Default to 1 if session not set (for testing)
+require_once 'models/employee_model.php'; 
+require_once 'models/admin_dashboard_model.php'; 
+
+// Fetch all necessary data
+$metrics = get_admin_dashboard_metrics($pdo, $company_id);
+$dept_data = get_dept_distribution_data($pdo, $company_id);
+
+// Prepare variables for HTML/JS injection
+$active_employees_count = $metrics['active_employees'];
+$new_hires_month_count = $metrics['new_hires_month'];
+$pending_leave_count = $metrics['pending_leave_count'];
+
+// Prepare chart data structure
+$dept_labels = json_encode(array_keys($dept_data));
+$dept_counts = json_encode(array_values($dept_data));
+
 require 'template/sidebar.php';
 require 'template/topbar.php';
 ?>
 
-<!-- Begin Page Content -->
 <div class="container-fluid">
 
-    <!-- 1. WELCOME BANNER -->
     <div class="welcome-banner shadow">
         <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 1;">
             <div>
@@ -24,10 +42,8 @@ require 'template/topbar.php';
         </div>
     </div>
 
-    <!-- 2. KPI CARDS (Modern Style) -->
     <div class="row mb-4">
 
-        <!-- Active Employees -->
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
             <div class="card h-100">
                 <div class="card-body">
@@ -37,17 +53,18 @@ require 'template/topbar.php';
                         </div>
                         <div>
                             <div class="text-label">Active Employees</div>
-                            <div class="text-value">145</div>
+                            <div class="text-value"><?php echo number_format($active_employees_count); ?></div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
-                        <span class="text-success font-weight-bold"><i class="fas fa-plus"></i> 5</span> new this month
+                        <span class="text-success font-weight-bold">
+                            <i class="fas fa-plus"></i> <?php echo number_format($new_hires_month_count); ?>
+                        </span> new this month
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Payroll Status -->
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
             <div class="card h-100">
                 <div class="card-body">
@@ -67,7 +84,6 @@ require 'template/topbar.php';
             </div>
         </div>
 
-        <!-- Pending Leave -->
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
             <div class="card h-100">
                 <div class="card-body">
@@ -77,7 +93,7 @@ require 'template/topbar.php';
                         </div>
                         <div>
                             <div class="text-label">Leave Requests</div>
-                            <div class="text-value">8</div>
+                            <div class="text-value"><?php echo number_format($pending_leave_count); ?></div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -87,7 +103,6 @@ require 'template/topbar.php';
             </div>
         </div>
 
-        <!-- Upcoming Tasks -->
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
             <div class="card h-100">
                 <div class="card-body">
@@ -106,12 +121,8 @@ require 'template/topbar.php';
                 </div>
             </div>
         </div>
-    </div> <!-- End KPI Row -->
-
-    <!-- 3. CHARTS ROW -->
-    <div class="row mb-4">
+    </div> <div class="row mb-4">
         
-        <!-- Chart 1: Payroll History (Area Chart) -->
         <div class="col-xl-8 col-lg-7">
             <div class="card h-100">
                 <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
@@ -130,7 +141,6 @@ require 'template/topbar.php';
             </div>
         </div>
 
-        <!-- Chart 2: Department Distribution (Doughnut) -->
         <div class="col-xl-4 col-lg-5">
             <div class="card h-100">
                 <div class="card-header bg-transparent border-0 pb-0">
@@ -142,171 +152,29 @@ require 'template/topbar.php';
                     </div>
                     <div class="mt-4 text-center small">
                         <span class="me-2">
-                            <i class="fas fa-circle text-teal"></i> IT
+                            <i class="fas fa-circle" style="color: #6b36ccff;"></i> I.T.
                         </span>
                         <span class="me-2">
-                            <i class="fas fa-circle text-primary"></i> HR
+                            <i class="fas fa-circle" style="color: #0CC0DF;"></i> Operations
+                        </span>                      
+                        <span class="me-2">
+                            <i class="fas fa-circle" style="color: #4e73df;"></i> Field
                         </span>
                         <span class="me-2">
-                            <i class="fas fa-circle text-info"></i> Ops
+                            <i class="fas fa-circle" style="color: #f6c23e;"></i> Corporate
                         </span>
                     </div>
                 </div>
             </div>
         </div>
-    </div> <!-- End Charts Row -->
-
-    <!-- 4. QUICK ACTIONS & NOTIFICATIONS ROW -->
-    <div class="row">
-
-        <!-- Quick Actions Grid -->
-        <div class="col-lg-8 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-transparent border-0 pb-0">
-                    <h6 class="m-0 font-weight-bold text-gray-800">Quick Actions</h6>
-                </div>
-                <div class="card-body">
-                    <div class="row g-3">
-                        
-                        <!-- Add Employee -->
-                        <div class="col-md-6">
-                            <a href="#" class="card bg-soft-primary border-0 h-100 text-decoration-none transition-hover" 
-                            data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
-                                <div class="card-body d-flex align-items-center p-4">
-                                    <div class="icon-box bg-white text-primary shadow-sm me-3">
-                                        <i class="fas fa-user-plus"></i>
-                                    </div>
-                                    <div>
-                                        <h6 class="font-weight-bold text-primary mb-1">Add New Employee</h6>
-                                        <small class="text-muted">Create active profile</small>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-
-                        <!-- Process Payroll -->
-                        <div class="col-md-6">
-                            <a href="payroll.php" class="card bg-soft-success border-0 h-100 text-decoration-none transition-hover">
-                                <div class="card-body d-flex align-items-center p-4">
-                                    <div class="icon-box bg-white text-success shadow-sm me-3">
-                                        <i class="fas fa-calculator"></i>
-                                    </div>
-                                    <div>
-                                        <h6 class="font-weight-bold text-success mb-1">Process Payroll</h6>
-                                        <small class="text-muted">Run monthly payroll</small>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-
-                        <!-- Approve Leave -->
-                        <div class="col-md-6">
-                            <a href="leave_management.php" class="card bg-soft-warning border-0 h-100 text-decoration-none transition-hover">
-                                <div class="card-body d-flex align-items-center p-4">
-                                    <div class="icon-box bg-white text-warning shadow-sm me-3">
-                                        <i class="fas fa-calendar-check"></i>
-                                    </div>
-                                    <div>
-                                        <h6 class="font-weight-bold text-warning mb-1">Approve Leave</h6>
-                                        <small class="text-muted">8 pending requests</small>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-
-                        <!-- Generate Report -->
-                        <div class="col-md-6">
-                            <a href="reports.php" class="card bg-soft-info border-0 h-100 text-decoration-none transition-hover">
-                                <div class="card-body d-flex align-items-center p-4">
-                                    <div class="icon-box bg-white text-info shadow-sm me-3">
-                                        <i class="fas fa-chart-bar"></i>
-                                    </div>
-                                    <div>
-                                        <h6 class="font-weight-bold text-info mb-1">Reports Center</h6>
-                                        <small class="text-muted">View analytics</small>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notifications Panel -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-transparent border-0">
-                    <h6 class="m-0 font-weight-bold text-gray-800">Notifications</h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="list-group list-group-flush">
-                        
-                        <!-- Notification 1 -->
-                        <a href="#" class="list-group-item list-group-item-action p-3 border-0 border-bottom">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box bg-soft-primary me-3" style="width:40px; height:40px; font-size:1rem;">
-                                    <i class="fas fa-file-alt"></i>
-                                </div>
-                                <div>
-                                    <div class="d-flex justify-content-between align-items-center w-100">
-                                        <strong class="text-dark">Payroll run complete</strong>
-                                    </div>
-                                    <small class="text-muted">Nov 14, 10:30 AM</small>
-                                </div>
-                            </div>
-                        </a>
-
-                        <!-- Notification 2 -->
-                        <a href="#" class="list-group-item list-group-item-action p-3 border-0 border-bottom">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box bg-soft-success me-3" style="width:40px; height:40px; font-size:1rem;">
-                                    <i class="fas fa-user-check"></i>
-                                </div>
-                                <div>
-                                    <div class="d-flex justify-content-between align-items-center w-100">
-                                        <strong class="text-dark">New Employee Added</strong>
-                                    </div>
-                                    <small class="text-muted">Jane Doe added by HR</small>
-                                </div>
-                            </div>
-                        </a>
-
-                        <!-- Notification 3 -->
-                        <a href="#" class="list-group-item list-group-item-action p-3 border-0">
-                            <div class="d-flex align-items-center">
-                                <div class="icon-box bg-soft-danger me-3" style="width:40px; height:40px; font-size:1rem;">
-                                    <i class="fas fa-exclamation-triangle"></i>
-                                </div>
-                                <div>
-                                    <div class="d-flex justify-content-between align-items-center w-100">
-                                        <strong class="text-dark">Action Required</strong>
-                                    </div>
-                                    <small class="text-muted">Tax calculation error found</small>
-                                </div>
-                            </div>
-                        </a>
-
-                    </div>
-                </div>
-                <div class="card-footer bg-transparent border-0 text-center">
-                    <a href="#" class="btn btn-sm btn-light text-teal font-weight-bold w-100">View All Alerts</a>
-                </div>
-            </div>
-        </div>
-
     </div>
-
-</div>
-<!-- /.container-fluid -->
 <?php require 'functions/add_employee.php'; ?>
-<!-- JS for Charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     
     // --- 1. PAYROLL HISTORY CHART (Teal Gradient) ---
+    // NOTE: This remains static as fetch logic for historical data was not provided
     var ctxPayroll = document.getElementById("payrollHistoryChart").getContext('2d');
     
     var gradientPayroll = ctxPayroll.createLinearGradient(0, 0, 0, 400);
@@ -317,9 +185,10 @@ document.addEventListener("DOMContentLoaded", function() {
         type: 'line',
         data: {
             labels: ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov"], // Dummy Months
+            data: [450000, 460000, 455000, 480000, 495000, 510000], // Dummy Data
             datasets: [{
                 label: "Total Payout",
-                data: [450000, 460000, 455000, 480000, 495000, 510000], // Dummy Data
+                data: [450000, 460000, 455000, 480000, 495000, 510000], 
                 backgroundColor: gradientPayroll,
                 borderColor: "#0CC0DF", // Teal Border
                 pointBackgroundColor: "#ffffff",
@@ -362,16 +231,22 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // --- 2. DEPARTMENT DISTRIBUTION (Doughnut) ---
+    // --- 2. DEPARTMENT DISTRIBUTION (Doughnut - DYNAMIC) ---
     var ctxDept = document.getElementById("deptDistributionChart");
+    
+    // Inject PHP data here
+    const deptLabels = <?php echo $dept_labels; ?>;
+    const deptCounts = <?php echo $dept_counts; ?>;
+    
     new Chart(ctxDept, {
         type: 'doughnut',
         data: {
-            labels: ["IT Dept", "HR Dept", "Operations", "Finance"],
+            labels: deptLabels,
             datasets: [{
-                data: [45, 15, 60, 25], // Dummy Data
-                backgroundColor: ['#0CC0DF', '#4e73df', '#36b9cc', '#f6c23e'], // Teal, Blue, Cyan, Yellow
-                hoverBackgroundColor: ['#0abad8', '#2e59d9', '#2c9faf', '#dda20a'],
+                data: deptCounts, // Dynamic Data
+                // Define colors for the chart elements based on the number of fetched departments
+                backgroundColor: ['#0CC0DF', '#4e73df', '#6b36ccff', '#f6c23e', '#e74a3b', '#1cc88a', '#858796'], 
+                hoverBackgroundColor: ['#0abad8', '#2e59d9', '#6b36ccff', '#dda20a', '#c73a2f', '#1cc88a', '#6d7083'],
                 borderWidth: 5,
                 hoverBorderColor: "#ffffff"
             }],

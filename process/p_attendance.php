@@ -5,7 +5,7 @@ date_default_timezone_set('Asia/Manila');
 header('Content-Type: application/json');
 
 // --- 1. GET ALL POST DATA ---
-$employee_id_varchar = $_POST['employee_id'] ?? ''; // This is the varchar ID (e.g., "LEN-001")
+$employee_id_varchar = $_POST['employee_id'] ?? '';
 $password = $_POST['password'] ?? '';
 $action = $_POST['action'] ?? '';
 $status_based = $_POST['status_based'] ?? 'On-site';

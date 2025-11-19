@@ -4,14 +4,14 @@ $page_title = 'User Management';
 $current_page = 'user_management';
 
 // --- DATABASE CONNECTION & AUTHENTICATION ---
-// Assuming connection and session start are handled in a required file (e.g., checking.php or header.php)
-require 'template/header.php'; // Assume header.php includes db_connection.php and defines $pdo
+require 'template/header.php'; 
 
-// --- REQUIRE MODEL ---
-require 'models/user_model.php'; // We assume this file contains user-related functions
+// --- REQUIRE MODELS ---
+require 'models/user_model.php'; 
+require 'models/employee_model.php'; 
+
 
 // --- LOOKUP DATA (FOR DISPLAY/FORMS) ---
-// Define user access levels/roles (Adjust values/names to match your database structure)
 $user_roles = [
     0 => 'Super Admin',
     1 => 'Management',
@@ -23,24 +23,35 @@ function getRoleText($roleId, $array) {
     return $array[$roleId] ?? 'N/A';
 }
 
+// --- FETCH EMPLOYEE DROPDOWN DATA ---
+if (function_exists('get_employee_ids_for_dropdown')) {
+    $available_employees = get_employee_ids_for_dropdown($pdo);
+} else {
+    $available_employees = [];
+    error_log("Error: get_employee_ids_for_dropdown function not found.");
+}
+
+
 // --- HANDLE FORM SUBMISSION (CREATE/ADD NEW USER) ---
 if (isset($_POST['add_user'])) {
-    
-    // 1. Basic Validation and Sanitization
+
+    $default_password = "losi123";
+
+    // 1. Collect and sanitize data
+    $employee_id = trim($_POST['username']); 
+
     $data = [
-        // Note: Using 'username' input for the 'employee_id' column in the database (based on model logic)
-        'username' => trim($_POST['username']),
-        'password' => password_hash($_POST['password'], PASSWORD_DEFAULT), // Hashing the password
-        'email' => filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL),
+        'username' => $employee_id,
+        'email'      => trim($_POST['email']),
+        'password' => password_hash($default_password, PASSWORD_DEFAULT), 
         'role' => (int)$_POST['role'],
-        'status' => 1, // Default to Active
+        'status' => 1, 
     ];
     
-    // 2. Execute CREATE function from model
     if (create_new_user($pdo, $data)) {
-        $_SESSION['message'] = "User **{$data['username']}** created successfully!";
+        $_SESSION['message'] = "User **{$employee_id}** created successfully! Login ID: **{$data['email']}**";
     } else {
-        $_SESSION['error'] = "Error creating user. Username (Employee ID) or email might already exist.";
+        $_SESSION['error'] = "Error creating user. Employee ID or Login ID might already be registered.";
     }
     
     header("Location: user_management.php");
@@ -54,17 +65,14 @@ if (isset($_GET['action']) && $_GET['action'] == 'toggle_status' && isset($_GET[
     $user_id = (int)$_GET['id'];
     
     if ($user_id > 0) {
-        // 1. Fetch current user data
         $user_to_toggle = getUserById($pdo, $user_id); 
         
         if ($user_to_toggle) {
-            // 2. Determine the new status (1=Active, 0=Inactive)
             $new_status = ((int)$user_to_toggle['status'] === 1) ? 0 : 1;
             $status_text = ($new_status === 1) ? 'Activated' : 'Deactivated';
             
-            // 3. Execute update function (assuming toggleUserStatus exists in user_model.php)
             if (toggleUserStatus($pdo, $user_id, $new_status)) {
-                $_SESSION['message'] = "User **{$user_to_toggle['employee_id']}** status set to **{$status_text}**.";
+                $_SESSION['message'] = "User **{$user_to_toggle['employee_id']}** status set to **{$status_text}**."; 
             } else {
                 $_SESSION['error'] = "Failed to change user status.";
             }
@@ -80,7 +88,7 @@ if (isset($_GET['action']) && $_GET['action'] == 'toggle_status' && isset($_GET[
 }
 
 // --- FETCH DATA FROM tbl_users (READ OPERATION) ---
-$users = get_all_users($pdo); // Assuming this function is in user_model.php
+$users = get_all_users($pdo);
 
 
 // --- INCLUDE TEMPLATES ---
@@ -102,7 +110,7 @@ require 'template/topbar.php';
             <h6 class="m-0 font-weight-bold text-gray-800">User Access List</h6>
             
             <div class="input-group" style="max-width: 300px;">
-                <input type="text" class="form-control small" id="searchInput" placeholder="Search by username or role..." aria-label="Search">
+                <input type="text" class="form-control small" id="searchInput" placeholder="Search by Employee ID or role..." aria-label="Search">
             </div>
         </div>
         <div class="card-body">
@@ -110,11 +118,11 @@ require 'template/topbar.php';
                 <table class="table table-hover table-striped" id="usersTable" width="100%" cellspacing="0">
                     <thead>
                         <tr>
-                            <th>Employee ID</th>
+                            <th>Employee ID</th> 
                             <th>Email</th>
                             <th>Role</th>
                             <th>Status</th>
-                            <th>Actions</th>
+                            <th>Actions</th> 
                         </tr>
                     </thead>
                     <tbody id="userTableBody">
@@ -125,26 +133,25 @@ require 'template/topbar.php';
                                 <td><?php echo htmlspecialchars($user['email'] ?? 'N/A'); ?></td>
                                 <td>
                                     <?php 
-                                    $role_text = getRoleText((int)$user['usertype'], $user_roles); // Corrected to usertype
-                                    // FIX: Use a PHP version-compatible switch statement
+                                    $role_text = getRoleText((int)$user['usertype'], $user_roles); 
                                     $user_type_int = (int)$user['usertype'];
-                                    $role_badge = 'bg-secondary'; // Default value
+                                    $role_badge = 'bg-secondary'; 
 
                                     switch ($user_type_int) {
                                         case 0:
-                                            $role_badge = 'bg-danger'; // Super Admin
+                                            $role_badge = 'bg-danger'; 
                                             break;
                                         case 1:
-                                            $role_badge = 'bg-primary'; // HR/Management
+                                            $role_badge = 'bg-primary'; 
                                             break;
                                         case 2:
-                                            $role_badge = 'bg-info'; // Employee
+                                            $role_badge = 'bg-info'; 
                                             break;
                                         default:
-                                            // Already set to 'bg-secondary'
                                             break;
                                     }
                                     ?>
+                                    <span class="d-none"><?php echo $user_type_int; ?></span>
                                     <span class="badge <?php echo $role_badge; ?>"><?php echo $role_text; ?></span>
                                 </td>
                                 <td>
@@ -153,6 +160,7 @@ require 'template/topbar.php';
                                     $status_class = ((int)$user['status'] === 1) ? 'bg-success' : 'bg-secondary';
                                     $toggle_icon = ((int)$user['status'] === 1) ? 'fas fa-toggle-on' : 'fas fa-toggle-off';
                                     ?>
+                                    <span class="d-none"><?php echo (int)$user['status']; ?></span>
                                     <span class="badge <?php echo $status_class; ?>"><?php echo $status_text; ?></span>
                                 </td>
                                 <td>
@@ -173,7 +181,7 @@ require 'template/topbar.php';
                             </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
-                            <tr><td colspan="6" class="text-center text-muted py-4">No system users found.</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-4">No system users found.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -184,6 +192,7 @@ require 'template/topbar.php';
 </div>
 
 <?php 
+// --- TOASTR MESSAGE DISPLAY ---
 $message_type = null;
 $message_text = null;
 
@@ -200,7 +209,6 @@ if (isset($_SESSION['message'])) {
 if ($message_type): 
 ?>
 <script>
-    // NOTE: This assumes SweetAlert2 library is loaded.
     Swal.fire({
         toast: true,
         icon: '<?php echo $message_type; ?>',
@@ -216,6 +224,7 @@ if ($message_type):
     });
 </script>
 <?php endif; ?>
+
 <?php require 'functions/add_user_modal.php'; ?>
 
 <?php

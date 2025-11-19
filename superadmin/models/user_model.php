@@ -22,24 +22,23 @@ function get_all_users($pdo) {
 
 /**
  * Inserts a new user record into tbl_users.
- * NOTE: It is assumed that $data['username'] holds the Employee ID string (VARCHAR(3)).
+ * NOTE: Assumes $data['username'] holds the Employee ID string (VARCHAR(3)).
  */
 function create_new_user($pdo, $data) {
     
     $sql_insert = "INSERT INTO tbl_users (
         employee_id, email, password, usertype, status, created_at
     ) VALUES (
-        :employee_id, :email, :password, :usertype, :status, NOW()
+        :employee_id, :email, :password, :usertype, :status, CURRENT_TIMESTAMP()
     )";
     
     try {
         $stmt = $pdo->prepare($sql_insert);
         return $stmt->execute([
-            // Input 'username' from controller is mapped to the 'employee_id' column
-            ':employee_id' => $data['username'], 
+            ':employee_id' => $data['username'], // Mapped from 'username' input
             ':email'       => $data['email'],
-            ':password'    => $data['password'], // Already hashed
-            ':usertype'    => $data['role'],     // Maps controller 'role' to 'usertype' column
+            ':password'    => $data['password'], 
+            ':usertype'    => $data['role'],     // Mapped from 'role' input
             ':status'      => $data['status'],
         ]);
     } catch (PDOException $e) {
@@ -70,9 +69,10 @@ function getUserById($pdo, $id) {
 
 /**
  * Updates a user's settings (employee_id, email, usertype, status, and optionally password).
+ * NOTE: Expects $data keys to match database columns or be fully mapped in the controller.
  */
 function updateUserSettings($pdo, $id, $data) {
-    // START FIX: Include employee_id in the update query
+    
     $sql_update = "UPDATE tbl_users SET
         employee_id = :employee_id,
         email = :email,
@@ -80,11 +80,12 @@ function updateUserSettings($pdo, $id, $data) {
         status = :status";
         
     $params = [
-        ':employee_id' => $data['employee_id'], // Requires employee_id to be passed in $data
-        ':email'    => $data['email'],
-        ':usertype' => $data['usertype'],
-        ':status'   => $data['status'],
-        ':id'       => $id
+        // Ensure the data keys are passed from the controller before calling this function
+        ':employee_id' => $data['employee_id'], 
+        ':email'       => $data['email'],
+        ':usertype'    => $data['usertype'],
+        ':status'      => $data['status'],
+        ':id'          => $id
     ];
     
     // Add password update if provided

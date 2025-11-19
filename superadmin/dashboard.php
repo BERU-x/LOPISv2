@@ -3,6 +3,23 @@
 $page_title = 'Super Admin Dashboard - LOPISv2';
 $current_page = 'dashboard'; 
 require 'template/header.php';
+
+// --- ADDED: REQUIRE MODEL & FETCH DYNAMIC DATA ---
+// Assume $pdo is available after header.php
+require 'models/superadmin_model.php'; 
+
+$metrics = get_dashboard_metrics($pdo);
+$role_counts = get_user_role_counts($pdo);
+
+// Prepare the PHP array for Chart.js
+$role_counts_json = json_encode($role_counts); 
+
+// Map fetched metrics to variables
+$total_companies_count = $metrics['total_companies'] ?? 0;
+$active_users_count = $metrics['active_users'] ?? 0;
+$monthly_payrolls_count = $metrics['monthly_payrolls'] ?? 0;
+$audit_alerts_count = $metrics['audit_alerts'] ?? 0;
+
 require 'template/sidebar.php';
 require 'template/topbar.php';
 ?>
@@ -32,7 +49,7 @@ require 'template/topbar.php';
                         </div>
                         <div>
                             <div class="text-label">Total Companies</div>
-                            <div class="text-value">42</div>
+                            <div class="text-value"><?php echo number_format($total_companies_count); ?></div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -51,7 +68,7 @@ require 'template/topbar.php';
                         </div>
                         <div>
                             <div class="text-label">Active Users</div>
-                            <div class="text-value">750</div>
+                            <div class="text-value"><?php echo number_format($active_users_count); ?></div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -70,7 +87,7 @@ require 'template/topbar.php';
                         </div>
                         <div>
                             <div class="text-label">Payrolls (Mo)</div>
-                            <div class="text-value">38</div>
+                            <div class="text-value"><?php echo number_format($monthly_payrolls_count); ?></div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -89,7 +106,7 @@ require 'template/topbar.php';
                         </div>
                         <div>
                             <div class="text-label">Audit Alerts</div>
-                            <div class="text-value">3</div>
+                            <div class="text-value"><?php echo number_format($audit_alerts_count); ?></div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -106,11 +123,6 @@ require 'template/topbar.php';
             <div class="card h-100">
                 <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
                     <h6 class="m-0 font-weight-bold text-gray-800">Platform Growth</h6>
-                    <div class="dropdown no-arrow">
-                        <a class="dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
-                        </a>
-                    </div>
                 </div>
                 <div class="card-body pt-0">
                     <div class="chart-area" style="height: 320px;">
@@ -249,6 +261,7 @@ require 'template/topbar.php';
         </div>
     </div>
 
+
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -287,12 +300,15 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // --- 2. USER ROLES CHART (Doughnut) ---
     var ctxRoles = document.getElementById("userRolesChart");
+    // Ensure the data is loaded before initializing the chart
+    const roleData = <?php echo $role_counts_json; ?>; 
+    
     new Chart(ctxRoles, {
         type: 'doughnut',
         data: {
             labels: ["Superadmin", "Admin", "User"],
             datasets: [{
-                data: [5, 45, 700], // Dummy data
+                data: roleData, // DYNAMIC INJECTION
                 backgroundColor: ['#0CC0DF', '#4e73df', '#eaecf4'], // Teal, Blue, Gray
                 hoverBackgroundColor: ['#0abad8', '#2e59d9', '#e3e6f0'],
                 borderWidth: 5,

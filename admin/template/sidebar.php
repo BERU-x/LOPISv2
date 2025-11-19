@@ -33,7 +33,14 @@ function isActive($page_name, $current_page) {
     <li class="nav-item <?php echo isActive('employee_management', $current_page); ?>">
         <a class="nav-link" href="employee_management.php">
             <i class="fas fa-fw fa-users"></i>
-            <span>Employee Mgmt</span>
+            <span>Employee Management</span>
+        </a>
+    </li>    
+    
+    <li class="nav-item <?php echo isActive('attendance_management', $current_page); ?>">
+        <a class="nav-link" href="attendance_management.php">
+            <i class="fas fa-fw fa-users"></i>
+            <span>Attendance Management</span>
         </a>
     </li>
 
@@ -47,7 +54,7 @@ function isActive($page_name, $current_page) {
     <li class="nav-item <?php echo isActive('leave_management', $current_page); ?>">
         <a class="nav-link" href="leave_management.php">
             <i class="fas fa-fw fa-calendar-check"></i>
-            <span>Leave Mgmt</span>
+            <span>Leave Management</span>
         </a>
     </li>
 

@@ -101,7 +101,7 @@ if (!isset($employment_statuses)) { $employment_statuses = [0 => 'Probationary',
                                         </h6>
                                         <hr class="mt-1 mb-3">
                                         <label class="text-label" for="photo">Upload Image (Max 2MB, JPG/PNG)</label>
-                                        <input type="file" name="photo" id="photo" class="dropify" data-height="100" data-allowed-file-extensions="jpg jpeg png" data-max-file-size="2M" data-default-file="">
+                                        <input type="file" name="photo" id="photo" class="dropify" data-height="260" data-allowed-file-extensions="jpg jpeg png" data-max-file-size="2M" data-default-file="">
                                     </div>
                                 </div>
                             </div>
@@ -117,21 +117,34 @@ if (!isset($employment_statuses)) { $employment_statuses = [0 => 'Probationary',
                                 <div class="row g-3">
                                     
                                     <div class="col-12">
-                                        <label for="position" class="text-label mb-1">&nbsp;</label>
+                                        <label for="position" class="text-label mb-1">POSITION</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-sitemap"></i></span>
-                                            <input type="text" name="position" id="position" class="form-control border-start-0 rounded-start-0" required placeholder="Position Title">
+                                            <input type="text" name="position" id="position" class="form-control border-start-0 rounded-start-0" required placeholder="Job Title">
                                         </div>
                                     </div>
                                     <div class="col-12">
-                                        <label for="department" class="text-label mb-1">&nbsp;</label>
+                                        <label for="department" class="text-label mb-1">DEPARTMENT</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-building"></i></span>
-                                            <input type="text" name="department" id="department" class="form-control border-start-0 rounded-start-0" required placeholder="Department">
+                                            <select name="department" id="department" class="form-select border-start-0 rounded-start-0" required>
+                                                <option value="">Select Department</option>
+                                                <option value="I.T. Department">I.T. Department</option>
+                                                <option value="Operations Department">Operations Department</option>
+                                                <option value="Field Department">Field Department</option>
+                                                <option value="Management Department">Management Department</option>
+                                                <option value="CI Department">CI Department</option>
+                                                <option value="Finance Department">Finance Department</option>
+                                                <option value="Compliance Department">Compliance Department</option>
+                                                <option value="HR Department">HR Department</option>
+                                                <option value="Training Department">Training Department</option>
+                                                <option value="Marketing Department">Marketing Department</option>
+                                                <option value="Corporate Department">Corporate Department</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <div class="col-12">
-                                        <label for="employment_status" class="text-label mb-1">&nbsp;</label>
+                                        <label for="employment_status" class="text-label mb-1">EMPLOYMENT STATUS</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-clipboard-user"></i></span>
                                             <select name="employment_status" id="employment_status" class="form-select border-start-0 rounded-start-0" required aria-placeholder="Employment Status">
@@ -140,25 +153,26 @@ if (!isset($employment_statuses)) { $employment_statuses = [0 => 'Probationary',
                                             </select>
                                         </div>
                                     </div>
-                                    
-                                    <h6 class="text-label mt-4 mb-1 col-12">Compensation Details</h6>
-                                    
+                                                                       
                                     <div class="col-12">
+                                        <label for="salary" class="text-label mb-1">Base Salary (Monthly)</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-hand-holding-dollar"></i></span>
-                                            <input type="number" name="salary" id="salary" class="form-control border-start-0 rounded-start-0" min="0" required placeholder="Base Salary (Monthly)">
+                                            <input type="number" name="salary" id="salary" class="form-control border-start-0 rounded-start-0" min="0" required placeholder="₱">
                                         </div>
                                     </div>
                                     <div class="col-12">
+                                        <label for="food" class="text-label mb-1">Food Allowance</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-bowl-food"></i></span>
-                                            <input type="number" name="food" id="food" class="form-control border-start-0 rounded-start-0" min="0" placeholder="Food Allowance">
+                                            <input type="number" name="food" id="food" class="form-control border-start-0 rounded-start-0" min="0" placeholder="₱">
                                         </div>
                                     </div>
                                     <div class="col-12">
+                                            <label for="travel" class="text-label mb-1">Transportation Allowance</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-route"></i></span>
-                                            <input type="number" name="travel" id="travel" class="form-control border-start-0 rounded-start-0" min="0" placeholder="Travel/Transportation Allowance">
+                                            <input type="number" name="travel" id="travel" class="form-control border-start-0 rounded-start-0" min="0" placeholder="₱">
                                         </div>
                                     </div>
                                 </div>
@@ -169,21 +183,24 @@ if (!isset($employment_statuses)) { $employment_statuses = [0 => 'Probationary',
                                 <hr class="mt-1 mb-4">
                                 <div class="row g-3">
                                     <div class="col-md-6">
+                                        <label for="bank_name" class="text-label mb-1">Bank Name</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-university"></i></span>
-                                            <input type="text" name="bank_name" id="bank_name" class="form-control border-start-0 rounded-start-0" placeholder="Bank Name">
+                                            <input type="text" name="bank_name" id="bank_name" class="form-control border-start-0 rounded-start-0" placeholder="e.g. Security Bank">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
+                                        <label for="account_type" class="text-label mb-1">Account Type</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-credit-card"></i></span>
-                                            <input type="text" name="account_type" id="account_type" class="form-control border-start-0 rounded-start-0" placeholder="Account Type (e.g., Savings)">
+                                            <input type="text" name="account_type" id="account_type" class="form-control border-start-0 rounded-start-0" placeholder="e.g. Savings">
                                         </div>
                                     </div>
                                     <div class="col-12">
+                                        <label for="account_number" class="text-label mb-1">Bank Account Number</label>
                                         <div class="input-group">
                                             <span class="input-group-text"><i class="fas fa-hashtag"></i></span>
-                                            <input type="text" name="account_number" id="account_number" class="form-control border-start-0 rounded-start-0" placeholder="Bank Account Number">
+                                            <input type="text" name="account_number" id="account_number" class="form-control border-start-0 rounded-start-0" placeholder="Account Number">
                                         </div>
                                     </div>
                                 </div>

@@ -140,23 +140,12 @@ require 'template/topbar.php';
                                     <?php 
                                     // FIX: Use the correct loop variable $emp to get the ID
                                     $employee_id = $emp['id'] ?? 0; 
-                                    
-                                    // Set button styles based on status (copied from previous fix)
-                                    $current_status = (int)$emp['employment_status'];
-                                    $status_btn_class = ($current_status >= 5) ? 'btn-outline-danger' : 'btn-outline-warning';
-                                    $status_icon = ($current_status >= 5) ? 'fas fa-power-off' : 'fas fa-toggle-on';
                                     ?>
                                     
                                     <a href="edit_employee.php?id=<?php echo htmlspecialchars($employee_id); ?>" 
                                     class="btn btn-sm btn-outline-info me-1" 
                                     title="Edit Employee Details">
                                         <i class="fas fa-edit"></i>
-                                    </a>
-                                    
-                                    <a href="employee_management.php?action=status_change&id=<?php echo htmlspecialchars($employee_id); ?>" 
-                                    class="btn btn-sm <?php echo $status_btn_class; ?>" 
-                                    title="Change Employment Status">
-                                        <i class="<?php echo $status_icon; ?>"></i>
                                     </a>
                                 </td>
                             </tr>

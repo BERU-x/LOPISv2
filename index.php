@@ -60,9 +60,9 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                         <div class="mb-3">
                             <div class="input-group">
                                 <span class="input-group-text">
-                                    <i class="fas fa-envelope"></i> 
+                                    <i class="fas fa-user-circle"></i> 
                                 </span>
-                                <input type="email" class="form-control" id="email" name="email" placeholder="Email" required>
+                                <input type="text" class="form-control" id="login_id" name="login_id" placeholder="Email or Employee ID" required>
                             </div>
                         </div>
 

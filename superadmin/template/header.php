@@ -52,7 +52,7 @@ $page_title = $page_title ?? 'Super Admin Portal - LOPISv2';
     <link rel="icon" href="../assets/images/favicon.ico" type="image/ico">
     
     <!-- Bootstrap 5.3.3 CSS -->
-    <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet">
     
     <!-- Font Awesome (from your assets) -->
     <link href="../assets/vendor/fa6/css/all.min.css" rel="stylesheet" type="text/css">

@@ -24,18 +24,6 @@ if (!empty($fullname)) {
                 <i class="fa fa-bars"></i>
             </button>
 
-            <form class="d-none d-sm-inline-block form-inline me-auto ml-md-3 my-2 my-md-0 mw-100 navbar-search">
-                <div class="input-group">
-                    <input type="text" class="form-control bg-light border-0 small" placeholder="Search system..."
-                        aria-label="Search" style="border-radius: 20px 0 0 20px;">
-                    <div class="input-group-append">
-                        <button class="btn btn-primary btn-teal" type="button" style="border-radius: 0 20px 20px 0;">
-                            <i class="fas fa-search fa-sm"></i>
-                        </button>
-                    </div>
-                </div>
-            </form>
-
             <ul class="navbar-nav ms-auto">
 
                 <li class="nav-item dropdown no-arrow mx-1">
