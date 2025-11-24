@@ -95,4 +95,3 @@ if (!isset($_SESSION['logged_in']) && isset($_COOKIE['remember_selector']) && is
     }
 }
 // --- END OF AUTO-LOGIN CODE ---
-?>

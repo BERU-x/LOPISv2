@@ -121,7 +121,9 @@ require 'template/topbar.php';
                 </div>
             </div>
         </div>
-    </div> <div class="row mb-4">
+    </div>
+    
+    <div class="row mb-4">
         
         <div class="col-xl-8 col-lg-7">
             <div class="card h-100">
@@ -168,6 +170,8 @@ require 'template/topbar.php';
             </div>
         </div>
     </div>
+
+</div>
 <?php require 'functions/add_employee.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

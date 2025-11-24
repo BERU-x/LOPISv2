@@ -1,4 +1,5 @@
 <?php
+
 // This is the Admin Sidebar
 $current_page = $current_page ?? ''; 
 
@@ -35,8 +36,8 @@ function isActive($page_name, $current_page) {
             <i class="fas fa-fw fa-users"></i>
             <span>Employee Management</span>
         </a>
-    </li>    
-    
+    </li>   
+        
     <li class="nav-item <?php echo isActive('attendance_management', $current_page); ?>">
         <a class="nav-link" href="attendance_management.php">
             <i class="fas fa-fw fa-users"></i>

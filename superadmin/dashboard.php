@@ -2,6 +2,7 @@
 // --- 1. SET PAGE CONFIGURATIONS ---
 $page_title = 'Super Admin Dashboard - LOPISv2';
 $current_page = 'dashboard'; 
+
 require 'template/header.php';
 
 // --- ADDED: REQUIRE MODEL & FETCH DYNAMIC DATA ---

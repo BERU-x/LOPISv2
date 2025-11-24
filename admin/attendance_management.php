@@ -7,8 +7,6 @@ $current_page = 'attendance';
 
 // --- DATABASE CONNECTION & TEMPLATES ---
 require 'template/header.php'; 
-// Assume $pdo is available after header.php
-
 require 'template/sidebar.php';
 require 'template/topbar.php';
 ?>
@@ -68,8 +66,7 @@ require 'template/topbar.php';
                             <th>Status In</th>
                             <th>Time Out</th>
                             <th>Status Out</th>
-                            <th>Hours Worked</th>
-                            <th>Status Based</th>
+                            <th>Regular Hrs</th> <th>Overtime Hrs</th> <th>Status Based</th>
                         </tr>
                     </thead>
                     <tbody> 
@@ -80,6 +77,5 @@ require 'template/topbar.php';
     </div>
 
 </div>
-<?php
-require 'template/footer.php';
-?>
+
+<?php require 'template/footer.php'; ?>

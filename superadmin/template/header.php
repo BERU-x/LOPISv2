@@ -1,29 +1,24 @@
 <?php
+// This is the Super Admin Header
+// It contains session auth, loader logic, and the HTML <head>
 
 require_once __DIR__ . '/../../checking.php';
+
 // --- 1. SESSION AUTHENTICATION ---
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header("Location: ../index.php"); 
     exit;
 }
 
-// --- ADD THIS LOGIC FOR THE LOADER ---
-$show_loader = false; // Default to false
+// --- 2. LOADER LOGIC ---
+$show_loader = false; 
 if (isset($_SESSION['show_loader']) && $_SESSION['show_loader'] === true) {
-    // Flag exists, so we'll show the loader
     $show_loader = true;
-    
-    // Unset the flag so it doesn't show on refresh
-    unset($_SESSION['show_loader']);
-    // --- THIS IS THE FIX ---
-    // Force the session to save (with 'show_loader' removed)
-    session_write_close();
-    // Re-open the session so the rest of the page can use it
-    session_start();
+    // Simple removal is enough. Avoid closing and restarting the session here.
+    unset($_SESSION['show_loader']); 
 }
-// --- END OF LOADER LOGIC ---
 
-// --- 2. ROLE-BASED ACCESS ---
+// --- 3. ROLE-BASED ACCESS ---
 if ($_SESSION['usertype'] != 0) {
     if ($_SESSION['usertype'] == 1) {
         header("Location: ../admin/dashboard.php");
@@ -33,11 +28,11 @@ if ($_SESSION['usertype'] != 0) {
     exit;
 }
 
-// --- 3. GET SESSION VARS ---
+// --- 4. GET SESSION VARS ---
 $fullname = $_SESSION['fullname'] ?? 'Super Admin';
 $email = $_SESSION['email'] ?? '';
 
-// --- 4. PAGE TITLE (Set in parent file) ---
+// --- 5. PAGE TITLE (Set in parent file) ---
 $page_title = $page_title ?? 'Super Admin Portal - LOPISv2';
 ?>
 <!DOCTYPE html>
