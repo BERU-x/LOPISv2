@@ -1,9 +1,9 @@
 <?php
-
 // This is the Admin Sidebar
+// Ensure variable is set to avoid errors if forgotten in a page
 $current_page = $current_page ?? ''; 
 
-// Helper function for Pill Styling
+// Helper function for Pill Styling (Active State)
 function isActive($page_name, $current_page) {
     return ($current_page == $page_name) ? 'active' : '';
 }
@@ -14,7 +14,6 @@ function isActive($page_name, $current_page) {
     <a class="sidebar-brand d-flex flex-column align-items-center justify-content-center py-4" href="dashboard.php" style="text-decoration: none;">
         <div class="sidebar-brand-icon">
             <img src="../assets/images/LOPISv2.png" class="logo-large" alt="Full Logo" style="max-height: 100px;">
-            
             <img src="../assets/images/lendell_logo.png" class="logo-small" alt="Icon Logo">
         </div>
     </a>
@@ -25,7 +24,15 @@ function isActive($page_name, $current_page) {
         <a class="nav-link" href="dashboard.php">
             <i class="fas fa-fw fa-th-large"></i> <span>Dashboard</span>
         </a>
+    </li> 
+        
+    <li class="nav-item <?php echo isActive('today_attendance', $current_page); ?>">
+        <a class="nav-link" href="today_attendance.php">
+            <i class="fas fa-fw fa-clock"></i> <span>Today Attendance</span>
+        </a>
     </li>
+
+    <hr class="sidebar-divider">
 
     <div class="sidebar-heading">
         Core Operations
@@ -40,8 +47,8 @@ function isActive($page_name, $current_page) {
         
     <li class="nav-item <?php echo isActive('attendance_management', $current_page); ?>">
         <a class="nav-link" href="attendance_management.php">
-            <i class="fas fa-fw fa-users"></i>
-            <span>Attendance Management</span>
+            <i class="fas fa-fw fa-clipboard-list"></i>
+            <span>Attendance Logs</span>
         </a>
     </li>
 
@@ -58,6 +65,8 @@ function isActive($page_name, $current_page) {
             <span>Leave Management</span>
         </a>
     </li>
+
+    <hr class="sidebar-divider">
 
     <div class="sidebar-heading">
         System & Reports

@@ -65,7 +65,7 @@ if (!isset($_GET['token'])) {
     <title>Employee Attendance</title>
     
     <link rel="icon" href="../assets/images/favicon.ico" type="image/ico">
-    <link href="../assets/fa6/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/vendor/fa6/css/all.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <link rel="stylesheet" href="../assets/css/time_styles.css"> </head>

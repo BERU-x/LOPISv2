@@ -1,28 +1,33 @@
 <?php
-// Set the page title and include the header
+// admin_dashboard.php
 $page_title = 'Admin Dashboard - LOPISv2';
 $current_page = 'dashboard';
 
 require 'template/header.php';
-
-// --- ADDED: DATA FETCHING LOGIC ---
-// ASSUMPTION: $pdo is available and $_SESSION['company_id'] is set.
-$company_id = $_SESSION['company_id'] ?? 1; // Default to 1 if session not set (for testing)
-require_once 'models/employee_model.php'; 
 require_once 'models/admin_dashboard_model.php'; 
 
-// Fetch all necessary data
-$metrics = get_admin_dashboard_metrics($pdo, $company_id);
-$dept_data = get_dept_distribution_data($pdo, $company_id);
+// --- FETCH REAL DATA ---
+$metrics = get_admin_dashboard_metrics($pdo);
+$dept_data = get_dept_distribution_data($pdo);
+$payroll_history = get_payroll_history($pdo);
 
-// Prepare variables for HTML/JS injection
+// Prepare Data for View
 $active_employees_count = $metrics['active_employees'];
-$new_hires_month_count = $metrics['new_hires_month'];
-$pending_leave_count = $metrics['pending_leave_count'];
+$new_hires_month_count  = $metrics['new_hires_month'];
+$pending_leave_count    = $metrics['pending_leave_count'];
+$payroll_status         = $metrics['payroll_status'];
+$attendance_today       = $metrics['attendance_today'];
 
-// Prepare chart data structure
+// Determine Payroll Card Color
+$payroll_text_color = ($payroll_status === 'Completed') ? 'text-success' : 'text-warning';
+$payroll_icon_bg    = ($payroll_status === 'Completed') ? 'bg-soft-success' : 'bg-soft-warning';
+
+// Prepare Chart JSON Data
 $dept_labels = json_encode(array_keys($dept_data));
 $dept_counts = json_encode(array_values($dept_data));
+
+$payroll_labels = json_encode($payroll_history['labels']);
+$payroll_values = json_encode($payroll_history['data']);
 
 require 'template/sidebar.php';
 require 'template/topbar.php';
@@ -30,11 +35,11 @@ require 'template/topbar.php';
 
 <div class="container-fluid">
 
-    <div class="welcome-banner shadow">
-        <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 1;">
+    <div class="welcome-banner shadow mb-4">
+        <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h1 class="h3 font-weight-bold mb-1">Dashboard Overview</h1>
-                <p class="mb-0 opacity-75">Manage your employees, payroll, and leave requests.</p>
+                <p class="mb-0 opacity-75">Welcome back! Here's what's happening today.</p>
             </div>
             <a href="reports.php" class="btn btn-light text-teal font-weight-bold shadow-sm border-0">
                 <i class="fas fa-download me-2"></i> Generate Report
@@ -43,9 +48,8 @@ require 'template/topbar.php';
     </div>
 
     <div class="row mb-4">
-
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
-            <div class="card h-100">
+            <div class="card h-100 border-left-teal shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="icon-box bg-soft-primary me-3">
@@ -66,74 +70,85 @@ require 'template/topbar.php';
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
-            <div class="card h-100">
+            <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="icon-box bg-soft-success me-3">
+                        <div class="icon-box <?php echo $payroll_icon_bg; ?> me-3">
                             <i class="fas fa-file-invoice-dollar"></i>
                         </div>
                         <div>
-                            <div class="text-label">Payroll Status</div>
-                            <div class="h5 font-weight-bold mb-0 text-gray-800">Pending</div>
+                            <div class="text-label">Payroll (<?php echo date('M Y'); ?>)</div>
+                            <div class="h5 font-weight-bold mb-0 <?php echo $payroll_text_color; ?>">
+                                <?php echo $payroll_status; ?>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
-                        <span class="text-warning font-weight-bold">Action Required</span>
+                        <?php if($payroll_status == 'Pending'): ?>
+                            <span class="text-warning font-weight-bold">Action Required</span>
+                        <?php else: ?>
+                            <span class="text-success font-weight-bold">Disbursed</span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
-            <div class="card h-100">
+            <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="icon-box bg-soft-warning me-3">
-                            <i class="fas fa-calendar-check"></i>
+                        <div class="icon-box bg-soft-danger me-3">
+                            <i class="fas fa-calendar-times"></i>
                         </div>
                         <div>
-                            <div class="text-label">Leave Requests</div>
+                            <div class="text-label">Pending Leaves</div>
                             <div class="text-value"><?php echo number_format($pending_leave_count); ?></div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
-                        Waiting for approval
+                        <a href="leave_management.php" class="text-decoration-none text-muted">View details &rarr;</a>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
-            <div class="card h-100">
+            <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
                         <div class="icon-box bg-soft-info me-3">
                             <i class="fas fa-tasks"></i>
                         </div>
                         <div>
-                            <div class="text-label">Upcoming Tasks</div>
-                            <div class="text-value">3</div>
+                            <div class="text-label">Today Attendance</div>
+                            
+                            <div class="text-value">
+                                <?php echo $attendance_today; ?>
+                                <span class="text-muted" style="font-size: 0.6em;">
+                                    / <?php echo $active_employees_count; ?>
+                                </span>
+                            </div>
+                            
                         </div>
                     </div>
+                    
                     <div class="mt-3 mb-0 text-muted text-xs">
-                        Due within 7 days
+                        <a href="today_attendance.php" class="text-decoration-none text-muted">
+                            View details <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
                     </div>
+                    
                 </div>
             </div>
         </div>
     </div>
     
     <div class="row mb-4">
-        
         <div class="col-xl-8 col-lg-7">
-            <div class="card h-100">
+            <div class="card h-100 shadow">
                 <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-gray-800">Payroll History</h6>
-                    <div class="dropdown no-arrow">
-                        <a class="dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
-                        </a>
-                    </div>
+                    <h6 class="m-0 font-weight-bold text-teal">Payroll History (Last 6 Months)</h6>
                 </div>
                 <div class="card-body pt-0">
                     <div class="chart-area" style="height: 320px;">
@@ -144,7 +159,7 @@ require 'template/topbar.php';
         </div>
 
         <div class="col-xl-4 col-lg-5">
-            <div class="card h-100">
+            <div class="card h-100 shadow">
                 <div class="card-header bg-transparent border-0 pb-0">
                     <h6 class="m-0 font-weight-bold text-gray-800">Employees by Dept</h6>
                 </div>
@@ -152,19 +167,8 @@ require 'template/topbar.php';
                     <div class="chart-pie" style="height: 250px;">
                         <canvas id="deptDistributionChart"></canvas>
                     </div>
-                    <div class="mt-4 text-center small">
-                        <span class="me-2">
-                            <i class="fas fa-circle" style="color: #6b36ccff;"></i> I.T.
-                        </span>
-                        <span class="me-2">
-                            <i class="fas fa-circle" style="color: #0CC0DF;"></i> Operations
-                        </span>                      
-                        <span class="me-2">
-                            <i class="fas fa-circle" style="color: #4e73df;"></i> Field
-                        </span>
-                        <span class="me-2">
-                            <i class="fas fa-circle" style="color: #f6c23e;"></i> Corporate
-                        </span>
+                    <div class="mt-4 text-center small text-muted">
+                        Hover over sections to see counts
                     </div>
                 </div>
             </div>
@@ -172,35 +176,37 @@ require 'template/topbar.php';
     </div>
 
 </div>
-<?php require 'functions/add_employee.php'; ?>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     
-    // --- 1. PAYROLL HISTORY CHART (Teal Gradient) ---
-    // NOTE: This remains static as fetch logic for historical data was not provided
+    // --- 1. PAYROLL HISTORY CHART (Dynamic) ---
     var ctxPayroll = document.getElementById("payrollHistoryChart").getContext('2d');
     
+    // PHP Data Injection
+    const payrollLabels = <?php echo $payroll_labels; ?>;
+    const payrollData = <?php echo $payroll_values; ?>;
+
     var gradientPayroll = ctxPayroll.createLinearGradient(0, 0, 0, 400);
-    gradientPayroll.addColorStop(0, 'rgba(12, 192, 223, 0.5)'); // Start Teal
-    gradientPayroll.addColorStop(1, 'rgba(255, 255, 255, 0.0)'); // End Transparent
+    gradientPayroll.addColorStop(0, 'rgba(12, 192, 223, 0.5)'); 
+    gradientPayroll.addColorStop(1, 'rgba(255, 255, 255, 0.0)'); 
 
     new Chart(ctxPayroll, {
         type: 'line',
         data: {
-            labels: ["Jun", "Jul", "Aug", "Sep", "Oct", "Nov"], // Dummy Months
-            data: [450000, 460000, 455000, 480000, 495000, 510000], // Dummy Data
+            labels: payrollLabels,
             datasets: [{
                 label: "Total Payout",
-                data: [450000, 460000, 455000, 480000, 495000, 510000], 
+                data: payrollData, 
                 backgroundColor: gradientPayroll,
-                borderColor: "#0CC0DF", // Teal Border
+                borderColor: "#0CC0DF",
                 pointBackgroundColor: "#ffffff",
                 pointBorderColor: "#0CC0DF",
                 pointRadius: 4,
                 pointHoverRadius: 6,
                 fill: true,
-                tension: 0.4 // Curvy line
+                tension: 0.4
             }]
         },
         options: {
@@ -211,9 +217,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     callbacks: {
                         label: function(context) {
                             let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
+                            if (label) { label += ': '; }
                             if (context.parsed.y !== null) {
                                 label += '₱' + context.parsed.y.toLocaleString();
                             }
@@ -226,7 +230,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 x: { grid: { display: false } },
                 y: { 
                     grid: { borderDash: [2, 4], color: "#e3e6f0" }, 
-                    beginAtZero: false,
+                    beginAtZero: false, // Allows chart to float if values are high
                     ticks: {
                         callback: function(value) { return '₱' + value.toLocaleString(); } 
                     }
@@ -235,10 +239,9 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // --- 2. DEPARTMENT DISTRIBUTION (Doughnut - DYNAMIC) ---
+    // --- 2. DEPARTMENT DISTRIBUTION (Dynamic) ---
     var ctxDept = document.getElementById("deptDistributionChart");
     
-    // Inject PHP data here
     const deptLabels = <?php echo $dept_labels; ?>;
     const deptCounts = <?php echo $dept_counts; ?>;
     
@@ -247,8 +250,7 @@ document.addEventListener("DOMContentLoaded", function() {
         data: {
             labels: deptLabels,
             datasets: [{
-                data: deptCounts, // Dynamic Data
-                // Define colors for the chart elements based on the number of fetched departments
+                data: deptCounts,
                 backgroundColor: ['#0CC0DF', '#4e73df', '#6b36ccff', '#f6c23e', '#e74a3b', '#1cc88a', '#858796'], 
                 hoverBackgroundColor: ['#0abad8', '#2e59d9', '#6b36ccff', '#dda20a', '#c73a2f', '#1cc88a', '#6d7083'],
                 borderWidth: 5,
@@ -257,29 +259,13 @@ document.addEventListener("DOMContentLoaded", function() {
         },
         options: {
             maintainAspectRatio: false,
-            cutout: '75%', // Thin modern ring
+            cutout: '75%', 
             plugins: { 
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed !== null) {
-                                label += context.parsed + ' employees';
-                            }
-                            return label;
-                        }
-                    }
-                }
+                legend: { display: false }, // Hiding legend to look cleaner
             }
         },
     });
 });
 </script>
 
-<?php
-require 'template/footer.php';
-?>
+<?php require 'template/footer.php'; ?>

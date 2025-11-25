@@ -22,7 +22,6 @@ $departments = [
 
 $employee = null;
 $error = '';
-$success = '';
 
 // --- 1. HANDLE EMPLOYEE ID RETRIEVAL ---
 $employee_id = $_GET['id'] ?? null;
@@ -31,9 +30,7 @@ if (!is_numeric($employee_id) || (int)$employee_id <= 0) {
     $error = "Invalid employee ID provided.";
     $employee_id = 0; 
 } else {
-    // Fetch employee data (Make sure your model performs the JOIN with tbl_compensation)
     $employee = getEmployeeById($pdo, $employee_id); 
-
     if (!$employee) {
         $error = "Employee not found.";
     }
@@ -44,11 +41,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_employee'])) {
     if (!$employee) {
         $error = "Cannot update: Employee record is missing.";
     } else {
-        // Collect and sanitize ALL form data fields
+        // Collect ONLY Personal and Employment Data
+        // Financial data is now handled in manage_financials.php
         $updated_data = [
             'employee_id' => trim($_POST['employee_id']),
             'firstname'   => trim($_POST['firstname']),
-            'middlename'  => trim($_POST['middlename']), // [NEW]
+            'middlename'  => trim($_POST['middlename']),
             'lastname'    => trim($_POST['lastname']),
             'suffix'      => trim($_POST['suffix'] ?? ''),
             'address'     => trim($_POST['address']),
@@ -58,17 +56,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_employee'])) {
             'position'    => trim($_POST['position']),
             'department'  => trim($_POST['department']),
             'employment_status' => (int)$_POST['employment_status'],
-            
-            // [UPDATED] Financial Data matching tbl_compensation
-            'daily_rate'        => (float)$_POST['daily_rate'],       // [NEW]
-            'monthly_rate'      => (float)$_POST['monthly_rate'],     // Was salary
-            'food_allowance'    => (float)($_POST['food_allowance'] ?? 0), // Was food
-            'transpo_allowance' => (float)($_POST['transpo_allowance'] ?? 0), // Was travel
-            
-            'bank_name'      => trim($_POST['bank_name']),
-            'account_type'   => trim($_POST['account_type']),
-            'account_number' => trim($_POST['account_number'] ?? null),
-            'photo'          => $employee['photo'] ?? null, 
+            'photo'       => $employee['photo'] ?? null, 
         ];
         
         // --- Process Image Upload ---
@@ -100,7 +88,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_employee'])) {
         }
         
         if (empty($error)) {
-            // Update the employee record (Ensure your Model handles the separation of tables)
+            // Update the employee record in tbl_employees
             $result = updateEmployee($pdo, $employee_id, $updated_data);
 
             if ($result) {
@@ -123,8 +111,11 @@ require 'template/topbar.php';
 <div class="container-fluid">
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">
-            <i class="fas fa-edit me-2"></i> Edit Employee Details
+            <i class="fas fa-user-edit me-2"></i> Edit Employee Profile
         </h1>
+        <a href="manage_financials.php?id=<?php echo $employee_id; ?>" class="btn btn-success shadow-sm">
+            <i class="fas fa-coins me-2"></i> Go to Financials
+        </a>
     </div>
 
     <?php if ($error): ?>
@@ -139,7 +130,7 @@ require 'template/topbar.php';
             <div class="row g-4">
                 
                 <div class="col-lg-6">
-                    <div class="card card-body p-4 border-0 h-100">
+                    <div class="card card-body p-4 border-0 shadow-sm h-100">
                         <h6 class="fw-bold text-teal mb-3">
                             <i class="fas fa-id-card me-2"></i> Personal Information
                         </h6>
@@ -229,7 +220,7 @@ require 'template/topbar.php';
                                 </h6>
                                 <hr class="mt-1 mb-3">
                                 <?php $default_photo_path = '../assets/images/' . htmlspecialchars($employee['photo'] ?? ''); ?>
-                                <input type="file" name="photo" id="photo" class="dropify" data-height="200" 
+                                <input type="file" name="photo" id="photo" class="dropify" data-height="150" 
                                        data-allowed-file-extensions="jpg jpeg png" data-max-file-size="2M" 
                                        data-default-file="<?php echo !empty($employee['photo']) && file_exists($default_photo_path) ? $default_photo_path : ''; ?>">
                             </div>
@@ -238,7 +229,7 @@ require 'template/topbar.php';
                 </div>
 
                 <div class="col-lg-6">
-                    <div class="card card-body p-4 border-0 h-100">
+                    <div class="card card-body p-4 border-0 shadow-sm h-100">
                         
                         <h6 class="fw-bold text-teal mb-3">
                             <i class="fas fa-briefcase me-2"></i> Employment Details
@@ -247,7 +238,7 @@ require 'template/topbar.php';
                         <div class="row g-3">
                             
                             <div class="col-12">
-                                <label for="position" class="text-label mb-1">Position</label>
+                                <label for="position" class="text-label mb-1">Position / Job Title</label>
                                 <input type="text" name="position" id="position" class="form-control" 
                                        required value="<?php echo htmlspecialchars($employee['position'] ?? ''); ?>">
                             </div>
@@ -278,68 +269,12 @@ require 'template/topbar.php';
                                 </select>
                             </div>
 
-                        <h6 class="fw-bold text-teal mb-3">
-                            <i class="fas fa-coins me-2"></i>Compensation Details
-                        </h6>
-                            <hr class="mt-1 mb-4">
-                                     
-                            <div class="col-12">
-                                <label for="daily_rate" class="text-label">Daily Rate (Per 8 Hours)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">₱</span>
-                                    <input type="number" step="0.01" name="daily_rate" id="daily_rate" class="form-control" 
-                                           min="0" required placeholder="0.00"
-                                           value="<?php echo htmlspecialchars($employee['daily_rate'] ?? 0); ?>">
+                            <div class="col-12 mt-4">
+                                <div class="alert alert-light border border-teal text-teal small">
+                                    <i class="fas fa-info-circle me-1"></i> 
+                                    Looking to edit Salary, Allowances, or Bank Info? <br>
+                                    Please use the <strong><a href="manage_financials.php?id=<?php echo $employee_id; ?>" class="fw-bold text-success text-decoration-none">Manage Financials</a></strong> page.
                                 </div>
-                            </div>
-
-                            <div class="col-12">
-                                <label for="monthly_rate" class="text-label mb-1">Monthly Rate (Reference)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">₱</span>
-                                    <input type="number" step="0.01" name="monthly_rate" id="monthly_rate" class="form-control" 
-                                           min="0" placeholder="0.00"
-                                           value="<?php echo htmlspecialchars($employee['monthly_rate'] ?? $employee['salary'] ?? 0); ?>">
-                                </div>
-                            </div>
-
-                            <div class="col-6">
-                                <label for="food_allowance" class="text-label mb-1">Food Allowance</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-bowl-food"></i></span>
-                                    <input type="number" step="0.01" name="food_allowance" id="food_allowance" class="form-control" 
-                                           min="0" placeholder="0.00"
-                                           value="<?php echo htmlspecialchars($employee['food_allowance'] ?? $employee['food'] ?? 0); ?>">
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label for="transpo_allowance" class="text-label mb-1">Transpo Allowance</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-route"></i></span>
-                                    <input type="number" step="0.01" name="transpo_allowance" id="transpo_allowance" class="form-control" 
-                                           min="0" placeholder="0.00"
-                                           value="<?php echo htmlspecialchars($employee['transpo_allowance'] ?? $employee['travel'] ?? 0); ?>">
-                                </div>
-                            </div>
-                        
-                            <h6 class="fw-bold text-teal mt-4 mb-3">
-                                <i class="fas fa-money-check-alt me-2"></i> Banking Information
-                            </h6>
-                            <hr class="mt-1 mb-4">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label for="bank_name" class="text-label mb-1">Bank Name</label>
-                                    <input type="text" name="bank_name" id="bank_name" class="form-control" 
-                                           placeholder="e.g. Security Bank"
-                                           value="<?php echo htmlspecialchars($employee['bank_name'] ?? ''); ?>">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="account_number" class="text-label mb-1">Account Number</label>
-                                    <input type="text" name="account_number" id="account_number" class="form-control" 
-                                           placeholder="Account Number"
-                                           value="<?php echo htmlspecialchars($employee['account_number'] ?? ''); ?>">
-                                </div>
-                                <input type="hidden" name="account_type" value="<?php echo htmlspecialchars($employee['account_type'] ?? 'Savings'); ?>">
                             </div>
 
                         </div>

@@ -18,7 +18,7 @@ if (isset($_POST['add_employee'])) {
     $data = [
         'employee_id' => trim($_POST['employee_id']),
         'firstname'   => trim($_POST['firstname']),
-        'middlename'  => trim($_POST['middlename']), // [NEW] Middle Name
+        'middlename'  => trim($_POST['middlename']), 
         'lastname'    => trim($_POST['lastname']),
         'suffix'      => trim($_POST['suffix'] ?? ''),
         'address'     => trim($_POST['address']),
@@ -29,11 +29,11 @@ if (isset($_POST['add_employee'])) {
         'department'  => trim($_POST['department']),
         'employment_status' => (int)$_POST['employment_status'],
         
-        // [UPDATED] Financial Mapping to tbl_compensation columns
-        'daily_rate'        => (float)$_POST['daily_rate'],       // [NEW] Critical for Payroll
-        'monthly_rate'      => (float)$_POST['monthly_rate'],     // Was salary
-        'food_allowance'    => (float)($_POST['food_allowance'] ?? 0), // Was food
-        'transpo_allowance' => (float)($_POST['transpo_allowance'] ?? 0), // Was travel
+        // Financial Mapping
+        'daily_rate'        => (float)$_POST['daily_rate'],       
+        'monthly_rate'      => (float)$_POST['monthly_rate'],     
+        'food_allowance'    => (float)($_POST['food_allowance'] ?? 0), 
+        'transpo_allowance' => (float)($_POST['transpo_allowance'] ?? 0), 
         
         'bank_name'      => trim($_POST['bank_name']),
         'account_type'   => trim($_POST['account_type'] ?? 'Savings'),
@@ -46,7 +46,6 @@ if (isset($_POST['add_employee'])) {
     if (isset($_FILES['photo']) && $_FILES['photo']['error'] === 0) {
         $upload_dir = '../assets/images/';
         $file_ext = pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION);
-        // Basic validation for image type
         if(in_array(strtolower($file_ext), ['jpg', 'jpeg', 'png'])) {
             $new_file_name = uniqid('emp_') . '.' . $file_ext;
             $target_file = $upload_dir . $new_file_name;
@@ -57,7 +56,7 @@ if (isset($_POST['add_employee'])) {
         }
     }
 
-    // 3. Execute CREATE function from model
+    // 3. Execute CREATE function
     if (create_new_employee($pdo, $data, $photo)) {
         $_SESSION['message'] = "Employee {$data['firstname']} {$data['lastname']} added successfully!";
     } else {
@@ -79,7 +78,6 @@ function getStatusText($statusId, $array) {
 // --- FETCH DATA (READ OPERATION) ---
 $employees = get_all_employees($pdo);
 
-
 // --- INCLUDE TEMPLATES ---
 require 'template/sidebar.php';
 require 'template/topbar.php';
@@ -88,7 +86,10 @@ require 'template/topbar.php';
 <div class="container-fluid">
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Employee Directory (<?php echo count($employees); ?>)</h1>
+        <div>
+            <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Employee Directory</h1>
+            <p class="mb-0 text-muted">Total Employees: <span class="fw-bold text-teal"><?php echo count($employees); ?></span></p>
+        </div>
         
         <button class="btn btn-teal shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
             <i class="fas fa-user-plus me-2"></i> Add New Employee
@@ -96,78 +97,94 @@ require 'template/topbar.php';
     </div>
 
     <div class="card shadow mb-4">
-        <div class="card-header bg-transparent py-3 d-flex flex-row align-items-center justify-content-between">
-            <h6 class="m-0 font-weight-bold text-gray-800">Employee List</h6>
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
+            <h6 class="m-0 font-weight-bold text-teal"><i class="fas fa-users me-2"></i>Masterlist</h6>
             
-            <div class="input-group" style="max-width: 300px;">
-                <input type="text" class="form-control small" id="searchInput" placeholder="Search by name or ID..." aria-label="Search">
+            <div class="input-group" style="max-width: 250px;">
+                <span class="input-group-text bg-light border-0"><i class="fas fa-search text-gray-400"></i></span>
+                <input type="text" id="customSearch" class="form-control bg-light border-0 small" placeholder="Search employees..." aria-label="Search">
             </div>
         </div>
+
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover table-striped align-middle" id="employeesTable" width="100%" cellspacing="0">
-                    <thead>
+                <table class="table table-striped table-hover align-middle" id="employeesTable" width="100%" cellspacing="0">
+                    <thead class="bg-light text-uppercase text-gray-600 text-xs font-weight-bold">
                         <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Daily Rate</th>
-                            <th>Status</th>
-                            <th>Actions</th>
+                            <th class="border-0">ID</th>
+                            <th class="border-0">Name</th>
+                            <th class="border-0">Daily Rate</th>
+                            <th class="border-0 text-center">Status</th>
+                            <th class="border-0 text-center">Actions</th>
                         </tr>
                     </thead>
-                <tbody id="employeeTableBody">
-                    <?php foreach ($employees as $emp): ?>
-                    <tr class="employee-row">
-                        <td class="fw-bold text-secondary"><?php echo htmlspecialchars($emp['employee_id']); ?></td>
-                        
-                        <?php
-                            $full_name = htmlspecialchars($emp['firstname'] . ' ' . ($emp['middlename'] ? $emp['middlename'].' ' : '') . $emp['lastname']);
-                            $sort_name = htmlspecialchars($emp['lastname'] ?? '') . ', ' . htmlspecialchars($emp['firstname'] ?? '');
-                        ?>
-                        <td data-order="<?php echo $sort_name; ?>" data-search="<?php echo $full_name; ?>">
-                            <div class="d-flex align-items-center">
-                                <img src="../assets/images/<?php echo htmlspecialchars($emp['photo'] ?? 'default.png'); ?>" 
-                                    alt="Photo" class="rounded-circle me-3 border shadow-sm" style="width: 40px; height: 40px; object-fit: cover;">
-                                <div>
-                                    <div class="fw-bold text-dark">
-                                        <?php echo $full_name; ?>
-                                    </div>
-                                    <div class="small text-muted"><?php echo htmlspecialchars($emp['department'] . ' • ' . $emp['position']); ?></div>
-                                </div>
-                            </div>
-                        </td>
-                        
-                        <td class="fw-bold text-teal">
-                            ₱<?php echo number_format($emp['daily_rate'] ?? 0, 2); ?>
-                            <div class="small text-muted fw-normal" style="font-size: 0.75rem;">
-                                Monthly: <?php echo number_format($emp['monthly_rate'] ?? 0, 0); ?>
-                            </div>
-                        </td>
-                        
-                        <td>
-                            <?php 
-                            $status_text = getStatusText((int)$emp['employment_status'], $employment_statuses);
-                            $badge_class = match((int)$emp['employment_status']) {
-                                1 => 'bg-success',
-                                2 => 'bg-warning text-dark',
-                                5 => 'bg-danger',
-                                6 => 'bg-dark',
-                                default => 'bg-secondary',
-                            };
+                    <tbody id="employeeTableBody">
+                        <?php foreach ($employees as $emp): ?>
+                        <tr class="employee-row">
+                            <td class="fw-bold text-gray-700 small"><?php echo htmlspecialchars($emp['employee_id']); ?></td>
+                            
+                            <?php
+                                $full_name = htmlspecialchars($emp['firstname'] . ' ' . ($emp['middlename'] ? $emp['middlename'].' ' : '') . $emp['lastname']);
+                                $sort_name = htmlspecialchars($emp['lastname'] ?? '') . ', ' . htmlspecialchars($emp['firstname'] ?? '');
                             ?>
-                            <span class="badge <?php echo $badge_class; ?>"><?php echo $status_text; ?></span>
-                        </td>
-                        <td>
-                            <?php $db_id = $emp['id'] ?? 0; ?>
-                            <a href="edit_employee.php?id=<?php echo htmlspecialchars($db_id); ?>" 
-                                class="btn btn-sm btn-outline-teal me-1" 
-                                title="Edit Employee Details">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                    
+                            
+                            <td data-order="<?php echo $sort_name; ?>" data-search="<?php echo $full_name; ?>">
+                                <div class="d-flex align-items-center">
+                                    <img src="../assets/images/<?php echo htmlspecialchars($emp['photo'] ?? 'default.png'); ?>" 
+                                         alt="Photo" class="rounded-circle me-3 border shadow-sm" 
+                                         style="width: 40px; height: 40px; object-fit: cover;">
+                                    <div>
+                                        <div class="fw-bold text-dark"><?php echo $full_name; ?></div>
+                                        <div class="small text-muted">
+                                            <?php echo htmlspecialchars($emp['department']); ?> 
+                                            <span class="mx-1">•</span> 
+                                            <?php echo htmlspecialchars($emp['position']); ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <td class="fw-bold text-teal">
+                                ₱<?php echo number_format($emp['daily_rate'] ?? 0, 2); ?>
+                                <div class="small text-muted fw-normal" style="font-size: 0.75rem;">
+                                    Monthly: ₱<?php echo number_format($emp['monthly_rate'] ?? 0, 0); ?>
+                                </div>
+                            </td>
+                            
+                            <td class="text-center">
+                                <?php 
+                                $status_text = getStatusText((int)$emp['employment_status'], $employment_statuses);
+                                // Soft Badge Styling Logic
+                                $badge_class = match((int)$emp['employment_status']) {
+                                    1 => 'bg-soft-success text-success border border-success', // Regular
+                                    2 => 'bg-soft-warning text-warning border border-warning', // Part-time
+                                    0 => 'bg-soft-info text-info border border-info',       // Probationary
+                                    5 => 'bg-soft-danger text-danger border border-danger',   // Resigned
+                                    6 => 'bg-soft-dark text-dark border border-dark',         // Terminated
+                                    default => 'bg-soft-secondary text-secondary border border-secondary',
+                                };
+                                ?>
+                                <span class="badge <?php echo $badge_class; ?> px-3 shadow-sm rounded-pill"><?php echo $status_text; ?></span>
+                            </td>
+
+                            <td class="text-center">
+                                <?php $db_id = $emp['id'] ?? 0; ?>
+                                <div class="btn-group" role="group">
+                                    <a href="edit_employee.php?id=<?php echo htmlspecialchars($db_id); ?>" 
+                                       class="btn btn-sm btn-light text-teal border" 
+                                       title="Edit Employee Details">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+
+                                    <a href="manage_financials.php?id=<?php echo htmlspecialchars($db_id); ?>" 
+                                       class="btn btn-sm btn-light text-success border" 
+                                       title="Manage Financials">
+                                        <i class="fas fa-coins"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -177,18 +194,16 @@ require 'template/topbar.php';
 </div>
 
 <?php 
-// employee_management.php (towards the end of the file)
+// SweetAlert Logic
 $message_type = null;
-$message_text_json = null; // Use a new variable name for clarity
+$message_text_json = null;
 
 if (isset($_SESSION['message'])) {
     $message_type = 'success';
-    // ✅ FIX: Safely encode the message string for JavaScript
     $message_text_json = json_encode($_SESSION['message']); 
     unset($_SESSION['message']);
 } elseif (isset($_SESSION['error'])) {
     $message_type = 'error';
-    // ✅ FIX: Safely encode the error string for JavaScript
     $message_text_json = json_encode($_SESSION['error']);
     unset($_SESSION['error']);
 }
@@ -199,7 +214,6 @@ if ($message_type):
     Swal.fire({
         toast: true,
         icon: '<?php echo $message_type; ?>',
-        // CRITICAL: Must be outputting the clean JSON string without surrounding 'quotes'
         title: <?php echo $message_text_json; ?>, 
         position: 'top-end', 
         showConfirmButton: false,
@@ -214,10 +228,25 @@ if ($message_type):
 <?php endif; ?>
 
 <?php
-// Ensure this file (functions/add_employee.php) contains the UPDATED MODAL CODE I provided earlier
+// Include Add Employee Modal
 require 'functions/add_employee.php';
-
-// DataTables initialization for #employeesTable and #searchInput handling 
-// MUST BE IN THE FOOTER NOW, as confirmed in the previous step.
 require 'template/footer.php'; 
 ?>
+
+<script>
+    $(document).ready(function() {
+        var table = $('#employeesTable').DataTable({
+            "order": [[ 1, "asc" ]], // Sort by Name
+            "pageLength": 10,
+            "dom": 'rtip', // Clean interface (hides default search)
+            "language": {
+                "emptyTable": "No employees found."
+            }
+        });
+
+        // Link Custom Search Input
+        $('#customSearch').on('keyup', function() {
+            table.search(this.value).draw();
+        });
+    });
+</script>
