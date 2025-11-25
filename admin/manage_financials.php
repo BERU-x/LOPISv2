@@ -3,6 +3,7 @@
 $page_title = 'Manage Financials';
 $current_page = 'employee_management';
 
+// --- CONFIGURATION & INCLUDES ---
 require 'template/header.php'; 
 require 'models/employee_model.php'; 
 
@@ -13,25 +14,37 @@ if (!isset($_GET['id'])) {
 
 $id = $_GET['id'];
 
-// Fetch Data including new balance columns
-$sql = "SELECT 
-            e.id as emp_db_id, e.employee_id as emp_string_id, e.firstname, e.lastname,
-            c.daily_rate, c.monthly_rate, c.food_allowance, c.transpo_allowance,
-            f.sss_loan, f.pagibig_loan, f.company_loan, f.cash_advance, f.savings_deduction,
-            f.cash_assist_total, f.cash_assist_deduction,
-            f.sss_loan_balance, f.pagibig_loan_balance, f.company_loan_balance
-        FROM tbl_employees e
-        LEFT JOIN tbl_compensation c ON e.employee_id = c.employee_id
-        LEFT JOIN tbl_employee_financials f ON e.employee_id = f.employee_id
-        WHERE e.id = ?";
+try {
+    // --- 1. Fetch Employee Details and Recurring Financials ---
+    // REMOVED f.cash_advance from the SELECT list
+    $sql = "SELECT 
+                e.id as emp_db_id, e.employee_id as emp_string_id, e.firstname, e.lastname,
+                c.daily_rate, c.monthly_rate, c.food_allowance, c.transpo_allowance,
+                f.sss_loan, f.pagibig_loan, f.company_loan, f.savings_deduction,
+                f.cash_assist_total, f.cash_assist_deduction,
+                f.sss_loan_balance, f.pagibig_loan_balance, f.company_loan_balance
+            FROM tbl_employees e
+            LEFT JOIN tbl_compensation c ON e.employee_id = c.employee_id
+            LEFT JOIN tbl_employee_financials f ON e.employee_id = f.employee_id
+            WHERE e.id = ?";
 
-$stmt = $pdo->prepare($sql);
-$stmt->execute([$id]);
-$emp = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$id]);
+    $emp = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$emp) { die("Employee not found."); }
+    if (!$emp) { die("Employee not found."); }
 
-// Defaults
+    // --- 2. Fetch Total Pending Cash Advance (from new table) ---
+    $sql_ca = "SELECT SUM(amount) FROM tbl_cash_advances WHERE employee_id = ? AND status = 'Pending'";
+    $stmt_ca = $pdo->prepare($sql_ca);
+    $stmt_ca->execute([$emp['emp_string_id']]);
+    $pending_ca_total = floatval($stmt_ca->fetchColumn() ?: 0);
+
+} catch (PDOException $e) {
+    die("Database Error: " . $e->getMessage());
+}
+
+// --- 3. Set Defaults for Display ---
 $emp['daily_rate'] = $emp['daily_rate'] ?? 0;
 $emp['monthly_rate'] = $emp['monthly_rate'] ?? 0;
 $emp['food_allowance'] = $emp['food_allowance'] ?? 0;
@@ -40,7 +53,6 @@ $emp['transpo_allowance'] = $emp['transpo_allowance'] ?? 0;
 $emp['sss_loan'] = $emp['sss_loan'] ?? 0;
 $emp['pagibig_loan'] = $emp['pagibig_loan'] ?? 0;
 $emp['company_loan'] = $emp['company_loan'] ?? 0;
-$emp['cash_advance'] = $emp['cash_advance'] ?? 0;
 $emp['savings_deduction'] = $emp['savings_deduction'] ?? 0;
 $emp['cash_assist_total'] = $emp['cash_assist_total'] ?? 0;
 $emp['cash_assist_deduction'] = $emp['cash_assist_deduction'] ?? 0;
@@ -48,6 +60,9 @@ $emp['cash_assist_deduction'] = $emp['cash_assist_deduction'] ?? 0;
 $emp['sss_loan_balance'] = $emp['sss_loan_balance'] ?? 0;
 $emp['pagibig_loan_balance'] = $emp['pagibig_loan_balance'] ?? 0;
 $emp['company_loan_balance'] = $emp['company_loan_balance'] ?? 0;
+
+// The pending CA amount for display
+$display_ca_total = $pending_ca_total; 
 
 require 'template/sidebar.php';
 require 'template/topbar.php';
@@ -66,6 +81,9 @@ require 'template/topbar.php';
                 Financial Profile: <span class="text-teal"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></span>
             </h1>
         </div>
+        <button class="btn btn-sm btn-danger shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#addCAModal">
+            <i class="fas fa-plus me-2"></i> Record New Cash Advance
+        </button>
     </div>
 
     <form action="functions/update_financials.php" method="POST">
@@ -202,14 +220,15 @@ require 'template/topbar.php';
                             </div>
 
                             <div class="col-md-6">
-                                <h6 class="text-uppercase text-gray-600 text-xs fw-bold mb-1 text-danger">Cash Advance</h6>
-                                <label class="form-label small">Deduction Amount (One-Time)</label>
+                                <h6 class="text-uppercase text-gray-600 text-xs fw-bold mb-1 text-danger">Pending Cash Advance</h6>
+                                <label class="form-label small">Total Amount Pending Deduction</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text bg-danger text-white border-danger">₱</span>
-                                    <input type="number" step="0.01" name="cash_advance" class="form-control border-danger fw-bold" value="<?php echo $emp['cash_advance']; ?>">
+                                    <input type="text" readonly class="form-control border-danger fw-bold bg-light" 
+                                            value="<?php echo number_format($display_ca_total, 2); ?>">
                                 </div>
                             </div>
-                        </div>
+                            </div>
                     </div>
                 </div>
 
@@ -220,7 +239,7 @@ require 'template/topbar.php';
                     <div class="card-body">
                         <div class="d-flex align-items-center justify-content-between">
                             <div>
-                                <label class="form-label fw-bold text-gray-800">Forced Savings</label>
+                                <label class="form-label fw-bold text-gray-800">Forced Savings Deduction</label>
                                 <div class="small text-muted">Amount deducted per payroll.</div>
                             </div>
                             <div class="input-group" style="width: 150px;">
@@ -239,10 +258,94 @@ require 'template/topbar.php';
                     <i class="fas fa-arrow-left me-2"></i> Back to List
                 </a>
                 <button type="submit" name="update_financials" class="btn btn-teal btn-lg fw-bold shadow">
-                    <i class="fas fa-save me-2"></i> Save Financial Profile
+                    <i class="fas fa-save me-2"></i> Save Recurring Financial Profile
                 </button>
             </div>
         </div>
     </form>
 </div>
 <?php require 'template/footer.php'; ?>
+
+<div class="modal fade" id="addCAModal" tabindex="-1" role="dialog" aria-labelledby="addCAModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="addCAModalLabel"><i class="fas fa-hand-holding-usd me-2"></i>Record New Cash Advance</h5>
+                <button class="close" type="button" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+            <form id="record-ca-form">
+                <div class="modal-body">
+                    <input type="hidden" name="employee_id" value="<?php echo $emp['emp_string_id']; ?>">
+                    <p class="text-muted small">Adding a new record here will increase the total deduction on the next payroll run.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Amount to be deducted (₱)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">₱</span>
+                            <input type="number" step="0.01" name="amount" class="form-control" required min="100" placeholder="e.g., 2500.00">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Date Requested</label>
+                        <input type="date" name="date_requested" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Remarks / Reason</label>
+                        <textarea name="reason" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+                    <button class="btn btn-danger" type="submit" id="save-ca-btn"><i class="fas fa-save me-2"></i>Save Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // --- Existing Calculation function remains here ---
+
+    // --- NEW: Handle Cash Advance Form Submission ---
+    $('#record-ca-form').submit(function(e) {
+        e.preventDefault();
+        let form = $(this);
+        let btn = $('#save-ca-btn');
+        let originalText = btn.html();
+
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Saving...');
+
+        $.ajax({
+            url: 'functions/record_cash_advance.php', 
+            type: 'POST',
+            data: form.serialize(),
+            dataType: 'json',
+            success: function(res) {
+                if(res.success) {
+                    Swal.fire({
+                        icon: 'success', 
+                        title: 'CA Recorded!',
+                        text: res.message, 
+                        timer: 2000, 
+                        showConfirmButton: false
+                    }).then(() => {
+                        // Reload the page to show the updated pending CA total
+                        window.location.reload(); 
+                    });
+                } else {
+                    Swal.fire('Error', res.message, 'error');
+                }
+            },
+            error: function() {
+                Swal.fire('Error', 'Failed to communicate with server.', 'error');
+            },
+            complete: function() {
+                btn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+});
+</script>

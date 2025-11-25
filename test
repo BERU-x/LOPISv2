@@ -1,0 +1,29 @@
+-- 1. TBL_EMPLOYEES (Parent Table)
+CREATE TABLE IF NOT EXISTS `lendellp_lopisv2`.`tbl_employees` (
+`id` INT(11) NOT NULL AUTO_INCREMENT,
+ `employee_id` VARCHAR(3) NOT NULL,
+  `firstname` VARCHAR(50) NOT NULL,
+  `lastname` VARCHAR(50) NOT NULL,
+  `suffix` VARCHAR(255) NULL DEFAULT NULL,
+  `address` VARCHAR(255) NOT NULL,
+  `birthdate` DATE NOT NULL,
+  `contact_info` VARCHAR(11) NULL DEFAULT NULL,
+  `gender` INT(11) NOT NULL COMMENT '0 - Male, 1 - Female',
+  `position` VARCHAR(100) NOT NULL,
+  `department` VARCHAR(255) NOT NULL,
+  `employment_status` INT(11) NOT NULL COMMENT '0 - Probationary, 1 - Regular, etc.',
+  `food` INT(100) NULL DEFAULT NULL COMMENT 'Food allowance',
+  `travel` INT(100) NULL DEFAULT NULL COMMENT 'Travel allowance',
+  `salary` INT(11) NOT NULL,
+  `bank_name` VARCHAR(255) NULL DEFAULT NULL,
+  `account_type` VARCHAR(255) NULL DEFAULT NULL,
+  `account_number` VARCHAR(255) NULL DEFAULT NULL,
+  `photo` VARCHAR(200) NULL DEFAULT NULL COMMENT 'Filename',
+  `created_on` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  `updated_on` DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP -- ***FIX IS HERE (NO COMMA)***
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `unique_employee_id` (`employee_id` ASC) VISIBLE
+)
+ENGINE = InnoDB
+AUTO_INCREMENT = 70
+DEFAULT CHARACTER SET = utf8mb4;

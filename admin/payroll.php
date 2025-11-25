@@ -10,13 +10,6 @@ require 'template/header.php';
 require 'template/sidebar.php';
 require 'template/topbar.php';
 
-// --- FETCH SETTINGS (For Modal) ---
-$stmt_settings = $pdo->query("SELECT * FROM tbl_deduction_settings");
-$settings = [];
-while ($row = $stmt_settings->fetch(PDO::FETCH_ASSOC)) {
-    $settings[$row['name']] = $row;
-}
-
 // --- FETCH STATS ---
 $total_payout = 0;
 $pending_count = 0;
@@ -41,10 +34,6 @@ try {
         </div>
         
         <div class="d-flex gap-2">
-            <button class="btn btn-white text-dark shadow-sm fw-bold border" data-bs-toggle="modal" data-bs-target="#settingsModal">
-                <i class="fas fa-cog text-gray-600 me-2"></i> Settings
-            </button>
-
             <button class="btn btn-white text-teal shadow-sm fw-bold border" onclick="window.print()">
                 <i class="fas fa-print me-2"></i> Print
             </button>
@@ -222,52 +211,6 @@ try {
     </div>
 </div>
 
-<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-bottom-0">
-                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-cog me-2"></i>Settings</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form action="functions/update_settings.php" method="POST">
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-8"><label class="fw-bold small">SSS Rate (%)</label></div>
-                        <div class="col-4">
-                            <input type="number" step="0.01" name="SSS" class="form-control form-control-sm fw-bold text-end" value="<?php echo $settings['SSS']['amount']; ?>" required>
-                        </div>
-                    </div>
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-8"><label class="fw-bold small">PhilHealth Rate (%)</label></div>
-                        <div class="col-4">
-                            <input type="number" step="0.01" name="PhilHealth" class="form-control form-control-sm fw-bold text-end" value="<?php echo $settings['PhilHealth']['amount']; ?>" required>
-                        </div>
-                    </div>
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-8"><label class="fw-bold small">Withholding Tax (%)</label></div>
-                        <div class="col-4">
-                            <input type="number" step="0.01" name="Tax" class="form-control form-control-sm fw-bold text-end" value="<?php echo $settings['Tax']['amount']; ?>" required>
-                        </div>
-                    </div>
-                    <hr>
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-8"><label class="fw-bold small">Pag-IBIG (Fixed Amount)</label></div>
-                        <div class="col-4">
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text">₱</span>
-                                <input type="number" step="0.01" name="Pag-IBIG" class="form-control fw-bold text-end" value="<?php echo $settings['Pag-IBIG']['amount']; ?>" required>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="d-grid mt-3">
-                        <button type="submit" name="update_settings_btn" class="btn btn-warning text-dark fw-bold">Save Changes</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 <?php require 'template/footer.php'; ?>
 
 <?php if(isset($_SESSION['status'])) { ?>
@@ -354,8 +297,8 @@ $(document).ready(function() {
                 orderable: false, 
                 className: 'text-center',
                 render: function(data) {
-                    // We use an anchor tag to link to the new PHP page in a new window/tab
-                    return `<a href="view_payslip.php?id=${data}" target="_blank" class="btn btn-sm btn-light text-primary border shadow-sm rounded-circle" title="View Payslip">
+                    // Removed target="_blank" to open the link in the current tab
+                    return `<a href="view_payslip.php?id=${data}" class="btn btn-sm btn-light text-primary border shadow-sm rounded-circle" title="View Payslip">
                                 <i class="fas fa-eye"></i>
                             </a>`;
                 }

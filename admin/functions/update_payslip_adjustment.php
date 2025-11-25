@@ -1,7 +1,7 @@
 <?php
 // functions/update_payroll_items.php
 
-require '../db_connection.php';
+require '../../db_connection.php';
 
 // Set response header to JSON
 header('Content-Type: application/json');

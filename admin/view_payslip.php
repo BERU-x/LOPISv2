@@ -50,8 +50,7 @@ try {
         elseif ($item['item_type'] == 'deduction') $deductions[] = $item;
     }
 
-    // --- NEW: C. Fetch Leave Usage (For this Cut-Off) ---
-    // We check tbl_leave for approved leaves (status=1) within the pay period
+    // C. Fetch Leave Usage (For this Cut-Off)
     $sql_leave = "SELECT leave_type, SUM(days_count) as total_days 
                   FROM tbl_leave 
                   WHERE employee_id = :eid 
@@ -65,12 +64,44 @@ try {
         ':end'   => $payslip['cut_off_end']
     ]);
     $leaves_taken = $stmt_leave->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Convert array for easier lookup
+    $leaves_taken_lookup = array_column($leaves_taken, 'total_days', 'leave_type');
 
-    // --- NEW: D. Fetch Financial/Loan Config (Reference) ---
+
+    // 🛑 D. Fetch Financial/Loan Config (Reference)
     $sql_finance = "SELECT * FROM tbl_employee_financials WHERE employee_id = :eid LIMIT 1";
     $stmt_finance = $pdo->prepare($sql_finance);
     $stmt_finance->execute([':eid' => $payslip['employee_id']]);
     $financials = $stmt_finance->fetch(PDO::FETCH_ASSOC);
+
+    // 🛑 E. Fetch Employee's Remaining Leave Balances
+    $remaining_balances = [];
+    if (file_exists('models/leave_model.php')) {
+        require_once 'models/leave_model.php';
+        if (function_exists('get_leave_balance')) {
+             $all_balances = get_leave_balance($pdo, $payslip['employee_id']);
+             foreach($all_balances as $type => $data) {
+                 if (isset($data['remaining'])) {
+                     $remaining_balances[$type] = $data['remaining'];
+                 }
+             }
+        }
+    }
+
+    // 🛑 F. Fetch Days Present
+    $sql_days = "SELECT COUNT(DISTINCT date) as days_present 
+                 FROM tbl_attendance 
+                 WHERE employee_id = :eid 
+                 AND date BETWEEN :start AND :end 
+                 AND num_hr > 0";
+    $stmt_days = $pdo->prepare($sql_days);
+    $stmt_days->execute([
+        ':eid'   => $payslip['employee_id'],
+        ':start' => $payslip['cut_off_start'],
+        ':end'   => $payslip['cut_off_end']
+    ]);
+    $days_present = intval($stmt_days->fetchColumn() ?: 0);
 
     // Format Name
     $full_name = strtoupper($payslip['lastname'] . ', ' . $payslip['firstname'] . ' ' . ($payslip['suffix'] ?? ''));
@@ -84,6 +115,7 @@ try {
 ?>
 
 <style>
+    /* ... existing CSS remains unchanged ... */
     .payslip-paper {
         background: #fff;
         max-width: 850px;
@@ -175,6 +207,11 @@ try {
                             <?php echo date('M d', strtotime($payslip['cut_off_start'])) . ' - ' . date('M d, Y', strtotime($payslip['cut_off_end'])); ?>
                         </div>
                     </div>
+                    
+                                        <div class="row mt-1">
+                        <div class="col-6 text-gray-600 fw-bold">Days Worked:</div>
+                        <div class="col-6 text-dark fw-bold"><?php echo $days_present; ?></div>
+                    </div>
                 </div>
             </div>
 
@@ -183,7 +220,7 @@ try {
                     <h6 class="text-success fw-bold text-uppercase border-bottom pb-2 mb-3">Earnings</h6>
                     <table class="table table-borderless table-sm small align-middle">
                         <tr>
-                            <td class="text-gray-600 fst-italic">Daily Rate (Ref)</td>
+                            <td class="text-gray-600 fst-italic">Daily Rate</td>
                             <td class="text-end text-muted">₱ <?php echo number_format($payslip['daily_rate'], 2); ?></td>
                         </tr>
                         
@@ -192,9 +229,9 @@ try {
                             <td class="text-gray-800 fw-bold"><?php echo htmlspecialchars($earn['item_name']); ?></td>
                             <td class="text-end">
                                 <input type="number" step="0.01" 
-                                       name="items[<?php echo $earn['id']; ?>]" 
-                                       class="form-control form-control-sm editable-input earning-field" 
-                                       value="<?php echo $earn['amount']; ?>">
+                                            name="items[<?php echo $earn['id']; ?>]" 
+                                            class="form-control form-control-sm editable-input earning-field" 
+                                            value="<?php echo $earn['amount']; ?>">
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -218,9 +255,9 @@ try {
                                 <td class="text-gray-600"><?php echo htmlspecialchars($deduct['item_name']); ?></td>
                                 <td class="text-end">
                                     <input type="number" step="0.01" 
-                                           name="items[<?php echo $deduct['id']; ?>]" 
-                                           class="form-control form-control-sm editable-input deduction-field" 
-                                           value="<?php echo $deduct['amount']; ?>">
+                                            name="items[<?php echo $deduct['id']; ?>]" 
+                                            class="form-control form-control-sm editable-input deduction-field" 
+                                            value="<?php echo $deduct['amount']; ?>">
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -239,73 +276,124 @@ try {
 
                 <div class="row mt-4 pt-3 border-top border-light">
                 
-                <div class="col-6">
-                    <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Leaves Taken (This Period)</h6>
-                    <table class="table table-bordered table-sm small align-middle">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>Type</th>
-                                <th class="text-center">Days</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if(count($leaves_taken) > 0): ?>
-                                <?php foreach($leaves_taken as $leave): ?>
+                    <div class="col-6">
+                        <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Leave Summary (Total)</h6>
+                        <table class="table table-bordered table-sm small align-middle">
+                            <thead class="bg-light">
                                 <tr>
-                                    <td><?php echo htmlspecialchars($leave['leave_type']); ?></td>
-                                    <td class="text-center fw-bold"><?php echo $leave['total_days']; ?></td>
+                                    <th>Type</th>
+                                    <th class="text-center">Used (Current Period)</th>
+                                    <th class="text-center">Remaining</th>
                                 </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr><td colspan="2" class="text-center text-muted fst-italic">No leaves taken.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="col-6">
-                    <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Active Loan Configs (Monthly)</h6>
-                    <table class="table table-bordered table-sm small align-middle">
-                        <thead class="bg-light">
-                            <tr>
-                                <th>Loan Type</th>
-                                <th class="text-end">Amortization</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php 
-                            $has_loans = false;
-                            $loan_fields = [
-                                'sss_loan' => 'SSS Loan', 
-                                'pagibig_loan' => 'Pag-IBIG Loan', 
-                                'company_loan' => 'Company Loan', 
-                                'cash_advance' => 'Cash Advance'
-                            ];
-                            
-                            if($financials):
-                                foreach($loan_fields as $db_col => $label):
-                                    $amount = floatval($financials[$db_col] ?? 0);
-                                    if($amount > 0): 
-                                        $has_loans = true;
-                            ?>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $leave_types = ['Vacation Leave', 'Sick Leave', 'Emergency Leave', 'Maternity/Paternity', 'Unpaid Leave'];
+                                $has_leave_data = false;
+                                foreach($leave_types as $type):
+                                    $used = $leaves_taken_lookup[$type] ?? 0;
+                                    $remaining = $remaining_balances[$type] ?? 'N/A';
+                                    
+                                    // Check if there is any relevant data to display
+                                    if ($used > 0 || $remaining !== 'N/A'): 
+                                        $has_leave_data = true;
+                                        $remaining_class = ($remaining !== 'N/A' && $remaining <= 0) ? 'text-danger' : 'text-teal';
+                                ?>
                                 <tr>
-                                    <td><?php echo $label; ?></td>
-                                    <td class="text-end text-muted">₱ <?php echo number_format($amount, 2); ?></td>
+                                    <td><?php echo htmlspecialchars($type); ?></td>
+                                    <td class="text-center"><?php echo $used; ?></td>
+                                    <td class="text-center fw-bold <?php echo $remaining_class; ?>"><?php echo $remaining; ?></td>
                                 </tr>
-                            <?php 
+                                <?php 
                                     endif;
                                 endforeach;
-                            endif;
 
-                            if(!$has_loans): 
-                            ?>
-                                <tr><td colspan="2" class="text-center text-muted fst-italic">No active loans.</td></tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                                if(!$has_leave_data):
+                                ?>
+                                    <tr><td colspan="3" class="text-center text-muted fst-italic">No relevant leave data.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="col-6">
+                        <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Active Loan Configs</h6>
+                        <table class="table table-bordered table-sm small align-middle">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Loan Type</th>
+                                    <th class="text-end">Total Remaining Balance</th> 
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $has_loans = false;
+                                
+                                // Map the AMORTIZATION columns from the database
+                                $loan_fields = [
+                                    'sss_loan'              => 'SSS Loan', 
+                                    'pagibig_loan'          => 'Pag-IBIG Loan', 
+                                    'company_loan'          => 'Company Loan', 
+                                    'cash_assist_deduction' => 'Cash Assistance'
+                                ];
+                                
+                                if($financials):
+                                    foreach($loan_fields as $amort_col => $label):
+                                        // We still fetch amortization to check if the loan is ACTIVE
+                                        $amortization = floatval($financials[$amort_col] ?? 0);
+                                        
+                                        // Logic to find the TOTAL BALANCE
+                                        $remaining_balance_display = '<span class="text-muted fst-italic">N/A (External)</span>'; 
+                                        
+                                        // Special logic for Cash Assistance Balance
+                                        if ($amort_col === 'cash_assist_deduction') {
+                                            $balance_amount = floatval($financials['cash_assist_total'] ?? 0);
+                                            $bal_class = ($balance_amount > 0) ? 'text-danger' : 'text-success';
+                                            $remaining_balance_display = '<span class="'.$bal_class.'">₱ ' . number_format($balance_amount, 2) . '</span>';
+                                        }
+                                        
+                                        if ($amort_col === 'company_loan') {
+                                            $balance_amount = floatval($financials['company_loan_balance'] ?? 0);
+                                            $bal_class = ($balance_amount > 0) ? 'text-danger' : 'text-success';
+                                            $remaining_balance_display = '<span class="'.$bal_class.'">₱ ' . number_format($balance_amount, 2) . '</span>';
+                                        }
+                                        
+                                        if ($amort_col === 'sss_loan') {
+                                            $balance_amount = floatval($financials['sss_loan_balance'] ?? 0);
+                                            $bal_class = ($balance_amount > 0) ? 'text-danger' : 'text-success';
+                                            $remaining_balance_display = '<span class="'.$bal_class.'">₱ ' . number_format($balance_amount, 2) . '</span>';
+                                        }
+                                        
+                                        if ($amort_col === 'pagibig_loan') {
+                                            $balance_amount = floatval($financials['pagibig_loan_balance'] ?? 0);
+                                            $bal_class = ($balance_amount > 0) ? 'text-danger' : 'text-success';
+                                            $remaining_balance_display = '<span class="'.$bal_class.'">₱ ' . number_format($balance_amount, 2) . '</span>';
+                                        }
+
+                                        // Only display the row if there is an active monthly deduction
+                                        if($amortization > 0): 
+                                            $has_loans = true;
+                                ?>
+                                        <tr>
+                                            <td><?php echo $label; ?></td>
+                                            <td class="text-end fw-bold text-dark small">
+                                                <?php echo $remaining_balance_display; ?>
+                                            </td>
+                                        </tr>
+                                <?php 
+                                        endif;
+                                    endforeach;
+                                endif;
+
+                                if(!$has_loans): 
+                                ?>
+                                    <tr><td colspan="2" class="text-center text-muted fst-italic">No active loans.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
-            <div class="row mt-4 pt-3 border-top border-2 border-teal"></div>
+                <div class="row mt-4 pt-3 border-top border-2 border-teal"></div>
             </div>
 
             <div class="row mt-5">
@@ -360,8 +448,9 @@ $(document).ready(function() {
         $('#disp_net').text(formatMoney(net));
     }
 
-    // Trigger on any input change
+    // Trigger on any input change and initial calculation
     $('#payslip-form').on('input', 'input.editable-input', calculate);
+    calculate(); // Initial calculation
 
     // --- 2. Save Adjustment (AJAX) ---
     $('#save-adjustment-btn').click(function() {
@@ -369,10 +458,10 @@ $(document).ready(function() {
         let originalText = btn.html();
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Saving...');
 
-        // Note: You will need a new "functions/update_payroll_items.php" to handle this
-        // because we are now sending an array of item IDs, not just columns.
+        // IMPORTANT: The server-side script 'functions/update_payroll_items.php' 
+        // MUST be updated to accept the item IDs array (items[id]=amount) and update tbl_payroll_items and tbl_payroll header.
         $.ajax({
-            url: 'functions/update_payroll_items.php', 
+            url: 'functions/update_payslip_adjustment.php', 
             type: 'POST',
             data: $('#payslip-form').serialize(),
             dataType: 'json',
@@ -382,6 +471,7 @@ $(document).ready(function() {
                         icon: 'success', title: 'Updated!',
                         text: res.message, timer: 1500, showConfirmButton: false
                     });
+                    // Re-enable the button with the updated status from the server if necessary
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
