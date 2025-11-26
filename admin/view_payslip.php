@@ -162,12 +162,11 @@ try {
         </div>
         
         <div class="d-flex gap-2">
-            <button type="button" class="btn btn-success shadow-sm fw-bold" id="save-adjustment-btn">
-                <i class="fas fa-save me-2"></i>Save Adjustments
-            </button>
-            <button class="btn btn-teal shadow-sm fw-bold" onclick="window.print()">
-                <i class="fas fa-print me-2"></i>Print
-            </button>
+            <a href="functions/print_payslip.php?id=<?php echo $payroll_id; ?>" 
+            target="_blank" 
+            class="btn btn-teal shadow-sm fw-bold">
+                <i class="fas fa-print me-2"></i>Print Payslip
+            </a>
         </div>
     </div>
 
@@ -316,83 +315,90 @@ try {
                         </table>
                     </div>
 
-                    <div class="col-6">
-                        <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Active Loan Configs</h6>
-                        <table class="table table-bordered table-sm small align-middle">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Loan Type</th>
-                                    <th class="text-end">Total Remaining Balance</th> 
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php 
-                                $has_loans = false;
-                                
-                                // Map the AMORTIZATION columns from the database
-                                $loan_fields = [
-                                    'sss_loan'              => 'SSS Loan', 
-                                    'pagibig_loan'          => 'Pag-IBIG Loan', 
-                                    'company_loan'          => 'Company Loan', 
-                                    'cash_assist_deduction' => 'Cash Assistance'
-                                ];
-                                
-                                if($financials):
-                                    foreach($loan_fields as $amort_col => $label):
-                                        // We still fetch amortization to check if the loan is ACTIVE
-                                        $amortization = floatval($financials[$amort_col] ?? 0);
-                                        
-                                        // Logic to find the TOTAL BALANCE
-                                        $remaining_balance_display = '<span class="text-muted fst-italic">N/A (External)</span>'; 
-                                        
-                                        // Special logic for Cash Assistance Balance
-                                        if ($amort_col === 'cash_assist_deduction') {
-                                            $balance_amount = floatval($financials['cash_assist_total'] ?? 0);
-                                            $bal_class = ($balance_amount > 0) ? 'text-danger' : 'text-success';
-                                            $remaining_balance_display = '<span class="'.$bal_class.'">₱ ' . number_format($balance_amount, 2) . '</span>';
-                                        }
-                                        
-                                        if ($amort_col === 'company_loan') {
-                                            $balance_amount = floatval($financials['company_loan_balance'] ?? 0);
-                                            $bal_class = ($balance_amount > 0) ? 'text-danger' : 'text-success';
-                                            $remaining_balance_display = '<span class="'.$bal_class.'">₱ ' . number_format($balance_amount, 2) . '</span>';
-                                        }
-                                        
-                                        if ($amort_col === 'sss_loan') {
-                                            $balance_amount = floatval($financials['sss_loan_balance'] ?? 0);
-                                            $bal_class = ($balance_amount > 0) ? 'text-danger' : 'text-success';
-                                            $remaining_balance_display = '<span class="'.$bal_class.'">₱ ' . number_format($balance_amount, 2) . '</span>';
-                                        }
-                                        
-                                        if ($amort_col === 'pagibig_loan') {
-                                            $balance_amount = floatval($financials['pagibig_loan_balance'] ?? 0);
-                                            $bal_class = ($balance_amount > 0) ? 'text-danger' : 'text-success';
-                                            $remaining_balance_display = '<span class="'.$bal_class.'">₱ ' . number_format($balance_amount, 2) . '</span>';
-                                        }
+                        <div class="col-6">
+                            <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Active Loan Configs</h6>
+                            <table class="table table-bordered table-sm small align-middle">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Loan Type</th>
+                                        <th class="text-end">Current Balance</th> 
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    $has_loans = false;
+                                    
+                                    // Map the AMORTIZATION columns/keys to Labels
+                                    $loan_fields = [
+                                        'sss_loan'              => 'SSS Loan', 
+                                        'pagibig_loan'          => 'Pag-IBIG Loan', 
+                                        'company_loan'          => 'Company Loan', 
+                                        'cash_assist_deduction' => 'Cash Assistance'
+                                    ];
+                                    
+                                    if($financials):
+                                        foreach($loan_fields as $amort_col => $label):
+                                            // 1. Check if the loan is active (has an amortization setting > 0)
+                                            $amortization = floatval($financials[$amort_col] ?? 0);
+                                            
+                                            if($amortization > 0): 
+                                                $has_loans = true;
 
-                                        // Only display the row if there is an active monthly deduction
-                                        if($amortization > 0): 
-                                            $has_loans = true;
-                                ?>
-                                        <tr>
-                                            <td><?php echo $label; ?></td>
-                                            <td class="text-end fw-bold text-dark small">
-                                                <?php echo $remaining_balance_display; ?>
-                                            </td>
-                                        </tr>
-                                <?php 
-                                        endif;
-                                    endforeach;
-                                endif;
+                                                // 2. Get the DATABASE Balance (Total before this payslip, usually)
+                                                $db_balance = 0;
+                                                if ($amort_col === 'cash_assist_deduction') {
+                                                    $db_balance = floatval($financials['cash_assist_total'] ?? 0);
+                                                } elseif ($amort_col === 'company_loan') {
+                                                    $db_balance = floatval($financials['company_loan_balance'] ?? 0);
+                                                } elseif ($amort_col === 'sss_loan') {
+                                                    $db_balance = floatval($financials['sss_loan_balance'] ?? 0);
+                                                } elseif ($amort_col === 'pagibig_loan') {
+                                                    $db_balance = floatval($financials['pagibig_loan_balance'] ?? 0);
+                                                }
 
-                                if(!$has_loans): 
-                                ?>
-                                    <tr><td colspan="2" class="text-center text-muted fst-italic">No active loans.</td></tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                                                // 3. Find the CURRENT DEDUCTION amount in this payslip
+                                                $current_deduction = 0;
+                                                foreach($deductions as $d_item) {
+                                                    // We check if the item name contains the Label (e.g., "SSS Loan")
+                                                    if (strpos($d_item['item_name'], $label) !== false) {
+                                                        $current_deduction = floatval($d_item['amount']);
+                                                        break; // Stop once found
+                                                    }
+                                                }
+
+                                                // 4. Calculate ACTUAL REMAINING (DB Balance - Current Deduction)
+                                                $calculated_remaining = $db_balance - $current_deduction;
+
+                                                // 5. Determine styling
+                                                $bal_class = ($calculated_remaining > 0) ? 'text-danger' : 'text-success';
+                                                
+                                                // Optional: visual breakdown tooltip or logic
+                                                // $display_text = number_format($db_balance, 2) . ' - ' . number_format($current_deduction, 2) . ' = ' . number_format($calculated_remaining, 2);
+                                    ?>
+                                                <tr>
+                                                    <td><?php echo $label; ?></td>
+                                                    <td class="text-end fw-bold text-dark small">
+                                                        <span class="<?php echo $bal_class; ?>">
+                                                            ₱ <?php echo number_format($calculated_remaining, 2); ?>
+                                                        </span>
+                                                        <div class="text-gray-400 text-xs font-weight-normal">
+                                                            (<?php echo number_format($db_balance, 2); ?> - <?php echo number_format($current_deduction, 2); ?>)
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                    <?php 
+                                            endif;
+                                        endforeach;
+                                    endif;
+
+                                    if(!$has_loans): 
+                                    ?>
+                                        <tr><td colspan="2" class="text-center text-muted fst-italic">No active loans.</td></tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
                 <div class="row mt-4 pt-3 border-top border-2 border-teal"></div>
             </div>
 
@@ -451,39 +457,6 @@ $(document).ready(function() {
     // Trigger on any input change and initial calculation
     $('#payslip-form').on('input', 'input.editable-input', calculate);
     calculate(); // Initial calculation
-
-    // --- 2. Save Adjustment (AJAX) ---
-    $('#save-adjustment-btn').click(function() {
-        let btn = $(this);
-        let originalText = btn.html();
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Saving...');
-
-        // IMPORTANT: The server-side script 'functions/update_payroll_items.php' 
-        // MUST be updated to accept the item IDs array (items[id]=amount) and update tbl_payroll_items and tbl_payroll header.
-        $.ajax({
-            url: 'functions/update_payslip_adjustment.php', 
-            type: 'POST',
-            data: $('#payslip-form').serialize(),
-            dataType: 'json',
-            success: function(res) {
-                if(res.success) {
-                    Swal.fire({
-                        icon: 'success', title: 'Updated!',
-                        text: res.message, timer: 1500, showConfirmButton: false
-                    });
-                    // Re-enable the button with the updated status from the server if necessary
-                } else {
-                    Swal.fire('Error', res.message, 'error');
-                }
-            },
-            error: function() {
-                Swal.fire('Error', 'Failed to save changes.', 'error');
-            },
-            complete: function() {
-                btn.prop('disabled', false).html(originalText);
-            }
-        });
-    });
 
 });
 </script>

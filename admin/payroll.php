@@ -34,8 +34,8 @@ try {
         </div>
         
         <div class="d-flex gap-2">
-            <button class="btn btn-white text-teal shadow-sm fw-bold border" onclick="window.print()">
-                <i class="fas fa-print me-2"></i> Print
+            <button class="btn btn-white text-teal shadow-sm fw-bold border" onclick="printBatchPayslips()">
+                <i class="fas fa-print me-2"></i> Print Batch (Date Range)
             </button>
             
             <button class="btn btn-teal shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#generatePayrollModal">
@@ -378,4 +378,24 @@ $(document).ready(function() {
         payrollTable.ajax.reload();
     });
 });
+
+function printBatchPayslips() {
+    // 1. Get values from the existing filter inputs
+    var start_date = $('#filter_start_date').val();
+    var end_date = $('#filter_end_date').val();
+
+    // 2. Validate
+    if(start_date === '' || end_date === '') {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Missing Date Range',
+            text: 'Please select a "Cut-Off Start" and "Cut-Off End" date in the filter section first.'
+        });
+        return;
+    }
+
+    // 3. Open the generator in a new tab
+    var url = 'functions/print_batch_payslips.php?start=' + start_date + '&end=' + end_date;
+    window.open(url, '_blank');
+}
 </script>
