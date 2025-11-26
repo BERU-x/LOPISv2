@@ -52,17 +52,24 @@ function isActive($page_name, $current_page) {
         </a>
     </li>
 
-    <li class="nav-item <?php echo isActive('payroll', $current_page); ?>">
-        <a class="nav-link" href="payroll.php">
-            <i class="fas fa-fw fa-file-invoice-dollar"></i>
-            <span>Payroll Processing</span>
-        </a>
-    </li>
-
     <li class="nav-item <?php echo isActive('leave_management', $current_page); ?>">
         <a class="nav-link" href="leave_management.php">
             <i class="fas fa-fw fa-calendar-check"></i>
             <span>Leave Management</span>
+        </a>
+    </li>
+    
+    <li class="nav-item <?php echo isActive('overtime_approval', $current_page); ?>">
+        <a class="nav-link" href="overtime_approval.php">
+            <i class="fas fa-business-time"></i>
+            <span>Overtime Management</span>
+        </a>
+    </li>
+
+    <li class="nav-item <?php echo isActive('payroll', $current_page); ?>">
+        <a class="nav-link" href="payroll.php">
+            <i class="fas fa-fw fa-file-invoice-dollar"></i>
+            <span>Payroll Processing</span>
         </a>
     </li>
 

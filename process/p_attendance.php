@@ -145,7 +145,11 @@ try {
         $lunch_start = strtotime("$date_today 12:00:00");
         $lunch_end   = strtotime("$date_today 13:00:00");
 
-        $actual_in   = strtotime($attendance['time_in']);
+        $actual_in_time_str = $attendance['time_in'];
+        // 🛑 CHANGE: Calculate IN time based on minute boundary (09:00:59 becomes 09:00:00 for duration calc)
+        $actual_in_minutes = floor(strtotime($actual_in_time_str) / 60) * 60; 
+        $actual_in         = $actual_in_minutes; 
+
         $actual_out  = strtotime($currentTime);
 
         // 1. Calculate Regular Hours (Capped at 9am - 6pm)
