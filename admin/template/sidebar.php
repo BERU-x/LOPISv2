@@ -80,21 +80,21 @@ function isActive($page_name, $current_page) {
     </div>
 
     <li class="nav-item <?php echo isActive('reports', $current_page); ?>">
-        <a class="nav-link" href="reports.php">
+        <a class="nav-link" href="coming_soon.php?feature=Reports">
             <i class="fas fa-fw fa-chart-pie"></i>
             <span>Reports</span>
         </a>
     </li>
 
     <li class="nav-item <?php echo isActive('policies', $current_page); ?>">
-        <a class="nav-link" href="company_policies.php">
+        <a class="nav-link" href="coming_soon.php?feature=Company Policies">
             <i class="fas fa-fw fa-book-open"></i>
             <span>Company Policies</span>
         </a>
     </li>
 
     <li class="nav-item <?php echo isActive('audit_logs', $current_page); ?>">
-        <a class="nav-link" href="audit_logs.php">
+        <a class="nav-link" href="coming_soon.php?feature=Audit Logs">
             <i class="fas fa-fw fa-history"></i>
             <span>Audit Logs</span>
         </a>

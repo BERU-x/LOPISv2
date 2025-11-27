@@ -14,9 +14,16 @@ $lat  = $_POST['latitude'] ?? null;
 $long = $_POST['longitude'] ?? null;
 $addr = $_POST['address'] ?? null;
 
-$today        = date("Y-m-d");
+// --- HANDLE OVERRIDES (TESTING MODE) ---
 
-// CHECK FOR TEST OVERRIDE
+// 1. Date Override
+if (!empty($_POST['custom_date'])) {
+    $today = $_POST['custom_date'];
+} else {
+    $today = date("Y-m-d");
+}
+
+// 2. Time Override
 if (!empty($_POST['custom_time'])) {
     $currentTime = $_POST['custom_time'];
 } else {
@@ -61,15 +68,17 @@ try {
         $check->execute([$employee_id, $today]);
         
         if ($check->rowCount() > 0) {
-            echo json_encode(['status' => 'warning', 'message' => "Hi $display_name, you have already timed in today."]);
+            echo json_encode(['status' => 'warning', 'message' => "Hi $display_name, you have already timed in for $today."]);
             exit();
         }
 
         // --- CALCULATE LATE HOURS ---
+        // Note: Using $today ensures we calculate relative to the override date
         $shift_start_str = "$today 09:00:00";
         $late_threshold_str = "$today 09:01:00"; // 🛑 Late starts at 9:01:00 exactly
         
-        $actual_in_time = strtotime($currentTime);
+        // We construct the timestamp using the Date (override or real) + Time (override or real)
+        $actual_in_time = strtotime("$today $currentTime");
         $shift_start_time = strtotime($shift_start_str);
         $late_threshold_time = strtotime($late_threshold_str);
         
@@ -116,9 +125,10 @@ try {
             $pdo->commit();
 
             $formattedTime = date("g:i A", strtotime($currentTime));
+            $formattedDate = date("M d", strtotime($today));
             $late_msg = ($total_late_hr > 0) ? " You are late by $total_late_hr hours." : "";
             
-            echo json_encode(['status' => 'success', 'message' => "Welcome, $display_name! Time In at $formattedTime.$late_msg"]);
+            echo json_encode(['status' => 'success', 'message' => "Welcome, $display_name! Time In recorded for $formattedDate at $formattedTime.$late_msg"]);
 
         } catch (Exception $e) {
             $pdo->rollBack();
@@ -134,23 +144,25 @@ try {
         $attendance = $check->fetch(PDO::FETCH_ASSOC);
 
         if (!$attendance) {
-            echo json_encode(['status' => 'error', 'message' => "Hi $display_name, you are not timed in yet or already timed out."]);
+            echo json_encode(['status' => 'error', 'message' => "Hi $display_name, no active Time In found for $today."]);
             exit();
         }
 
         // --- HOURS CALCULATION ---
-        $date_today  = date("Y-m-d");
-        $shift_start = strtotime("$date_today 09:00:00");
-        $shift_end   = strtotime("$date_today 18:00:00");
-        $lunch_start = strtotime("$date_today 12:00:00");
-        $lunch_end   = strtotime("$date_today 13:00:00");
+        // Use global $today to ensure we use the overridden date if applicable
+        $shift_start = strtotime("$today 09:00:00");
+        $shift_end   = strtotime("$today 18:00:00");
+        $lunch_start = strtotime("$today 12:00:00");
+        $lunch_end   = strtotime("$today 13:00:00");
 
-        $actual_in_time_str = $attendance['time_in'];
+        // Construct timestamps using the Date + Time string to ensure accurate math
+        $actual_in_timestamp = strtotime("$today " . $attendance['time_in']);
+        
         // 🛑 CHANGE: Calculate IN time based on minute boundary (09:00:59 becomes 09:00:00 for duration calc)
-        $actual_in_minutes = floor(strtotime($actual_in_time_str) / 60) * 60; 
+        $actual_in_minutes = floor($actual_in_timestamp / 60) * 60; 
         $actual_in         = $actual_in_minutes; 
 
-        $actual_out  = strtotime($currentTime);
+        $actual_out = strtotime("$today $currentTime");
 
         // 1. Calculate Regular Hours (Capped at 9am - 6pm)
         $effective_in = max($actual_in, $shift_start); 
@@ -235,10 +247,11 @@ try {
             $pdo->commit();
 
             $formattedTime = date("g:i A", strtotime($currentTime));
+            $formattedDate = date("M d", strtotime($today));
             $ot_msg = ($overtime_hr > 0) ? " (OT: $overtime_hr hrs)" : "";
             $ut_msg = ($undertime_hr > 0) ? " (Undertime: $undertime_hr hrs)" : "";
 
-            echo json_encode(['status' => 'success', 'message' => "Goodbye, $display_name! Time Out at $formattedTime. Status: $final_status_str. Paid Hrs: $num_hr$ot_msg$ut_msg"]);
+            echo json_encode(['status' => 'success', 'message' => "Goodbye, $display_name! Time Out recorded for $formattedDate at $formattedTime. Status: $final_status_str. Paid Hrs: $num_hr$ot_msg$ut_msg"]);
 
         } catch (Exception $e) {
             $pdo->rollBack();

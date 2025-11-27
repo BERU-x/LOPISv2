@@ -2,7 +2,7 @@
 // attendance_management.php
 
 // --- 1. SET PAGE CONFIGURATIONS ---
-$page_title = 'Attendance Management';
+$page_title = 'Attendance Logs';
 $current_page = 'attendance_management'; 
 
 // --- DATABASE CONNECTION & TEMPLATES ---
@@ -26,7 +26,7 @@ require 'template/topbar.php';
     <div class="card shadow mb-4">
         <div class="card-header py-3 bg-white border-bottom-0">
             <h6 class="m-0 font-weight-bold text-gray-800">
-                <i class="fas fa-filter me-2 text-teal"></i>Filter Records
+                <i class="fas fa-filter me-2 text-secondary"></i>Filter Records
             </h6>
         </div>
         <div class="card-body bg-light rounded-bottom">
@@ -55,7 +55,7 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
-            <h6 class="m-0 font-weight-bold text-teal"><i class="fas fa-list-alt me-2"></i>History Log</h6>
+            <h6 class="m-0 font-weight-bold text-gray-800"><i class="fas fa-list-alt me-2"></i>History Log</h6>
             
             <div class="input-group" style="max-width: 250px;">
                 <span class="input-group-text bg-light border-0"><i class="fas fa-search text-gray-400"></i></span>
@@ -94,7 +94,7 @@ $(document).ready(function() {
     // Check if table exists
     if ($('#attendanceTable').length) {
         
-        // Destroy existing if needed
+        // Destroy existing if needed to prevent duplicates on reload
         if ($.fn.DataTable.isDataTable('#attendanceTable')) {
             $('#attendanceTable').DataTable().destroy();
         }
@@ -102,8 +102,8 @@ $(document).ready(function() {
         var attendanceTable = $('#attendanceTable').DataTable({
             processing: true,
             serverSide: true,
-            destroy: true, // Backup destroy
-            ordering: false, // Disable client-side sorting to let server handle it (optional)
+            destroy: true, 
+            ordering: false, // Server handles sorting
             
             // Clean DOM (Hides default search 'f' and length 'l')
             dom: 'rtip', 
@@ -118,19 +118,19 @@ $(document).ready(function() {
             },
             
             columns: [
-                // Col 0: Employee (Combined ID + Name + Avatar)
+                // Col 0: Employee
                 { 
                     data: 'employee_name',
                     render: function(data, type, row) {
-                        // Assuming SSP returns 'photo' and 'department'
-                        // If not, it falls back to defaults
-                        var photo = row.photo ? row.photo : 'default.png';
-                        var dept = row.department ? row.department : ''; 
+                        // Check if photo exists in row data, else use default
+                        var photo = row.photo ? '../assets/images/' + row.photo : '../assets/images/default.png';
                         var id = row.employee_id ? row.employee_id : '';
 
                         return `
                             <div class="d-flex align-items-center">
-                                <img src="../assets/images/${photo}" class="rounded-circle me-3 border shadow-sm" style="width: 40px; height: 40px; object-fit: cover;">
+                                <img src="${photo}" class="rounded-circle me-3 border shadow-sm" 
+                                     style="width: 40px; height: 40px; object-fit: cover;" 
+                                     onerror="this.src='../assets/images/default.png'">
                                 <div>
                                     <div class="fw-bold text-dark">${data}</div>
                                     <div class="small text-muted">${id}</div>
@@ -140,39 +140,27 @@ $(document).ready(function() {
                     }
                 },
                 
-                // Col 1: Date
+                // Col 1: Date (Server formatted)
                 { 
                     data: 'date',
-                    render: function(data) {
-                        // Formatting YYYY-MM-DD to "MMM DD, YYYY"
-                        if(data) {
-                            var d = new Date(data);
-                            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                        }
-                        return '';
-                    }
+                    className: "text-nowrap"
                 },
                 
-                // Col 2: Time In
+                // Col 2: Time In (Server formatted)
                 { 
                     data: 'time_in',
-                    className: "fw-bold text-teal"
                 },
 
-                // Col 3: Status (Soft Badges)
+                // Col 3: Status (Server sends HTML Badge)
                 { 
                     data: 'status', 
                     className: "text-center",
                     render: function (data) {
-                        if (data == 1) {
-                            return '<span class="badge bg-soft-success text-success border border-success px-3 shadow-sm rounded-pill">On Time</span>';
-                        } else {
-                            return '<span class="badge bg-soft-warning text-warning border border-warning px-3 shadow-sm rounded-pill">Late</span>';
-                        }
+                        return data; // Output the HTML directly
                     }
                 }, 
                 
-                // Col 4: Time Out
+                // Col 4: Time Out (Server formatted)
                 { data: 'time_out' },
 
                 // Col 5: Hours
@@ -180,14 +168,13 @@ $(document).ready(function() {
                     data: 'num_hr',
                     className: "text-center fw-bold text-gray-700",
                     render: function (data) {
-                        return data ? parseFloat(data).toFixed(2) : '—';
+                        return data > 0 ? parseFloat(data).toFixed(2) : '—';
                     }
                 },
 
                 // Col 6: Overtime
                 { 
                     data: 'overtime_hr',
-                    className: "text-center text-danger",
                     render: function (data) {
                         return (data > 0) ? '+' + parseFloat(data).toFixed(2) : '—';
                     }
@@ -196,7 +183,8 @@ $(document).ready(function() {
             
             language: {
                 processing: "<div class='spinner-border text-teal' role='status'><span class='visually-hidden'>Loading...</span></div>",
-                emptyTable: "No attendance records found."
+                emptyTable: "No attendance records found.",
+                zeroRecords: "No matching records found."
             }
         });
 
@@ -223,8 +211,8 @@ $(document).ready(function() {
         $('#clearFilterBtn').off('click').on('click', function() {
             $('#filter_start_date').val('');
             $('#filter_end_date').val('');
-            $('#customSearch').val(''); // Clear search input too
-            attendanceTable.search('').draw(); // Clear datatable search
+            $('#customSearch').val(''); 
+            attendanceTable.search('').draw(); 
             attendanceTable.ajax.reload();
         });
     }

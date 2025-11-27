@@ -113,7 +113,7 @@ require 'template/topbar.php';
         <h1 class="h3 mb-0 text-gray-800">
             <i class="fas fa-user-edit me-2"></i> Edit Employee Profile
         </h1>
-        <a href="manage_financials.php?id=<?php echo $employee_id; ?>" class="btn btn-success shadow-sm">
+        <a href="manage_financials.php?id=<?php echo $employee_id; ?>" class="btn btn-secondary shadow-sm">
             <i class="fas fa-coins me-2"></i> Go to Financials
         </a>
     </div>
@@ -131,7 +131,7 @@ require 'template/topbar.php';
                 
                 <div class="col-lg-6">
                     <div class="card card-body p-4 border-0 shadow-sm h-100">
-                        <h6 class="fw-bold text-teal mb-3">
+                        <h6 class="fw-bold text-gray-600 mb-3">
                             <i class="fas fa-id-card me-2"></i> Personal Information
                         </h6>
                         <hr class="mt-1 mb-4">
@@ -215,7 +215,7 @@ require 'template/topbar.php';
                             </div>
                             
                             <div class="col-12 mt-4">
-                                <h6 class="fw-bold text-teal mb-3">
+                                <h6 class="fw-bold text-gray-600 mb-3">
                                     <i class="fas fa-camera me-2"></i> Profile Photo
                                 </h6>
                                 <hr class="mt-1 mb-3">
@@ -231,7 +231,7 @@ require 'template/topbar.php';
                 <div class="col-lg-6">
                     <div class="card card-body p-4 border-0 shadow-sm h-100">
                         
-                        <h6 class="fw-bold text-teal mb-3">
+                        <h6 class="fw-bold text-gray-600 mb-3">
                             <i class="fas fa-briefcase me-2"></i> Employment Details
                         </h6>
                         <hr class="mt-1 mb-4">
@@ -270,7 +270,7 @@ require 'template/topbar.php';
                             </div>
 
                             <div class="col-12 mt-4">
-                                <div class="alert alert-light border border-teal text-teal small">
+                                <div class="alert alert-light border border-teal text-gray-600 small">
                                     <i class="fas fa-info-circle me-1"></i> 
                                     Looking to edit Salary, Allowances, or Bank Info? <br>
                                     Please use the <strong><a href="manage_financials.php?id=<?php echo $employee_id; ?>" class="fw-bold text-success text-decoration-none">Manage Financials</a></strong> page.

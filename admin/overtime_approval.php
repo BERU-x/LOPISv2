@@ -1,9 +1,6 @@
 <?php
 // overtime_approval.php (Admin/Manager Portal)
 
-// --- TEMPLATE INCLUDES & INITIAL SETUP ---
-// NOTE: Ensure 'header.php' includes 'checking.php' and grants access based on $_SESSION['usertype']
-require 'template/header.php'; 
 // Assuming database connection ($pdo) is available after header inclusion.
 date_default_timezone_set('Asia/Manila');
 
@@ -11,6 +8,9 @@ date_default_timezone_set('Asia/Manila');
 $page_title = 'Overtime Approval';
 $current_page = 'overtime_approval'; 
 
+// --- TEMPLATE INCLUDES & INITIAL SETUP ---
+// NOTE: Ensure 'header.php' includes 'checking.php' and grants access based on $_SESSION['usertype']
+require 'template/header.php'; 
 // --- 2. TEMPLATE INCLUDES (Structure) ---
 require 'template/sidebar.php';
 require 'template/topbar.php';
@@ -20,7 +20,7 @@ require 'template/topbar.php';
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <div>
-            <h1 class="h3 mb-0 text-gray-800 font-weight-bold">⏰ Overtime Requests</h1>
+            <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Overtime Requests</h1>
             <p class="mb-0 text-muted">Review, filter, and approve submitted employee overtime requests.</p>
         </div>
         <a href="#" class="btn btn-teal shadow-sm fw-bold">
@@ -134,7 +134,7 @@ $(document).ready(function() {
                 // Col 2: Raw OT (Log)
                 { 
                     data: 'raw_ot_hr',
-                    className: 'text-center text-danger fw-bold',
+                    className: 'text-center text-secondary fw-bold',
                     render: function(data) {
                         return data === '0.00 hrs' || data === '0.00' ? '—' : data;
                     }
@@ -150,13 +150,13 @@ $(document).ready(function() {
                 // Col 4: Requested Hrs
                 { 
                     data: 'hours_requested',
-                    className: 'text-center fw-bold text-teal' 
+                    className: 'text-center fw-bold text-secondary' 
                 },
                 
                 // Col 5: Approved Hrs
                 { 
                     data: 'hours_approved',
-                    className: 'text-center fw-bold text-success',
+                    className: 'text-center fw-bold text-secondary',
                     render: function(data) {
                         return data === '—' ? '—' : data;
                     }
@@ -183,7 +183,7 @@ $(document).ready(function() {
                     render: function(data, type, row) {
                         if (data.status === 'Pending') {
                             return `
-                                <button class="btn btn-sm btn-success btn-approve mb-1" data-id="${data.id}" data-requested="${data.hours_requested}">Approve</button>
+                                <button class="btn btn-sm btn-teal btn-approve mb-1" data-id="${data.id}" data-requested="${data.hours_requested}">Approve</button>
                                 <button class="btn btn-sm btn-danger btn-reject" data-id="${data.id}">Reject</button>
                             `;
                         } else {
@@ -244,7 +244,7 @@ $(document).ready(function() {
             Swal.fire({
                 title: 'Approve Overtime',
                 html: `Approve request ID: <b>${otId}</b>.<br>Requested: <b>${requestedHrs} hours</b>.
-                       <hr>Enter **whole** hours to approve:`,
+                       <hr>Enter <b>whole</b> hours to approve:`,
                 input: 'number',
                 // Suggest rounding down to the nearest whole hour
                 inputValue: Math.floor(requestedHrs), 

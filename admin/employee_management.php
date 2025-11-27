@@ -88,7 +88,7 @@ require 'template/topbar.php';
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <div>
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Employee Directory</h1>
-            <p class="mb-0 text-muted">Total Employees: <span class="fw-bold text-teal"><?php echo count($employees); ?></span></p>
+            <p class="mb-0 text-muted">Total Employees: <span class="fw-bold text-gray-600"><?php echo count($employees); ?></span></p>
         </div>
         
         <button class="btn btn-teal shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#addEmployeeModal">
@@ -98,7 +98,7 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
-            <h6 class="m-0 font-weight-bold text-teal"><i class="fas fa-users me-2"></i>Masterlist</h6>
+            <h6 class="m-0 font-weight-bold text-gray-800"><i class="fas fa-users me-2"></i>Masterlist</h6>
             
             <div class="input-group" style="max-width: 250px;">
                 <span class="input-group-text bg-light border-0"><i class="fas fa-search text-gray-400"></i></span>
@@ -144,7 +144,7 @@ require 'template/topbar.php';
                                 </div>
                             </td>
                             
-                            <td class="fw-bold text-teal">
+                            <td class="fw-bold text-gray-800">
                                 ₱<?php echo number_format($emp['daily_rate'] ?? 0, 2); ?>
                                 <div class="small text-muted fw-normal" style="font-size: 0.75rem;">
                                     Monthly: ₱<?php echo number_format($emp['monthly_rate'] ?? 0, 0); ?>
@@ -171,13 +171,13 @@ require 'template/topbar.php';
                                 <?php $db_id = $emp['id'] ?? 0; ?>
                                 <div class="btn-group" role="group">
                                     <a href="edit_employee.php?id=<?php echo htmlspecialchars($db_id); ?>" 
-                                       class="btn btn-sm btn-light text-teal border" 
+                                       class="btn btn-sm btn-light text-muted border" 
                                        title="Edit Employee Details">
                                         <i class="fas fa-edit"></i>
                                     </a>
 
                                     <a href="manage_financials.php?id=<?php echo htmlspecialchars($db_id); ?>" 
-                                       class="btn btn-sm btn-light text-success border" 
+                                       class="btn btn-sm btn-light text-muted border" 
                                        title="Manage Financials">
                                         <i class="fas fa-coins"></i>
                                     </a>

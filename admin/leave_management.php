@@ -137,7 +137,7 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
-            <h6 class="m-0 font-weight-bold text-teal"><i class="fas fa-list-alt me-2"></i>Request History</h6>
+            <h6 class="m-0 font-weight-bold text-gray-800"><i class="fas fa-list-alt me-2"></i>Request History</h6>
             
             <div class="input-group" style="max-width: 250px;">
                 <span class="input-group-text bg-light border-0"><i class="fas fa-search text-gray-400"></i></span>
@@ -176,7 +176,7 @@ require 'template/topbar.php';
 
                             <td>
                                 <div class="d-flex flex-column">
-                                    <span class="fw-bold text-teal small text-uppercase mb-1"><?php echo htmlspecialchars($leave['leave_type']); ?></span>
+                                    <span class="fw-bold small text-uppercase mb-1"><?php echo htmlspecialchars($leave['leave_type']); ?></span>
                                     <div class="small text-muted">
                                         <i class="fas fa-calendar-alt me-1"></i> 
                                         <?php echo date('M d', strtotime($leave['start_date'])); ?> 
@@ -221,7 +221,7 @@ require 'template/topbar.php';
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius:1rem;">
             <div class="modal-header border-bottom-0">
-                <h5 class="modal-title fw-bold text-teal"><i class="fas fa-clipboard-list me-2"></i> Leave Request Details</h5>
+                <h5 class="modal-title fw-bold text-secondary"><i class="fas fa-clipboard-list me-2"></i> Leave Request Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-4">
@@ -243,7 +243,7 @@ require 'template/topbar.php';
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius:1rem;">
             <div class="modal-header border-bottom-0">
-                <h5 class="modal-title fw-bold text-teal"><i class="fas fa-calendar-plus me-2"></i> File New Leave</h5>
+                <h5 class="modal-title fw-bold text-secondary"><i class="fas fa-calendar-plus me-2"></i> File New Leave</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
@@ -370,21 +370,21 @@ require 'template/footer.php';
                                 <p class="text-muted small">${data.department}</p>
                             </div>
                             <div class="col-md-7">
-                                <h6 class="fw-bold text-teal mb-3">Request Overview</h6>
+                                <h6 class="fw-bold text-gray-600 mb-3">Request Overview</h6>
                                 <table class="table table-sm small">
                                     <tr><td class="fw-bold">Status:</td><td>${statusBadge}</td></tr>
                                     <tr><td class="fw-bold">Leave Type:</td><td>${data.leave_type}</td></tr>
-                                    <tr><td class="fw-bold">Requested Days:</td><td><span class="text-primary fw-bolder">${data.days_count}</span></td></tr>
+                                    <tr><td class="fw-bold">Requested Days:</td><td><span class="text-black fw-bolder">${data.days_count}</span></td></tr>
                                     <tr><td class="fw-bold">Date Range:</td><td>${data.start_date} to ${data.end_date}</td></tr>
                                     <tr><td class="fw-bold">Filed On:</td><td>${data.date_filed}</td></tr>
                                 </table>
                             </div>
                         </div>
                         <hr>
-                        <h6 class="fw-bold text-teal mb-3">Reason</h6>
+                        <h6 class="fw-bold text-gray-600 mb-3">Reason</h6>
                         <div class="alert alert-light border small">${data.reason || 'No specific reason provided.'}</div>
                         <hr>
-                        <h6 class="fw-bold text-teal mb-3">Leave Balance Check</h6>
+                        <h6 class="fw-bold text-gray-600 mb-3">Leave Balance Check</h6>
                         <div id="balance-check-area">
                             ${response.balance_html}
                         </div>

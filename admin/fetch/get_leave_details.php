@@ -58,10 +58,10 @@ try {
         <table class="table table-bordered table-sm small">
             <thead class="bg-light">
                 <tr>
-                    <th class="text-uppercase text-teal">Type</th>
-                    <th class="text-uppercase text-center text-teal">Max</th>
-                    <th class="text-uppercase text-center text-teal">Used</th>
-                    <th class="text-uppercase text-center text-teal">Remaining</th>
+                    <th class="text-uppercase text-gray-600">Type</th>
+                    <th class="text-uppercase text-center text-gray-600">Max</th>
+                    <th class="text-uppercase text-center text-gray-600">Used</th>
+                    <th class="text-uppercase text-center text-gray-600">Remaining</th>
                 </tr>
             </thead>
             <tbody>
@@ -76,7 +76,7 @@ try {
         // Skip types that don't have balance tracking AND have a Max of 0
         if (in_array($type, ['Maternity/Paternity', 'Unpaid Leave']) && $max === 0) continue;
         
-        $remaining_class = ($remaining !== 'N/A' && $remaining <= 0) ? 'text-danger fw-bold' : 'text-success fw-bold';
+        $remaining_class = ($remaining !== 'N/A' && $remaining <= 0) ? 'text-danger fw-bold' : 'text-black fw-bold';
 
         $balance_html .= "
             <tr>

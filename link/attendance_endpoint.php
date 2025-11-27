@@ -45,7 +45,7 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                     <p class="h5 mb-4">Location: <strong class="text-warning"><?php echo htmlspecialchars($friendly_location); ?></strong></p>
 
                     <form id="attendance-form">
-                                                                     
+                                                             
                         <div class="mb-3">
                             <div class="input-group">
                                 <span class="input-group-text">
@@ -65,15 +65,28 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                         </div>
 
                         <div class="mb-3 p-2 border border-danger rounded" style="background-color: #fff3cd;">
-                            <div class="d-flex align-items-center mb-1">
+                            <div class="d-flex align-items-center justify-content-center mb-2">
                                 <i class="fas fa-bug text-danger me-2"></i>
                                 <strong class="text-danger small">DEVELOPER TEST MODE</strong>
                             </div>
-                            <input type="text" class="form-control form-control-sm text-center font-monospace" 
-                                   name="custom_time" 
-                                   placeholder="Override Time (HH:MM:SS)">
-                            <small class="text-muted" style="font-size: 11px;">
-                                Example: 09:15:00 (Late) or 19:00:00 (OT). <br>Leave empty for Real Time.
+                            
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="small text-muted mb-1">Override Date</label>
+                                    <input type="date" class="form-control form-control-sm text-center font-monospace" 
+                                           name="custom_date" 
+                                           max="<?php echo date('Y-m-d'); ?>"> </div>
+
+                                <div class="col-6">
+                                    <label class="small text-muted mb-1">Override Time</label>
+                                    <input type="text" class="form-control form-control-sm text-center font-monospace" 
+                                           name="custom_time" 
+                                           placeholder="HH:MM:SS" value="">
+                                </div>
+                            </div>
+
+                            <small class="text-muted d-block mt-2" style="font-size: 11px;">
+                                Leave fields empty to use current Real Date & Time.
                             </small>
                         </div>
                         <input type="hidden" id="action" name="action" value="">
@@ -262,7 +275,11 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                                 // Full Reset on Success
                                 $('#employee_id').val('');
                                 $('#password').val('');
+                                
+                                // Reset Test Fields
                                 $('input[name="custom_time"]').val('');
+                                $('input[name="custom_date"]').val(''); // Clears the Date Override
+                                
                                 resetButtonsOnly();
                             }
                         });

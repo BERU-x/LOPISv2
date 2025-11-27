@@ -34,7 +34,7 @@ try {
         </div>
         
         <div class="d-flex gap-2">
-            <button class="btn btn-white text-teal shadow-sm fw-bold border" onclick="printBatchPayslips()">
+            <button class="btn btn-white text-gray-800 shadow-sm fw-bold border" onclick="printBatchPayslips()">
                 <i class="fas fa-print me-2"></i> Print Batch (Date Range)
             </button>
             
@@ -79,7 +79,7 @@ try {
     <div class="card shadow mb-4">
         <div class="card-header py-3 bg-white border-bottom-0">
             <h6 class="m-0 font-weight-bold text-gray-800">
-                <i class="fas fa-filter me-2 text-teal"></i>Filter Records
+                <i class="fas fa-filter me-2 text-secondary"></i>Filter Records
             </h6>
         </div>
         <div class="card-body bg-light rounded-bottom">
@@ -110,7 +110,7 @@ try {
         <div class="card-header py-3 d-flex flex-column flex-md-row align-items-center justify-content-between bg-white">
             
             <div class="d-flex align-items-center mb-2 mb-md-0">
-                <h6 class="m-0 font-weight-bold text-teal me-3"><i class="fas fa-list-alt me-2"></i>Payroll History</h6>
+                <h6 class="m-0 font-weight-bold text-gray-800 me-3"><i class="fas fa-list-alt me-2"></i>Payroll History</h6>
                 
                 <div class="dropdown no-arrow">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" type="button" id="batchDropdown" data-bs-toggle="dropdown">
@@ -262,7 +262,7 @@ $(document).ready(function() {
                             <img src="../assets/images/${photo}" class="rounded-circle me-3 border shadow-sm" style="width: 40px; height: 40px; object-fit: cover;">
                             <div>
                                 <div class="fw-bold text-dark">${data}</div>
-                                <div class="small text-muted">Ref: <span class="text-teal fw-bold">${ref}</span> • ${dept}</div>
+                                <div class="small text-muted">Ref: <span class="text-gray-600 fw-bold">${ref}</span> • ${dept}</div>
                             </div>
                         </div>
                     `;
@@ -298,7 +298,7 @@ $(document).ready(function() {
                 className: 'text-center',
                 render: function(data) {
                     // Removed target="_blank" to open the link in the current tab
-                    return `<a href="view_payslip.php?id=${data}" class="btn btn-sm btn-light text-primary border shadow-sm rounded-circle" title="View Payslip">
+                    return `<a href="view_payslip.php?id=${data}" class="btn btn-sm btn-light text-secondary border shadow-sm rounded-circle" title="View Payslip">
                                 <i class="fas fa-eye"></i>
                             </a>`;
                 }

@@ -128,7 +128,7 @@ try {
     input.editable-input {
         border: 1px dashed #d1d3e2;
         background-color: #f8f9fc;
-        color: #4e73df;
+        color: black;
         font-weight: 700;
         text-align: right;
         padding: 2px 5px;
@@ -158,7 +158,6 @@ try {
     <div class="d-sm-flex align-items-center justify-content-between mb-4 no-print">
         <div>
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Payslip Details</h1>
-            <a href="payroll.php" class="text-xs text-teal fw-bold text-decoration-none"><i class="fas fa-arrow-left me-1"></i> Back to Payroll List</a>
         </div>
         
         <div class="d-flex gap-2">
@@ -176,7 +175,7 @@ try {
 
             <div class="row border-bottom border-2 border-teal pb-3 mb-4 align-items-end">
                 <div class="col-8">
-                    <h4 class="text-teal fw-bolder mb-0 text-uppercase">Payslip</h4>
+                    <h4 class="text-black fw-bolder mb-0 text-uppercase">Payslip</h4>
                     <div class="small text-muted font-weight-bold">Ref: <?php echo htmlspecialchars($payslip['ref_no']); ?></div>
                 </div>
                 <div class="col-4 text-end">
@@ -207,7 +206,7 @@ try {
                         </div>
                     </div>
                     
-                                        <div class="row mt-1">
+                    <div class="row mt-1">
                         <div class="col-6 text-gray-600 fw-bold">Days Worked:</div>
                         <div class="col-6 text-dark fw-bold"><?php echo $days_present; ?></div>
                     </div>
@@ -216,7 +215,7 @@ try {
 
             <div class="row">
                 <div class="col-6 border-end">
-                    <h6 class="text-success fw-bold text-uppercase border-bottom pb-2 mb-3">Earnings</h6>
+                    <h6 class="text-secondary fw-bold text-uppercase border-bottom pb-2 mb-3">Earnings</h6>
                     <table class="table table-borderless table-sm small align-middle">
                         <tr>
                             <td class="text-gray-600 fst-italic">Daily Rate</td>
@@ -230,7 +229,7 @@ try {
                                 <input type="number" step="0.01" 
                                             name="items[<?php echo $earn['id']; ?>]" 
                                             class="form-control form-control-sm editable-input earning-field" 
-                                            value="<?php echo $earn['amount']; ?>">
+                                            value="<?php echo $earn['amount']; ?>" readonly>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -245,7 +244,7 @@ try {
                 </div>
 
                 <div class="col-6 ps-4">
-                    <h6 class="text-danger fw-bold text-uppercase border-bottom pb-2 mb-3">Deductions</h6>
+                    <h6 class="text-secondary fw-bold text-uppercase border-bottom pb-2 mb-3">Deductions</h6>
                     <table class="table table-borderless table-sm small align-middle">
                         
                         <?php if(count($deductions) > 0): ?>
@@ -256,7 +255,7 @@ try {
                                     <input type="number" step="0.01" 
                                             name="items[<?php echo $deduct['id']; ?>]" 
                                             class="form-control form-control-sm editable-input deduction-field" 
-                                            value="<?php echo $deduct['amount']; ?>">
+                                            value="<?php echo $deduct['amount']; ?>" readonly>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -296,7 +295,7 @@ try {
                                     // Check if there is any relevant data to display
                                     if ($used > 0 || $remaining !== 'N/A'): 
                                         $has_leave_data = true;
-                                        $remaining_class = ($remaining !== 'N/A' && $remaining <= 0) ? 'text-danger' : 'text-teal';
+                                        $remaining_class = ($remaining !== 'N/A' && $remaining <= 0) ? 'text-black' : 'text-black';
                                 ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($type); ?></td>
@@ -370,7 +369,7 @@ try {
                                                 $calculated_remaining = $db_balance - $current_deduction;
 
                                                 // 5. Determine styling
-                                                $bal_class = ($calculated_remaining > 0) ? 'text-danger' : 'text-success';
+                                                $bal_class = ($calculated_remaining > 0) ? 'text-black' : 'text-black';
                                                 
                                                 // Optional: visual breakdown tooltip or logic
                                                 // $display_text = number_format($db_balance, 2) . ' - ' . number_format($current_deduction, 2) . ' = ' . number_format($calculated_remaining, 2);
@@ -405,7 +404,7 @@ try {
             <div class="row mt-5">
                 <div class="col-12 text-center">
                     <div class="d-inline-block px-5 py-3 border border-2 border-teal rounded bg-light">
-                        <div class="text-xs fw-bold text-teal text-uppercase mb-1">Total Net Pay</div>
+                        <div class="text-xs fw-bold text-gray-800 text-uppercase mb-1">Total Net Pay</div>
                         <h2 class="mb-0 fw-bolder text-gray-900" id="disp_net">
                             ₱ <?php echo number_format($payslip['net_pay'], 2); ?>
                         </h2>
