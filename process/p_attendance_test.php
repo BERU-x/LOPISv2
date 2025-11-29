@@ -5,7 +5,6 @@ header('Content-Type: application/json');
 
 // --- 1. GET & SANITIZE DATA ---
 $employee_id  = trim($_POST['employee_id'] ?? ''); 
-$password     = $_POST['password'] ?? ''; // Added Password check for production safety
 $action       = $_POST['action'] ?? '';
 $status_based = $_POST['status_based'] ?? 'On-site'; 
 
@@ -14,19 +13,27 @@ $lat  = $_POST['latitude'] ?? null;
 $long = $_POST['longitude'] ?? null;
 $addr = $_POST['address'] ?? null;
 
-// --- 2. SET SERVER DATE & TIME (STRICT - NO OVERRIDES) ---
-$today       = date("Y-m-d");
-$currentTime = date("H:i:s");
+// --- HANDLE OVERRIDES (TESTING MODE) ---
+if (!empty($_POST['custom_date'])) {
+    $today = $_POST['custom_date']; // This acts as the "Current Real Date"
+} else {
+    $today = date("Y-m-d");
+}
 
-// --- 3. VALIDATE INPUTS ---
+if (!empty($_POST['custom_time'])) {
+    $currentTime = $_POST['custom_time'];
+} else {
+    $currentTime = date("H:i:s");
+}
+
+// --- 2. VALIDATE INPUTS ---
 if (empty($employee_id)) {
     echo json_encode(['status' => 'warning', 'message' => 'Please enter Employee ID.']);
     exit();
 }
 
 try {
-    // --- 4. AUTHENTICATION & FETCH SCHEDULE ---
-    // Note: In production, verify the password too if $password is passed
+    // --- 3. AUTHENTICATION & FETCH SCHEDULE ---
     $sql = "SELECT u.status, e.Firstname, e.Lastname, e.schedule_type 
             FROM tbl_users u 
             JOIN tbl_employees e ON u.employee_id = e.employee_id 
@@ -49,7 +56,7 @@ try {
     $schedule_type = $user_data['schedule_type'] ?? 'Fixed'; 
 
 
-    // --- 5. PROCESS ATTENDANCE ---
+    // --- 4. PROCESS ATTENDANCE ---
 
     if ($action == 'time_in') {
 
@@ -143,7 +150,7 @@ try {
         $actual_in_timestamp = strtotime("$entry_date " . $attendance['time_in']);
         $actual_in_timestamp = floor($actual_in_timestamp / 60) * 60; 
         
-        // Use Strict Server Time ($today)
+        // ⚠️ KEY CHANGE: Use $today (the Time Out Date) for the calculation
         $actual_out_timestamp = strtotime("$today $currentTime");
         
         $num_hr = 0;
@@ -243,7 +250,7 @@ try {
 
         try {
             // 1. Update MAIN TABLE
-            // Updates time_out_date with $today
+            // ⚠️ KEY CHANGE: We now update `time_out_date` with $today
             $sql = "UPDATE tbl_attendance 
                     SET time_out = ?, time_out_date = ?, attendance_status = ?, num_hr = ?, overtime_hr = ?, total_deduction_hr = ? 
                     WHERE id = ?";

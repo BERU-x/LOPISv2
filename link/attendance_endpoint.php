@@ -45,22 +45,13 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                     <p class="h5 mb-4">Location: <strong class="text-warning"><?php echo htmlspecialchars($friendly_location); ?></strong></p>
 
                     <form id="attendance-form">
-                                                             
+                                                     
                         <div class="mb-3">
                             <div class="input-group">
                                 <span class="input-group-text">
                                     <i class="fa-solid fa-address-card"></i>
                                 </span>
                                 <input type="text" class="form-control" id="employee_id" name="employee_id" placeholder="Employee ID" required autocomplete="off">
-                            </div>
-                        </div>
-
-                        <div class="mb-3" id="password-group">
-                            <div class="input-group">
-                                <span class="input-group-text">
-                                    <i class="fas fa-lock"></i>
-                                </span>
-                                <input type="password" class="form-control" id="password" name="password" placeholder="Password">
                             </div>
                         </div>
 
@@ -183,8 +174,9 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
 
             function handleStatusResponse(response) {
                 var status = response.status; 
+                var msg = response.message; 
 
-                // Reset UI
+                // Reset UI (Hide everything first)
                 $('#action-buttons').hide();
                 $('#btn-time-in').hide();
                 $('#btn-time-out').hide();
@@ -210,12 +202,22 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                 else if (status === 'need_time_in') {
                     $('#employee_id').addClass('is-valid');
                     $('#action-buttons').fadeIn();
-                    $('#btn-time-in').show();
+                    $('#btn-time-in').show(); // Show Only Time In
                 } 
                 else if (status === 'need_time_out') {
                     $('#employee_id').addClass('is-valid');
                     $('#action-buttons').fadeIn();
-                    $('#btn-time-out').show();
+                    $('#btn-time-out').show(); // Show Only Time Out
+
+                    // Show Toast if there is a pending log warning
+                    if (msg) {
+                        Toast.fire({ 
+                            icon: 'warning', 
+                            title: 'Pending Log Found', 
+                            text: msg,
+                            timer: 5000 
+                        });
+                    }
                 } 
                 else if (status === 'completed') {
                     $('#employee_id').addClass('is-valid');
@@ -251,10 +253,9 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
 
             function submitAttendance() {
                 var employeeId = $('#employee_id').val();
-                var password = $('#password').val();
                 
-                if (employeeId.trim() === '' || password.trim() === '') {
-                    Toast.fire({ icon: 'warning', title: 'Password is required.' });
+                if (employeeId.trim() === '') {
+                    Toast.fire({ icon: 'warning', title: 'Employee ID is required.' });
                     return; 
                 }
 
@@ -262,7 +263,7 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
 
                 $.ajax({
                     type: 'POST',
-                    url: '../process/p_attendance.php',
+                    url: '../process/p_attendance_test.php', 
                     data: formData,
                     dataType: 'json',
                     success: function(response) {
@@ -274,11 +275,10 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                             if (response.status === 'success') {
                                 // Full Reset on Success
                                 $('#employee_id').val('');
-                                $('#password').val('');
                                 
                                 // Reset Test Fields
                                 $('input[name="custom_time"]').val('');
-                                $('input[name="custom_date"]').val(''); // Clears the Date Override
+                                $('input[name="custom_date"]').val(''); 
                                 
                                 resetButtonsOnly();
                             }
@@ -289,21 +289,6 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                     }
                 });
             }
-
-            // ============================================
-            // 3. ENTER KEY LISTENER
-            // ============================================
-            $('#password').on('keypress', function(e) {
-                if (e.which === 13) { 
-                    e.preventDefault(); 
-                    if ($('#btn-time-in').is(':visible')) {
-                        $('#btn-time-in').click();
-                    } 
-                    else if ($('#btn-time-out').is(':visible')) {
-                        $('#btn-time-out').click();
-                    }
-                }
-            });
 
             $('#attendance-form').on('submit', function(e){
                 e.preventDefault();

@@ -13,6 +13,7 @@ require_once 'models/employee_model.php';
 // Define lookup arrays
 $genders = [0 => 'Male', 1 => 'Female'];
 $employment_statuses = [0 => 'Probationary', 1 => 'Regular', 2 => 'Part-time', 3 => 'Contractual', 4 => 'OJT', 5 => 'Resigned', 6 => 'Terminated'];
+$schedule_types = ['Fixed', 'Flexible']; // Added Schedule Types
 
 $departments = [
     'I.T. Department', 'Operations Department', 'Field Department', 'Management Department',
@@ -56,6 +57,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_employee'])) {
             'position'    => trim($_POST['position']),
             'department'  => trim($_POST['department']),
             'employment_status' => (int)$_POST['employment_status'],
+            'schedule_type'     => trim($_POST['schedule_type']), // Added Schedule Type
             'photo'       => $employee['photo'] ?? null, 
         ];
         
@@ -264,6 +266,19 @@ require 'template/topbar.php';
                                     <?php foreach ($employment_statuses as $id => $name): ?>
                                         <option value="<?php echo $id; ?>" <?php echo ((string)$current_status === (string)$id) ? 'selected' : ''; ?>>
                                             <?php echo $name; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="schedule_type" class="text-label mb-1">Schedule Type</label>
+                                <select name="schedule_type" id="schedule_type" class="form-select" required>
+                                    <option value="">Select Schedule</option>
+                                    <?php $current_schedule = $employee['schedule_type'] ?? 'Fixed'; ?>
+                                    <?php foreach ($schedule_types as $type): ?>
+                                        <option value="<?php echo $type; ?>" <?php echo ($current_schedule === $type) ? 'selected' : ''; ?>>
+                                            <?php echo $type; ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>

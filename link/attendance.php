@@ -62,13 +62,14 @@ if (!isset($_GET['token'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Attendance</title>
+    <title>Attendance Kiosk</title>
     
     <link rel="icon" href="../assets/images/favicon.ico" type="image/ico">
     <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/vendor/fa6/css/all.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <link rel="stylesheet" href="../assets/css/time_styles.css"> </head>
+    <link rel="stylesheet" href="../assets/css/time_styles.css"> 
+</head>
 <body>
 
     <div class="container vh-100 d-flex justify-content-center align-items-center">
@@ -88,7 +89,7 @@ if (!isset($_GET['token'])) {
                     <p class="h5 mb-4">Location: <strong><?php echo htmlspecialchars($friendly_location); ?></strong></p>
 
                     <form id="attendance-form">
-                                            
+                                                    
                         <div class="mb-3">
                             <div class="input-group">
                                 <span class="input-group-text">
@@ -103,7 +104,7 @@ if (!isset($_GET['token'])) {
                                 <span class="input-group-text">
                                     <i class="fas fa-lock"></i>
                                 </span>
-                                <input type="password" class="form-control" id="password" name="password" placeholder="Password">
+                                <input type="password" class="form-control" id="password" name="password" placeholder="Password" required autocomplete="off">
                             </div>
                         </div>
 
@@ -128,8 +129,10 @@ if (!isset($_GET['token'])) {
 
                 <?php else: ?>
 
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
+                    <div class="text-center">
+                        <i class="fas fa-exclamation-triangle text-danger fa-3x mb-3"></i>
+                        <h3 class="text-danger"><?php echo $swal_title; ?></h3>
+                        <p class="text-muted"><?php echo $swal_message; ?></p>
                     </div>
 
                 <?php endif; ?>
@@ -144,6 +147,21 @@ if (!isset($_GET['token'])) {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
+    // JAVASCRIPT: Disable Right Click Menu Globally
+    document.addEventListener('contextmenu', function(event) {
+        event.preventDefault(); // This blocks the menu from appearing
+    });
+
+    // OPTIONAL: Prevent F12 (DevTools) and other shortcuts if this is for strict security
+    document.onkeydown = function(e) {
+        if(e.keyCode == 123) { // F12
+            return false;
+        }
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) { // Ctrl+Shift+I
+            return false;
+        }
+    }
+
         $(document).ready(function() {
             
             // --- SweetAlert Setup ---
@@ -161,13 +179,7 @@ if (!isset($_GET['token'])) {
             });
 
             <?php if (!$accessGranted): ?>
-                // Access Denied Logic
-                Toast.fire({
-                    icon: '<?php echo $swal_icon; ?>',
-                    title: '<?php echo $swal_title; ?>',
-                    text: '<?php echo $swal_message; ?>',
-                    timer: 5000 
-                });
+                // Access Denied Logic (Optional: Auto-redirect or show alert on load)
             <?php else: ?>
 
             // --- Clock Logic ---
@@ -192,7 +204,6 @@ if (!isset($_GET['token'])) {
 
             $('#employee_id').on('blur', function() {
                 var empId = $(this).val().trim();
-                // Grab the current location (OFB or WFH) from the hidden input
                 var currentLocation = $('input[name="status_based"]').val(); 
                 
                 if (empId === '') {
@@ -205,14 +216,13 @@ if (!isset($_GET['token'])) {
                 $.ajax({
                     url: '../process/check_status.php',
                     type: 'POST',
-                    // SEND LOCATION DATA HERE:
                     data: { 
                         employee_id: empId, 
                         current_location: currentLocation 
                     },
                     dataType: 'json',
                     success: function(response) {
-                        handleStatusResponse(response); // Pass the whole object, not just string
+                        handleStatusResponse(response);
                     },
                     error: function() {
                         console.log('Error checking status');
@@ -221,7 +231,8 @@ if (!isset($_GET['token'])) {
             });
 
             function handleStatusResponse(response) {
-                var status = response.status; // Extract status string
+                var status = response.status; 
+                var msg = response.message; // Capture "Forgot Time Out" message
 
                 // Reset UI
                 $('#action-buttons').hide();
@@ -260,6 +271,16 @@ if (!isset($_GET['token'])) {
                     $('#employee_id').addClass('is-valid');
                     $('#action-buttons').fadeIn();
                     $('#btn-time-out').show();
+
+                    // ⚠️ CHECK FOR WARNING MESSAGE (FORGOT TIME OUT)
+                    if (msg) {
+                        Toast.fire({ 
+                            icon: 'warning', 
+                            title: 'Pending Log Found', 
+                            text: msg,
+                            timer: 5000 
+                        });
+                    }
                 } 
                 // --- SCENARIO 5: COMPLETED ---
                 else if (status === 'completed') {
@@ -334,22 +355,16 @@ if (!isset($_GET['token'])) {
             // 3. ENTER KEY LISTENER
             // ============================================
             $('#password').on('keypress', function(e) {
-                // Check if the key pressed is "Enter" (code 13)
                 if (e.which === 13) { 
-                    e.preventDefault(); // Stop the page from reloading/submitting standard form
-
-                    // If Time In button is visible, click it
+                    e.preventDefault(); 
                     if ($('#btn-time-in').is(':visible')) {
                         $('#btn-time-in').click();
-                    } 
-                    // If Time Out button is visible, click it
-                    else if ($('#btn-time-out').is(':visible')) {
+                    } else if ($('#btn-time-out').is(':visible')) {
                         $('#btn-time-out').click();
                     }
                 }
             });
 
-            // Optional: Prevent default form submission on the whole form just in case
             $('#attendance-form').on('submit', function(e){
                 e.preventDefault();
             });

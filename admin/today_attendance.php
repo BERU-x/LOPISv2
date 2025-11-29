@@ -124,7 +124,7 @@ foreach ($attendance_logs as $log) {
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
-            <h6 class="m-0 font-weight-bold text-teal"><i class="fas fa-list-alt me-2"></i>Real-time Logs</h6>
+            <h6 class="m-0 font-weight-bold text-gray-600"><i class="fas fa-list-alt me-2"></i>Real-time Logs</h6>
             
             <div class="input-group" style="max-width: 250px;">
                 <span class="input-group-text bg-light border-0"><i class="fas fa-search text-gray-400"></i></span>
@@ -156,7 +156,9 @@ foreach ($attendance_logs as $log) {
                                     $photo = !empty($log['photo']) ? $log['photo'] : 'default.png';
                                     $fullname = $log['firstname'] . ' ' . $log['lastname'];
                                     $time_in = date('h:i A', strtotime($log['time_in']));
-                                    
+                                    $date_in = $log['date'];
+                                    $date_out = $log['time_out_date'];
+
                                     // Time Out Check
                                     $is_active = ($log['time_out'] === null || $log['time_out'] === '00:00:00');
                                     $time_out = !$is_active ? date('h:i A', strtotime($log['time_out'])) : '<span class="text-muted small fst-italic">--:--</span>';
@@ -175,11 +177,16 @@ foreach ($attendance_logs as $log) {
                                     }
                                     // 3. Check Undertime
                                     if (stripos($raw_status, 'Undertime') !== false) {
-                                        $badges_html .= '<span class="badge bg-soft-danger text-danger border border-danger px-2 rounded-pill me-1">Undertime</span>';
+                                        $badges_html .= '<span class="badge bg-soft-info text-info border border-info px-2 rounded-pill me-1">Undertime</span>';
                                     }
                                     // 4. Check Overtime
                                     if (stripos($raw_status, 'Overtime') !== false) {
                                         $badges_html .= '<span class="badge bg-soft-primary text-primary border border-primary px-2 rounded-pill me-1">Overtime</span>';
+                                    }
+                                    
+                                    // 4.1. Check No Time Out
+                                    if (stripos($raw_status, 'Forgot Time Out') !== false) {
+                                        $badges_html .= '<span class="badge bg-soft-danger text-danger border border-danger px-2 rounded-pill me-1">Forgot Time Out</span>';
                                     }
 
                                     // 5. Check Active (If clocked in but no time out yet)
@@ -208,8 +215,14 @@ foreach ($attendance_logs as $log) {
                                             </div>
                                         </div>
                                     </td>
-                                    <td><?php echo $time_in; ?></td>
-                                    <td><?php echo $time_out; ?></td>
+                                    <td>
+                                        <div class="fw-bold text-dark"><?php echo $time_in; ?></div>
+                                        <div class="small text-muted"><?php echo $date_in; ?></div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-dark"><?php echo $time_out; ?></div>
+                                        <div class="small text-muted"><?php echo $date_out; ?></div>
+                                    </td>
                                     <td class="text-center"><?php echo $badges_html; ?></td>
                                     <td class="fw-bold text-end text-gray-700"><?php echo $hours_worked; ?></td>
                                 </tr>
@@ -227,7 +240,7 @@ foreach ($attendance_logs as $log) {
 <script>
     $(document).ready(function() {
         var table = $('#todayTable').DataTable({
-            "order": [[ 1, "desc" ]],
+            "order": [[ 2, "asc" ]],
             "pageLength": 25,
             "dom": 'rtip', 
             "language": { "emptyTable": "No attendance records found for today." }

@@ -5,10 +5,10 @@
 function get_all_employees($pdo) {
     if (!$pdo) return [];
     
-    // We use LEFT JOIN to get employee info + their compensation details
+    // Updated: Added e.schedule_type to selection
     $sql = "SELECT 
                 e.id, e.employee_id, e.firstname, e.middlename, e.lastname, e.suffix, 
-                e.position, e.department, e.employment_status, e.photo,
+                e.position, e.department, e.employment_status, e.schedule_type, e.photo,
                 c.daily_rate, c.monthly_rate 
             FROM tbl_employees e
             LEFT JOIN tbl_compensation c ON e.employee_id = c.employee_id
@@ -28,6 +28,7 @@ function getEmployeeById($pdo, $id) {
     if (!$pdo || (int)$id <= 0) return false;
 
     // Join tables to fill the Edit Form completely
+    // Note: e.* automatically includes schedule_type
     $sql = "SELECT 
                 e.*, 
                 c.daily_rate, c.monthly_rate, c.food_allowance, c.transpo_allowance
@@ -52,36 +53,38 @@ function create_new_employee($pdo, $data, $photo) {
         $pdo->beginTransaction();
 
         // A. Insert into tbl_employees (Personal Info)
+        // Updated: Added schedule_type
         $sql_emp = "INSERT INTO tbl_employees (
             employee_id, firstname, middlename, lastname, suffix, 
             address, birthdate, contact_info, gender, 
-            position, department, employment_status, 
+            position, department, employment_status, schedule_type,
             bank_name, account_type, account_number, photo, created_on
         ) VALUES (
             :employee_id, :firstname, :middlename, :lastname, :suffix, 
             :address, :birthdate, :contact_info, :gender, 
-            :position, :department, :employment_status, 
+            :position, :department, :employment_status, :schedule_type,
             :bank_name, :account_type, :account_number, :photo, NOW()
         )";
 
         $stmt = $pdo->prepare($sql_emp);
         $stmt->execute([
-            ':employee_id'   => $data['employee_id'],
-            ':firstname'     => $data['firstname'],
-            ':middlename'    => $data['middlename'] ?? '',
-            ':lastname'      => $data['lastname'],
-            ':suffix'        => $data['suffix'],
-            ':address'       => $data['address'],
-            ':birthdate'     => $data['birthdate'],
-            ':contact_info'  => $data['contact_info'],
-            ':gender'        => $data['gender'],
-            ':position'      => $data['position'],
-            ':department'    => $data['department'],
+            ':employee_id'       => $data['employee_id'],
+            ':firstname'         => $data['firstname'],
+            ':middlename'        => $data['middlename'] ?? '',
+            ':lastname'          => $data['lastname'],
+            ':suffix'            => $data['suffix'],
+            ':address'           => $data['address'],
+            ':birthdate'         => $data['birthdate'],
+            ':contact_info'      => $data['contact_info'],
+            ':gender'            => $data['gender'],
+            ':position'          => $data['position'],
+            ':department'        => $data['department'],
             ':employment_status' => $data['employment_status'],
-            ':bank_name'     => $data['bank_name'],
-            ':account_type'  => $data['account_type'],
-            ':account_number'=> $data['account_number'],
-            ':photo'         => $photo 
+            ':schedule_type'     => $data['schedule_type'] ?? 'Fixed', // Default to Fixed if missing
+            ':bank_name'         => $data['bank_name'],
+            ':account_type'      => $data['account_type'],
+            ':account_number'    => $data['account_number'],
+            ':photo'             => $photo 
         ]);
 
         // B. Insert into tbl_compensation (Financial Info)
@@ -124,6 +127,7 @@ function updateEmployee($pdo, $id, $data) {
         $old_emp_id = $old_record['employee_id'];
 
         // 2. Update tbl_employees
+        // Updated: Added schedule_type
         $sql_emp = "UPDATE tbl_employees SET
             employee_id = :employee_id,
             firstname = :firstname,
@@ -137,6 +141,7 @@ function updateEmployee($pdo, $id, $data) {
             position = :position,
             department = :department,
             employment_status = :employment_status,
+            schedule_type = :schedule_type,
             bank_name = :bank_name,
             account_type = :account_type,
             account_number = :account_number,
@@ -146,23 +151,24 @@ function updateEmployee($pdo, $id, $data) {
 
         $stmt = $pdo->prepare($sql_emp);
         $stmt->execute([
-            ':employee_id'   => $data['employee_id'],
-            ':firstname'     => $data['firstname'],
-            ':middlename'    => $data['middlename'] ?? '',
-            ':lastname'      => $data['lastname'],
-            ':suffix'        => $data['suffix'],
-            ':address'       => $data['address'],
-            ':birthdate'     => $data['birthdate'],
-            ':contact_info'  => $data['contact_info'],
-            ':gender'        => $data['gender'],
-            ':position'      => $data['position'],
-            ':department'    => $data['department'],
+            ':employee_id'       => $data['employee_id'],
+            ':firstname'         => $data['firstname'],
+            ':middlename'        => $data['middlename'] ?? '',
+            ':lastname'          => $data['lastname'],
+            ':suffix'            => $data['suffix'],
+            ':address'           => $data['address'],
+            ':birthdate'         => $data['birthdate'],
+            ':contact_info'      => $data['contact_info'],
+            ':gender'            => $data['gender'],
+            ':position'          => $data['position'],
+            ':department'        => $data['department'],
             ':employment_status' => $data['employment_status'],
-            ':bank_name'     => $data['bank_name'],
-            ':account_type'  => $data['account_type'],
-            ':account_number'=> $data['account_number'],
-            ':photo'         => $data['photo'] ?? null, 
-            ':id'            => $id
+            ':schedule_type'     => $data['schedule_type'],
+            ':bank_name'         => $data['bank_name'],
+            ':account_type'      => $data['account_type'],
+            ':account_number'    => $data['account_number'],
+            ':photo'             => $data['photo'] ?? null, 
+            ':id'                => $id
         ]);
 
         // 3. Update tbl_compensation

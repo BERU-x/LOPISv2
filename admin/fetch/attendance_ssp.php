@@ -23,7 +23,7 @@ $columns = array(
 
 $sql_details = " FROM tbl_attendance a LEFT JOIN tbl_employees e ON a.employee_id = e.employee_id ";
 
-// --- STANDARD SSP QUERY LOGIC (Condensed for brevity, same as previous) ---
+// --- STANDARD SSP QUERY LOGIC ---
 $draw = $_GET['draw'] ?? 1;
 $start = $_GET['start'] ?? 0;
 $length = $_GET['length'] ?? 10;
@@ -65,7 +65,8 @@ $stmt = $pdo->prepare("SELECT COUNT(a.id) $sql_details $where_sql");
 $stmt->execute($where_bindings);
 $recordsFiltered = $stmt->fetchColumn();
 
-$stmt = $pdo->prepare("SELECT a.id, a.employee_id, CONCAT_WS(' ', e.firstname, e.middlename, e.lastname) AS employee_name, a.date, a.time_in, a.time_out, a.attendance_status, a.num_hr, a.overtime_hr, e.photo, e.department $sql_details $where_sql $order_sql $limit_sql");
+// UPDATED QUERY: Added a.time_out_date
+$stmt = $pdo->prepare("SELECT a.id, a.employee_id, CONCAT_WS(' ', e.firstname, e.middlename, e.lastname) AS employee_name, a.date, a.time_in, a.time_out, a.time_out_date, a.attendance_status, a.num_hr, a.overtime_hr, e.photo, e.department $sql_details $where_sql $order_sql $limit_sql");
 $stmt->execute($where_bindings);
 $raw_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -76,7 +77,22 @@ $formatted_data = [];
 foreach ($raw_data as $row) {
     // Times
     $time_in = date('h:i A', strtotime($row['time_in']));
-    $time_out = ($row['time_out'] && $row['time_out'] !== '00:00:00') ? date('h:i A', strtotime($row['time_out'])) : '--';
+    
+    // UPDATED TIME OUT LOGIC
+    $time_out = '--';
+    if ($row['time_out'] && $row['time_out'] !== '00:00:00') {
+        // 1. Format the time
+        $time_out_str = date('h:i A', strtotime($row['time_out']));
+        
+        // 2. Format the date if it exists
+        $date_str = '';
+        if (!empty($row['time_out_date']) && $row['time_out_date'] !== '0000-00-00') {
+            $date_str = '<br><small class="text-muted" style="font-size: 0.85em;">' . date('M d, Y', strtotime($row['time_out_date'])) . '</small>';
+        }
+
+        // 3. Combine them
+        $time_out = $time_out_str . $date_str;
+    }
     
     // Status Logic (Multi-Badge)
     $status_str = $row['attendance_status'];
@@ -90,10 +106,13 @@ foreach ($raw_data as $row) {
         $badges .= '<span class="badge bg-soft-warning text-warning border border-warning px-2 rounded-pill me-1">Late</span>';
     
     if (stripos($status_str, 'Undertime') !== false) 
-        $badges .= '<span class="badge bg-soft-danger text-danger border border-danger px-2 rounded-pill me-1">Undertime</span>';
+        $badges .= '<span class="badge bg-soft-info text-info border border-info px-2 rounded-pill me-1">Undertime</span>';
         
     if (stripos($status_str, 'Overtime') !== false) 
         $badges .= '<span class="badge bg-soft-primary text-primary border border-primary px-2 rounded-pill me-1">Overtime</span>';
+    
+    if (stripos($status_str, 'Forgot Time Out') !== false) 
+        $badges .= '<span class="badge bg-soft-danger text-danger border border-danger px-2 rounded-pill me-1">Overtime</span>';
 
     // Active State
     if ($time_out == '--') {
@@ -104,12 +123,12 @@ foreach ($raw_data as $row) {
 
     $formatted_data[] = [
         'employee_id'   => $row['employee_id'],
-        'employee_name' => $row['employee_name'], // You can also pass 'photo' here if you want to use it in JS
-        'photo'         => $row['photo'], // Passing photo for the JS render function
+        'employee_name' => $row['employee_name'], 
+        'photo'         => $row['photo'], 
         'date'          => date('M d, Y', strtotime($row['date'])),
         'time_in'       => $time_in,
-        'time_out'      => $time_out,
-        'status'        => $badges, // Send HTML badges
+        'time_out'      => $time_out, // Now contains HTML (Time <br> Date)
+        'status'        => $badges, 
         'num_hr'        => $row['num_hr'],
         'overtime_hr'   => $row['overtime_hr']
     ];

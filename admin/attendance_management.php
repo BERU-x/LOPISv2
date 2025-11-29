@@ -149,6 +149,7 @@ $(document).ready(function() {
                 // Col 2: Time In (Server formatted)
                 { 
                     data: 'time_in',
+                    className: "fw-bold text-dark"
                 },
 
                 // Col 3: Status (Server sends HTML Badge)
@@ -161,7 +162,10 @@ $(document).ready(function() {
                 }, 
                 
                 // Col 4: Time Out (Server formatted)
-                { data: 'time_out' },
+                { 
+                    data: 'time_out',
+                    className: "fw-bold text-dark",
+                },
 
                 // Col 5: Hours
                 { 
