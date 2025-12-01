@@ -14,7 +14,7 @@ if (isset($_POST['generate_btn'])) {
     $end_date     = $_POST['end_date'];
     $target_employee = $_POST['employee_id'] ?? 'all';
     
-    // OT multiplier constants for premiums 
+    // OT multiplier constants 
     $REGULAR_OT_MULTIPLIER = 1.25; 
     $SUNDAY_OT_PREMIUM_MULTIPLIER = 1.69; 
     $RH_OT_PREMIUM_MULTIPLIER = 2.6; 
@@ -35,7 +35,6 @@ if (isset($_POST['generate_btn'])) {
         $holidays = $stmt_holidays->fetchAll(PDO::FETCH_ASSOC);
 
         // Fetch Employee Data
-        // 🛑 UPDATE: Added f.outstanding_balance to this query 🛑
         $sql_emp = "SELECT 
                         e.employee_id, e.firstname, e.lastname,
                         c.monthly_rate, c.daily_rate, c.hourly_rate, c.food_allowance, c.transpo_allowance,
@@ -67,7 +66,9 @@ if (isset($_POST['generate_btn'])) {
         $count = 0;
 
         // --- PREPARE STATEMENTS ---
-        $stmt_late = $pdo->prepare("SELECT SUM(total_late_hr) as total_late_hrs FROM tbl_attendance WHERE employee_id = :eid AND date BETWEEN :start AND :end AND total_late_hr > 0");
+
+        // 1. Calculations
+        $stmt_late = $pdo->prepare("SELECT SUM(total_deduction_hr) as total_deduction_hrs FROM tbl_attendance WHERE employee_id = :eid AND date BETWEEN :start AND :end AND total_deduction_hr > 0");
         $stmt_days = $pdo->prepare("SELECT COUNT(DISTINCT date) as days_present FROM tbl_attendance WHERE employee_id = :eid AND date BETWEEN :start AND :end AND num_hr > 0");
         $stmt_sss = $pdo->prepare("SELECT total_contribution FROM tbl_sss_standard WHERE :rate >= min_salary AND :rate <= max_salary ORDER BY id DESC LIMIT 1");
         $stmt_leave_days = $pdo->prepare("SELECT SUM(days_count) FROM tbl_leave WHERE employee_id = :eid AND status = 1 AND leave_type NOT LIKE '%Unpaid%' AND start_date BETWEEN :start AND :end");
@@ -75,19 +76,25 @@ if (isset($_POST['generate_btn'])) {
         $stmt_check_attendance_single = $pdo->prepare("SELECT num_hr FROM tbl_attendance WHERE employee_id = :eid AND date = :check_date LIMIT 1");
         $stmt_check_leave_single = $pdo->prepare("SELECT days_count FROM tbl_leave WHERE employee_id = :eid AND status = 1 AND leave_type NOT LIKE '%Unpaid%' AND :check_date BETWEEN start_date AND end_date LIMIT 1");
         
-        $stmt_all_work_hours = $pdo->prepare("
-            SELECT 
-                SUM(CASE WHEN num_hr > 8 THEN 8 ELSE num_hr END) as total_base_hours,
-                SUM(overtime_hr) as total_ot_hours_agg
-            FROM tbl_attendance 
+        // Fetch Approved Overtime
+        $stmt_approved_ot = $pdo->prepare("
+            SELECT ot_date, SUM(hours_approved) as daily_ot 
+            FROM tbl_overtime 
             WHERE employee_id = :eid 
-            AND date BETWEEN :start AND :end
-            AND num_hr > 0
-        "); 
-        
+            AND ot_date BETWEEN :start AND :end 
+            AND status = 'Approved' 
+            GROUP BY ot_date
+        ");
+
         $stmt_header = $pdo->prepare("INSERT INTO tbl_payroll (ref_no, employee_id, cut_off_start, cut_off_end, gross_pay, total_deductions, net_pay, status) VALUES (:ref, :empid, :start, :end, :gross, :deduct, :net, 0)");
         $stmt_item = $pdo->prepare("INSERT INTO tbl_payroll_items (payroll_id, item_name, item_type, amount) VALUES (?, ?, ?, ?)");
         
+        // --- 2. UPDATES ---
+        // 🛑 REMOVED: $stmt_update_balance (Outstanding balance update logic removed)
+        
+        $stmt_update_emp_ts = $pdo->prepare("UPDATE tbl_employees SET updated_on = NOW() WHERE employee_id = :eid");
+        $stmt_update_ca = $pdo->prepare("UPDATE tbl_cash_advances SET status = 'Paid', date_updated = NOW() WHERE employee_id = :eid AND status = 'Pending' AND date_requested BETWEEN :start AND :end");
+
         // --- HELPER CLOSURE ---
         $check_eligibility = function($current_emp_id, $check_date) use ($stmt_check_attendance_single, $stmt_check_leave_single) {
             $stmt_check_attendance_single->execute([':eid' => $current_emp_id, ':check_date' => $check_date]);
@@ -135,14 +142,17 @@ if (isset($_POST['generate_btn'])) {
             $total_paid_leave_days = floatval($stmt_leave_days->fetchColumn() ?: 0);
             $paid_leave_amount = $total_paid_leave_days * $daily_rate;
 
-            $stmt_all_work_hours->execute([':eid' => $emp_id, ':start' => $start_date, ':end' => $end_date]);
-            $aggregated_hours = $stmt_all_work_hours->fetch(PDO::FETCH_ASSOC);
-            $total_ot_hours = floatval($aggregated_hours['total_ot_hours_agg'] ?? 0);
+            // Load Approved OT into a lookup array
+            $stmt_approved_ot->execute([':eid' => $emp_id, ':start' => $start_date, ':end' => $end_date]);
+            $approved_ot_records = $stmt_approved_ot->fetchAll(PDO::FETCH_KEY_PAIR); 
+            
+            // Calculate Total OT Hours (for display reference)
+            $total_approved_ot_hours_agg = array_sum($approved_ot_records);
             $premium_day_ot_hours = 0; 
             
             // --- 2. ATTENDANCE LOOP ---
             $stmt_all_daily_records = $pdo->prepare("
-                SELECT date, num_hr, overtime_hr
+                SELECT date, num_hr
                 FROM tbl_attendance 
                 WHERE employee_id = :eid 
                 AND date BETWEEN :start AND :end
@@ -157,7 +167,13 @@ if (isset($_POST['generate_btn'])) {
             foreach($all_work_hours as $record) {
                 $day_date = $record['date'];
                 $base_hours = min(8, floatval($record['num_hr'])); 
-                $ot_hours = floatval($record['overtime_hr']); 
+                
+                // Get OT from Approved Array
+                $ot_hours = 0;
+                if (isset($approved_ot_records[$day_date])) {
+                    $ot_hours = floatval($approved_ot_records[$day_date]);
+                }
+
                 $day_of_week = date('N', strtotime($day_date)); 
 
                 $is_sunday = ($day_of_week == 7);
@@ -168,24 +184,26 @@ if (isset($_POST['generate_btn'])) {
                     $h_type = $holiday_lookup[$day_date];
                     if ($ot_hours > 0) $premium_day_ot_hours += $ot_hours; 
                     $h_multiplier = floatval($holiday_multiplier_lookup[$day_date]);
+                    
+                    // Holiday Work Premium (1st 8 hours)
                     $hourly_premium = $base_pay_for_worked_day * ($h_multiplier - 1.0); 
                     
                     if ($h_type == 'Regular') {
                         $rh_worked_pay_premium += $hourly_premium; 
-                        $rh_ot_premium_only += $ot_hours * $hourly_rate * ($RH_OT_PREMIUM_MULTIPLIER - 1.0);
+                        $rh_ot_premium_only += $ot_hours * $hourly_rate * $RH_OT_PREMIUM_MULTIPLIER;
                     }
                     elseif ($h_type == 'Special Non-Working') {
                         $snwh_worked_pay_premium += $hourly_premium;
-                        $snwh_ot_premium_only += $ot_hours * $hourly_rate * ($SNWD_OT_PREMIUM_MULTIPLIER - 1.0);
+                        $snwh_ot_premium_only += $ot_hours * $hourly_rate * $SNWD_OT_PREMIUM_MULTIPLIER;
                     }
                 }
                 elseif ($is_sunday) {
                     if ($ot_hours > 0) $premium_day_ot_hours += $ot_hours; 
                     $sunday_work_premium += $base_pay_for_worked_day * 0.30;
-                    $sunday_ot_premium += $ot_hours * $hourly_rate * ($SUNDAY_OT_PREMIUM_MULTIPLIER - 1.0);
+                    $sunday_ot_premium += $ot_hours * $hourly_rate * $SUNDAY_OT_PREMIUM_MULTIPLIER;
                 } 
                 else {
-                    $regular_ot_premium += $ot_hours * $hourly_rate * ($REGULAR_OT_MULTIPLIER - 1.0);
+                    $regular_ot_premium += $ot_hours * $hourly_rate * $REGULAR_OT_MULTIPLIER;
                 }
             }
             
@@ -218,6 +236,7 @@ if (isset($_POST['generate_btn'])) {
                 }
             }
             
+            // --- BASIC PAY (Daily Rate * Days Present) ---
             $total_worked_base_pay_GROSS = $daily_rate * $days_present;
             $total_base_pay = $total_worked_base_pay_GROSS + $regular_holiday_non_work_pay + $paid_leave_amount; 
 
@@ -261,14 +280,14 @@ if (isset($_POST['generate_btn'])) {
             $savings      = floatval($emp['savings_deduction'] ?? 0);
             $cash_assist  = floatval($emp['cash_assist_deduction'] ?? 0); 
 
-            // 🛑 NEW: Check for Previous Period Deficit 🛑
+            // Previous Period Deficit
             $previous_deficit_deduction = 0;
             $outstanding_bal = floatval($emp['outstanding_balance'] ?? 0);
             if ($outstanding_bal > 0) {
                 $previous_deficit_deduction = $outstanding_bal; 
             }
 
-            // TOTAL DEDUCTIONS (Added $previous_deficit_deduction)
+            // TOTAL DEDUCTIONS
             $total_deductions = $total_govt_deductions + 
                                 $sss_loan + $pagibig_loan + $company_loan + 
                                 $savings + $cash_advance + $cash_assist + $tax_deduction + 
@@ -285,10 +304,10 @@ if (isset($_POST['generate_btn'])) {
             // --- 6. INSERT ITEMS ---
             $total_worked_base_pay = $total_worked_base_pay_GROSS; 
 
-            // Display rates
-            $rate_rh_ot_premium = $hourly_rate * ($RH_OT_PREMIUM_MULTIPLIER - 1.0);
-            $rate_snwh_ot_premium = $hourly_rate * ($SNWD_OT_PREMIUM_MULTIPLIER - 1.0);
-            $rate_sunday_ot_premium = $hourly_rate * ($SUNDAY_OT_PREMIUM_MULTIPLIER - 1.0);
+            // Rates for display (Full Rate Multiplier)
+            $rate_rh_ot_premium = $hourly_rate * $RH_OT_PREMIUM_MULTIPLIER;
+            $rate_snwh_ot_premium = $hourly_rate * $SNWD_OT_PREMIUM_MULTIPLIER;
+            $rate_sunday_ot_premium = $hourly_rate * $SUNDAY_OT_PREMIUM_MULTIPLIER;
             
             $rh_ot_hours = ($rh_ot_premium_only > 0 && $rate_rh_ot_premium > 0) ? $rh_ot_premium_only / $rate_rh_ot_premium : 0;
             $snwh_ot_hours = ($snwh_ot_premium_only > 0 && $rate_snwh_ot_premium > 0) ? $snwh_ot_premium_only / $rate_snwh_ot_premium : 0;
@@ -296,13 +315,13 @@ if (isset($_POST['generate_btn'])) {
 
             $items = [
                 // Earnings
-                ['name' => 'Basic Pay (' . number_format($days_present, 1) . ' day/s)', 'type' => 'earning', 'amount' => $total_worked_base_pay],
-                ['name' => 'Leave Pay (' . number_format($total_paid_leave_days, 1) . ' day/s)', 'type' => 'earning', 'amount' => $paid_leave_amount],
+                ['name' => 'Basic Pay (' . number_format($days_present) . ' day/s)', 'type' => 'earning', 'amount' => $total_worked_base_pay],
+                ['name' => 'Leave Pay (' . number_format($total_paid_leave_days) . ' day/s)', 'type' => 'earning', 'amount' => $paid_leave_amount],
                 ['name' => 'RH Premium Pay', 'type' => 'earning', 'amount' => $rh_worked_pay_premium],
                 ['name' => 'SNW Holiday Premium Pay', 'type' => 'earning', 'amount' => $snwh_worked_pay_premium],
-                ['name' => 'Regular Holiday Pay (' . number_format(($daily_rate > 0 ? $regular_holiday_non_work_pay / $daily_rate : 0), 1) . ' day/s)', 'type' => 'earning', 'amount' => $regular_holiday_non_work_pay],
+                ['name' => 'Regular Holiday Pay (' . number_format($daily_rate > 0 ? $regular_holiday_non_work_pay / $daily_rate : 0) . ' day/s)', 'type' => 'earning', 'amount' => $regular_holiday_non_work_pay],
                 ['name' => 'Sunday Work Premium Pay', 'type' => 'earning', 'amount' => $sunday_work_premium],
-                ['name' => 'Regular OT (' . number_format($total_ot_hours - $premium_day_ot_hours, 2) . ' hr/s)', 'type' => 'earning', 'amount' => $regular_ot_premium],
+                ['name' => 'Regular OT (' . number_format($total_approved_ot_hours_agg - $premium_day_ot_hours, 2) . ' hr/s)', 'type' => 'earning', 'amount' => $regular_ot_premium],
                 ['name' => 'RH OT Premium (' . number_format($rh_ot_hours, 2) . ' hr/s)', 'type' => 'earning', 'amount' => $rh_ot_premium_only],
                 ['name' => 'SNWH OT Premium (' . number_format($snwh_ot_hours, 2) . ' hr/s)', 'type' => 'earning', 'amount' => $snwh_ot_premium_only],
                 ['name' => 'Sunday OT Premium (' . number_format($sunday_ot_hours, 2) . ' hr/s)', 'type' => 'earning', 'amount' => $sunday_ot_premium],
@@ -310,7 +329,6 @@ if (isset($_POST['generate_btn'])) {
 
                 // Deductions
                 ['name' => 'Late / Undertime (' . number_format($total_late_hours, 2) . ' hrs)', 'type' => 'deduction', 'amount' => $late_deduction_amount],
-                // 🛑 ADDED: Previous Period Deficit Item 🛑
                 ['name' => 'Previous Period Deficit', 'type' => 'deduction', 'amount' => $previous_deficit_deduction],                
                 ['name' => 'SSS Contribution', 'type' => 'deduction', 'amount' => $sss_contrib],
                 ['name' => 'PhilHealth', 'type' => 'deduction', 'amount' => $philhealth_deduct],
@@ -327,6 +345,21 @@ if (isset($_POST['generate_btn'])) {
             foreach ($items as $item) {
                 if ($item['amount'] > 0) $stmt_item->execute([$payroll_id, $item['name'], $item['type'], $item['amount']]);
             }
+            
+            // --- 7. EXECUTE UPDATES ---
+            
+            // 🛑 REMOVED: Outstanding Balance Update logic here
+
+            $stmt_update_emp_ts->execute([':eid' => $emp_id]);
+
+            if ($cash_advance > 0) {
+                $stmt_update_ca->execute([
+                    ':eid'   => $emp_id,
+                    ':start' => $start_date,
+                    ':end'   => $end_date
+                ]);
+            }
+
             $count++;
         }
 

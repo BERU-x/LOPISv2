@@ -1,6 +1,8 @@
 <?php
 // today_attendance.php
-
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);   
 $page_title = 'Today\'s Attendance';
 $current_page = 'today_attendance'; 
 
@@ -145,11 +147,7 @@ foreach ($attendance_logs as $log) {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if(empty($attendance_logs)): ?>
-                            <tr>
-                                <td colspan="5" class="text-center text-muted fst-italic py-4">No records found.</td>
-                            </tr>
-                        <?php else: ?>
+                        <?php if(!empty($attendance_logs)): ?>
                             <?php foreach($attendance_logs as $log): ?>
                                 <?php 
                                     // Basic Vars
@@ -157,7 +155,9 @@ foreach ($attendance_logs as $log) {
                                     $fullname = $log['firstname'] . ' ' . $log['lastname'];
                                     $time_in = date('h:i A', strtotime($log['time_in']));
                                     $date_in = $log['date'];
-                                    $date_out = $log['time_out_date'];
+                                    
+                                    // Handle potential null dates for Time Out
+                                    $date_out = !empty($log['time_out_date']) ? $log['time_out_date'] : '--';
 
                                     // Time Out Check
                                     $is_active = ($log['time_out'] === null || $log['time_out'] === '00:00:00');
@@ -189,12 +189,11 @@ foreach ($attendance_logs as $log) {
                                         $badges_html .= '<span class="badge bg-soft-danger text-danger border border-danger px-2 rounded-pill me-1">Forgot Time Out</span>';
                                     }
 
-                                    // 5. Check Active (If clocked in but no time out yet)
+                                    // 5. Check Active
                                     if ($is_active) {
                                         $badges_html .= '<span class="badge bg-soft-secondary text-secondary border px-2 rounded-pill"><i class="fas fa-spinner fa-spin me-1"></i>Active</span>';
                                     }
 
-                                    // Fallback if empty
                                     if(empty($badges_html)) {
                                         $badges_html = '<span class="badge bg-light text-muted border">Unknown</span>';
                                     }
@@ -202,7 +201,12 @@ foreach ($attendance_logs as $log) {
                                     // Hours
                                     $hours_worked = '--';
                                     if (!$is_active) {
-                                        $hours_worked = !empty($log['num_hr']) ? $log['num_hr'] . ' hrs' : number_format((strtotime($log['time_out']) - strtotime($log['time_in'])) / 3600, 2) . ' hrs';
+                                        if (!empty($log['num_hr']) && $log['num_hr'] > 0) {
+                                            $hours_worked = $log['num_hr'] . ' hrs';
+                                        } else {
+                                            $diff = strtotime($log['time_out']) - strtotime($log['time_in']);
+                                            $hours_worked = number_format($diff / 3600, 2) . ' hrs';
+                                        }
                                     }
                                 ?>
                                 <tr>

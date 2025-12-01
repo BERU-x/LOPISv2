@@ -77,6 +77,9 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                                     <i class="fas fa-eye"></i>
                                 </button>
                             </div>
+                            <div id="caps-warning" class="text-danger mt-1 d-none small fw-bold">
+                                <i class="fas fa-exclamation-triangle me-1"></i> Caps Lock is ON
+                            </div>
                         </div>
                         
                         <div class="mb-3 form-check">
@@ -192,6 +195,20 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                         icon.removeClass('d-none');
                     }
                 });
+            });
+            // --- 4. ADDED: Caps Lock Detection ---
+            $('#password').on('keyup keydown click focus', function(e) {
+                // getModifierState is a native DOM method, so we use e.originalEvent
+                if (e.originalEvent.getModifierState('CapsLock')) {
+                    $('#caps-warning').removeClass('d-none');
+                } else {
+                    $('#caps-warning').addClass('d-none');
+                }
+            });
+
+            // Optional: Hide warning when user clicks away from the password field
+            $('#password').on('blur', function() {
+                $('#caps-warning').addClass('d-none');
             });
         });
     </script>
