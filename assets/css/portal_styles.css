@@ -417,7 +417,7 @@ body.sidebar-toggled .sidebar .nav-item:hover .nav-link span::before {
 
     /* When mobile sidebar is open, PUSH the content wrapper */
     body.sidebar-toggled #content-wrapper {
-        margin-left: 280px;
+        margin-left: 105px;
     }
     
     .topbar .dropdown-menu {

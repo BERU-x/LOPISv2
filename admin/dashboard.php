@@ -1,5 +1,5 @@
 <?php
-// admin_dashboard.php
+// dashboard.php
 $page_title = 'Admin Dashboard - LOPISv2';
 $current_page = 'dashboard';
 
@@ -10,6 +10,10 @@ require_once 'models/admin_dashboard_model.php';
 $metrics = get_admin_dashboard_metrics($pdo);
 $dept_data = get_dept_distribution_data($pdo);
 $payroll_history = get_payroll_history($pdo);
+// ✅ NEW DATA FETCH
+$upcoming_leaves = get_upcoming_leaves($pdo, 5);
+$upcoming_holidays = get_upcoming_holidays($pdo, 5);
+
 
 // Prepare Data for View
 $active_employees_count = $metrics['active_employees'];
@@ -46,7 +50,7 @@ require 'template/topbar.php';
             </a>
         </div>
     </div>
-
+    
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
             <div class="card h-100 border-left-teal shadow-sm">
@@ -145,10 +149,75 @@ require 'template/topbar.php';
     </div>
     
     <div class="row mb-4">
+        <div class="col-xl-6 col-lg-6 mb-4">
+            <div class="card h-100 shadow">
+                <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-label">Upcoming Approved Leaves</h6>
+                    <a href="leave_management.php" class="text-decoration-none text-sm text-muted">See All &rarr;</a>
+                </div>
+                <div class="card-body pt-0">
+                    <?php if (count($upcoming_leaves) > 0): ?>
+                        <ul class="list-group list-group-flush">
+                            <?php foreach ($upcoming_leaves as $leave): ?>
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <h6 class="mb-0 text-gray-800"><?php echo htmlspecialchars($leave['firstname'] . ' ' . $leave['lastname']); ?></h6>
+                                        <small class="text-muted"><?php echo htmlspecialchars($leave['leave_type']); ?></small>
+                                    </div>
+                                    <span class="badge bg-soft-danger text-danger p-2">
+                                        <?php echo date("M d", strtotime($leave['start_date'])); ?> 
+                                        <?php echo ($leave['start_date'] != $leave['end_date']) ? ' - ' . date("M d", strtotime($leave['end_date'])) : ''; ?>
+                                    </span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-check-circle fa-2x mb-3"></i>
+                            <p class="mb-0">No approved leaves scheduled soon.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-6 col-lg-6 mb-4">
+            <div class="card h-100 shadow">
+                <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-label">Upcoming Company Holidays</h6>
+                    <a href="holidays.php" class="text-decoration-none text-sm text-muted">Manage &rarr;</a>
+                </div>
+                <div class="card-body pt-0">
+                    <?php if (count($upcoming_holidays) > 0): ?>
+                        <ul class="list-group list-group-flush">
+                            <?php foreach ($upcoming_holidays as $holiday): ?>
+                                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <h6 class="mb-0 text-gray-800"><?php echo htmlspecialchars($holiday['holiday_name']); ?></h6>
+                                        <small class="text-muted"><?php echo htmlspecialchars($holiday['holiday_type']); ?></small>
+                                    </div>
+                                    <span class="badge bg-soft-primary text-primary p-2">
+                                        <?php echo date("M d, Y", strtotime($holiday['holiday_date'])); ?>
+                                    </span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-calendar-alt fa-2x mb-3"></i>
+                            <p class="mb-0">No upcoming holidays configured.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
         <div class="col-xl-8 col-lg-7">
             <div class="card h-100 shadow">
                 <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-teal">Payroll History (Last 6 Months)</h6>
+                    <h6 class="m-0 font-weight-bold text-label">Payroll History (Last 6 Months)</h6>
                 </div>
                 <div class="card-body pt-0">
                     <div class="chart-area" style="height: 320px;">
@@ -161,7 +230,7 @@ require 'template/topbar.php';
         <div class="col-xl-4 col-lg-5">
             <div class="card h-100 shadow">
                 <div class="card-header bg-transparent border-0 pb-0">
-                    <h6 class="m-0 font-weight-bold text-gray-800">Employees by Dept</h6>
+                    <h6 class="m-0 font-weight-bold text-label">Employees by Dept</h6>
                 </div>
                 <div class="card-body">
                     <div class="chart-pie" style="height: 250px;">
@@ -230,7 +299,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 x: { grid: { display: false } },
                 y: { 
                     grid: { borderDash: [2, 4], color: "#e3e6f0" }, 
-                    beginAtZero: false, // Allows chart to float if values are high
+                    beginAtZero: false, 
                     ticks: {
                         callback: function(value) { return '₱' + value.toLocaleString(); } 
                     }
@@ -261,7 +330,7 @@ document.addEventListener("DOMContentLoaded", function() {
             maintainAspectRatio: false,
             cutout: '75%', 
             plugins: { 
-                legend: { display: false }, // Hiding legend to look cleaner
+                legend: { display: false }, 
             }
         },
     });

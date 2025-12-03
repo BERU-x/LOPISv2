@@ -14,6 +14,7 @@ function get_admin_dashboard_metrics($pdo) {
         // 1. Active Employees
         $stmt = $pdo->query("SELECT COUNT(id) FROM tbl_employees WHERE employment_status < 5");
         $metrics['active_employees'] = (int)$stmt->fetchColumn();
+        
 
         // 2. New Hires This Month
         $stmt = $pdo->query("SELECT COUNT(id) FROM tbl_employees WHERE MONTH(created_on) = MONTH(NOW()) AND YEAR(created_on) = YEAR(NOW())");
@@ -25,9 +26,9 @@ function get_admin_dashboard_metrics($pdo) {
         
         // 4. Payroll Status
         $stmt = $pdo->prepare("SELECT COUNT(id) FROM tbl_payroll 
-                               WHERE MONTH(cut_off_end) = MONTH(NOW()) 
-                               AND YEAR(cut_off_end) = YEAR(NOW()) 
-                               AND status = 1");
+                              WHERE MONTH(cut_off_end) = MONTH(NOW()) 
+                              AND YEAR(cut_off_end) = YEAR(NOW()) 
+                              AND status = 1");
         $stmt->execute();
         $metrics['payroll_status'] = ((int)$stmt->fetchColumn() > 0) ? 'Completed' : 'Pending';
 
@@ -58,18 +59,18 @@ function get_dept_distribution_data($pdo) {
     return $data;
 }
 
-// ✅ FIXED: Fetch Payroll History based on your table structure
+// Fetch Payroll History based on your table structure
 function get_payroll_history($pdo) {
     $history = ['labels' => [], 'data' => []];
     try {
         // We SUM() the net_pay for everyone sharing the same cut_off_end date
         // This groups individual employee payslips into one big "Pay Run" total
         $sql = "SELECT cut_off_end, SUM(net_pay) as total_payout 
-                FROM tbl_payroll 
-                WHERE status = 1 
-                GROUP BY cut_off_end
-                ORDER BY cut_off_end DESC 
-                LIMIT 6";
+                 FROM tbl_payroll 
+                 WHERE status = 1 
+                 GROUP BY cut_off_end
+                 ORDER BY cut_off_end DESC 
+                 LIMIT 6";
                 
         $stmt = $pdo->query($sql);
         $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -78,7 +79,7 @@ function get_payroll_history($pdo) {
         $results = array_reverse($results);
 
         foreach ($results as $row) {
-            // Format Date (e.g., "Oct 15, 2023")
+            // Format Date (e.g., "Oct 15")
             $dateLabel = date("M d", strtotime($row['cut_off_end'])); 
             $history['labels'][] = $dateLabel;
             $history['data'][] = (float)$row['total_payout'];
@@ -87,5 +88,44 @@ function get_payroll_history($pdo) {
         error_log("Payroll History Error: " . $e->getMessage());
     }
     return $history;
+}
+
+// ✅ NEW: Fetch Upcoming Leaves
+function get_upcoming_leaves($pdo, $limit = 5) {
+    try {
+        // Get approved leaves that start today or in the future, ordered soonest first
+        $sql = "SELECT t1.start_date, t1.end_date, t1.leave_type, t1.days_count, t2.firstname, t2.lastname
+                FROM tbl_leave t1
+                JOIN tbl_employees t2 ON t1.employee_id = t2.employee_id
+                WHERE t1.status = 1 AND t1.end_date >= CURDATE()
+                ORDER BY t1.start_date ASC
+                LIMIT :limit";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Upcoming Leaves Error: " . $e->getMessage());
+        return [];
+    }
+}
+
+// ✅ NEW: Fetch Upcoming Holidays
+function get_upcoming_holidays($pdo, $limit = 5) {
+    try {
+        // Get holidays that are today or in the future, ordered soonest first
+        $sql = "SELECT holiday_date, holiday_name, holiday_type
+                FROM tbl_holidays
+                WHERE holiday_date >= CURDATE()
+                ORDER BY holiday_date ASC
+                LIMIT :limit";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Upcoming Holidays Error: " . $e->getMessage());
+        return [];
+    }
 }
 ?>
