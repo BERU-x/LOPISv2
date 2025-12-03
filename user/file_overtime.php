@@ -34,7 +34,7 @@ if (isset($_POST['submit_ot'])) {
     // Input validation 
     if (empty($ot_date) || empty($ot_hours) || empty($reason)) {
         $submission_message = ['type' => 'danger', 'text' => 'Please fill out all required fields.'];
-    } elseif (!is_numeric($ot_hours) || $ot_hours <= 0 || $ot_hours > 8) {
+    } elseif (!is_numeric($ot_hours) || $ot_hours < 0.5 || $ot_hours > 8) {
         $submission_message = ['type' => 'danger', 'text' => 'Requested hours must be a valid number between 0.5 and 8.'];
     } else {
         try {
