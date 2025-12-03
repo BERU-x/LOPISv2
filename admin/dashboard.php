@@ -149,6 +149,37 @@ require 'template/topbar.php';
     </div>
     
     <div class="row mb-4">
+        <div class="col-xl-8 col-lg-7">
+            <div class="card h-100 shadow">
+                <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-label">Payroll History (Last 6 Months)</h6>
+                </div>
+                <div class="card-body pt-0">
+                    <div class="chart-area" style="height: 320px;">
+                        <canvas id="payrollHistoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4 col-lg-5">
+            <div class="card h-100 shadow">
+                <div class="card-header bg-transparent border-0 pb-0">
+                    <h6 class="m-0 font-weight-bold text-label">Employees by Dept</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie" style="height: 250px;">
+                        <canvas id="deptDistributionChart"></canvas>
+                    </div>
+                    <div class="mt-4 text-center small text-muted">
+                        Hover over sections to see counts
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
         <div class="col-xl-6 col-lg-6 mb-4">
             <div class="card h-100 shadow">
                 <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
@@ -208,37 +239,6 @@ require 'template/topbar.php';
                             <p class="mb-0">No upcoming holidays configured.</p>
                         </div>
                     <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="row mb-4">
-        <div class="col-xl-8 col-lg-7">
-            <div class="card h-100 shadow">
-                <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-label">Payroll History (Last 6 Months)</h6>
-                </div>
-                <div class="card-body pt-0">
-                    <div class="chart-area" style="height: 320px;">
-                        <canvas id="payrollHistoryChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-4 col-lg-5">
-            <div class="card h-100 shadow">
-                <div class="card-header bg-transparent border-0 pb-0">
-                    <h6 class="m-0 font-weight-bold text-label">Employees by Dept</h6>
-                </div>
-                <div class="card-body">
-                    <div class="chart-pie" style="height: 250px;">
-                        <canvas id="deptDistributionChart"></canvas>
-                    </div>
-                    <div class="mt-4 text-center small text-muted">
-                        Hover over sections to see counts
-                    </div>
                 </div>
             </div>
         </div>

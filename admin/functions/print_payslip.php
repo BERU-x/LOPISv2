@@ -38,9 +38,16 @@ if (file_exists($font_path_reg)) {
 }
 
 // ==========================================
-// HELPER: NUMBER TO WORDS
+// HELPER: NUMBER TO WORDS (UPDATED FOR NEGATIVE)
 // ==========================================
 function numberToWords($number) {
+    // 1. Handle Negative Numbers
+    $prefix = '';
+    if ($number < 0) {
+        $prefix = 'Negative ';
+        $number = abs($number); // Convert to positive for processing
+    }
+
     $number = number_format($number, 2, '.', '');
     list($whole, $fraction) = explode('.', $number);
 
@@ -87,7 +94,8 @@ function numberToWords($number) {
         $whole_words = 'Zero';
     }
 
-    $final_words = $whole_words . ' Pesos';
+    // Add Prefix here
+    $final_words = $prefix . $whole_words . ' Pesos';
 
     $fraction_int = intval(str_pad($fraction, 2, '0', STR_PAD_RIGHT));
 
@@ -167,7 +175,8 @@ try {
     $total_ded  = array_sum(array_column($deductions, 1));
     $net_pay    = $total_earn - $total_ded;
     
-    $amount_in_words = numberToWords(number_format($net_pay, 2, '.', ''));
+    // 🛑 NUMBER TO WORDS CONVERSION (Pass raw net_pay)
+    $amount_in_words = numberToWords($net_pay);
 
     // ==========================================
     // 2. IMAGES & QR

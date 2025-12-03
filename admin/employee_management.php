@@ -176,11 +176,6 @@ require 'template/topbar.php';
                                         <i class="fas fa-edit"></i>
                                     </a>
 
-                                    <a href="manage_financials.php?id=<?php echo htmlspecialchars($db_id); ?>" 
-                                       class="btn btn-sm btn-light text-muted border" 
-                                       title="Manage Financials">
-                                        <i class="fas fa-coins"></i>
-                                    </a>
                                 </div>
                             </td>
                         </tr>

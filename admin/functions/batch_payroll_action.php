@@ -21,8 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
             $approved_count = 0;
 
             foreach ($ids as $payroll_id) {
-                // 1. Fetch current status, Employee ID, AND Net Pay
-                $stmt = $pdo->prepare("SELECT id, employee_id, status, net_pay FROM tbl_payroll WHERE id = ?");
+                // 1. Fetch Status, Employee ID, Net Pay AND Date Range (Added cut_off dates)
+                $stmt = $pdo->prepare("SELECT id, employee_id, status, net_pay, cut_off_start, cut_off_end FROM tbl_payroll WHERE id = ?");
                 $stmt->execute([$payroll_id]);
                 $payroll = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -31,9 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
                     
                     $emp_id = $payroll['employee_id'];
                     $net_pay = floatval($payroll['net_pay']);
+                    $start_date = $payroll['cut_off_start'];
+                    $end_date = $payroll['cut_off_end'];
 
                     // --- A. HANDLE NEGATIVE NET PAY (Incur New Debt) ---
-                    // If this specific payroll resulted in a negative, add it to the balance.
                     if ($net_pay < 0) {
                         $deficit_amount = abs($net_pay); 
                         $sql_update_deficit = "UPDATE tbl_employee_financials 
@@ -62,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
                         } elseif (stripos($item['item_name'], 'Cash Assistance') !== false) {
                             $col_to_update = 'cash_assist_total';
                         } 
-                        // 2. NEW: Check for Previous Deficit Payment
+                        // 2. Check for Previous Deficit Payment
                         elseif (stripos($item['item_name'], 'Previous Period Deficit') !== false) {
                             $col_to_update = 'outstanding_balance';
                         }
@@ -78,7 +79,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
                         }
                     }
 
-                    // --- C. UPDATE PAYROLL STATUS TO APPROVED (1) ---
+                    // --- C. MARK CASH ADVANCES AS PAID ---
+                    // Any CA that was marked as 'Deducted' falling within this payroll period is now considered 'Paid'
+                    $sql_update_ca = "UPDATE tbl_cash_advances 
+                                      SET status = 'Paid', date_updated = NOW() 
+                                      WHERE employee_id = ? 
+                                      AND status = 'Deducted' 
+                                      AND date_requested BETWEEN ? AND ?";
+                    $stmt_ca = $pdo->prepare($sql_update_ca);
+                    $stmt_ca->execute([$emp_id, $start_date, $end_date]);
+
+
+                    // --- D. UPDATE PAYROLL STATUS TO APPROVED (1) ---
                     $update_stmt = $pdo->prepare("UPDATE tbl_payroll SET status = 1 WHERE id = ?");
                     $update_stmt->execute([$payroll_id]);
                     
@@ -87,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
             }
             
             $pdo->commit();
-            echo json_encode(['success' => true, 'message' => "$approved_count records approved. Balances updated."]);
+            echo json_encode(['success' => true, 'message' => "$approved_count records approved. Loans updated & Cash Advances marked as Paid."]);
 
         } 
         elseif ($action === 'send_email') {

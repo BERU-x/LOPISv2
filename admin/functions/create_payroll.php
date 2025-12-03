@@ -72,7 +72,12 @@ if (isset($_POST['generate_btn'])) {
         $stmt_days = $pdo->prepare("SELECT COUNT(DISTINCT date) as days_present FROM tbl_attendance WHERE employee_id = :eid AND date BETWEEN :start AND :end AND num_hr > 0");
         $stmt_sss = $pdo->prepare("SELECT total_contribution FROM tbl_sss_standard WHERE :rate >= min_salary AND :rate <= max_salary ORDER BY id DESC LIMIT 1");
         $stmt_leave_days = $pdo->prepare("SELECT SUM(days_count) FROM tbl_leave WHERE employee_id = :eid AND status = 1 AND leave_type NOT LIKE '%Unpaid%' AND start_date BETWEEN :start AND :end");
-        $stmt_ca_check = $pdo->prepare("SELECT SUM(amount) FROM tbl_cash_advances WHERE employee_id = :eid AND status = 'Pending' AND date_requested BETWEEN :start AND :end");
+        
+        // --- UPDATED CASH ADVANCE CHECK ---
+        // Checks for 'Deducted' (Admin Approved) records to calculate the amount.
+        // It does NOT change the status yet.
+        $stmt_ca_check = $pdo->prepare("SELECT SUM(amount) FROM tbl_cash_advances WHERE employee_id = :eid AND status = 'Deducted' AND date_requested BETWEEN :start AND :end");
+        
         $stmt_check_attendance_single = $pdo->prepare("SELECT num_hr FROM tbl_attendance WHERE employee_id = :eid AND date = :check_date LIMIT 1");
         $stmt_check_leave_single = $pdo->prepare("SELECT days_count FROM tbl_leave WHERE employee_id = :eid AND status = 1 AND leave_type NOT LIKE '%Unpaid%' AND :check_date BETWEEN start_date AND end_date LIMIT 1");
         
@@ -90,10 +95,10 @@ if (isset($_POST['generate_btn'])) {
         $stmt_item = $pdo->prepare("INSERT INTO tbl_payroll_items (payroll_id, item_name, item_type, amount) VALUES (?, ?, ?, ?)");
         
         // --- 2. UPDATES ---
-        // 🛑 REMOVED: $stmt_update_balance (Outstanding balance update logic removed)
-        
         $stmt_update_emp_ts = $pdo->prepare("UPDATE tbl_employees SET updated_on = NOW() WHERE employee_id = :eid");
-        $stmt_update_ca = $pdo->prepare("UPDATE tbl_cash_advances SET status = 'Paid', date_updated = NOW() WHERE employee_id = :eid AND status = 'Pending' AND date_requested BETWEEN :start AND :end");
+        
+        // 🛑 REMOVED: The query that updates Cash Advance status to 'Paid' has been removed. 
+        // The status will remain 'Deducted' until you run a separate "Approve Payroll" script.
 
         // --- HELPER CLOSURE ---
         $check_eligibility = function($current_emp_id, $check_date) use ($stmt_check_attendance_single, $stmt_check_leave_single) {
@@ -347,18 +352,8 @@ if (isset($_POST['generate_btn'])) {
             }
             
             // --- 7. EXECUTE UPDATES ---
-            
-            // 🛑 REMOVED: Outstanding Balance Update logic here
-
             $stmt_update_emp_ts->execute([':eid' => $emp_id]);
-
-            if ($cash_advance > 0) {
-                $stmt_update_ca->execute([
-                    ':eid'   => $emp_id,
-                    ':start' => $start_date,
-                    ':end'   => $end_date
-                ]);
-            }
+            // NOTE: We do NOT mark CA as 'Paid' here. That happens on Payslip Approval.
 
             $count++;
         }

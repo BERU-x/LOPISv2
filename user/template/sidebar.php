@@ -59,8 +59,15 @@ function isActive($page_name, $current_page) {
             <i class="fas fa-fw fa-clock"></i>
             <span>File Overtime</span>
         </a>
-    </li>    
-    
+    </li>
+
+    <li class="nav-item <?php echo isActive('request_ca', $current_page); ?>">
+        <a class="nav-link" href="request_ca.php">
+            <i class="fas fa-fw fa-money-bill"></i>
+            <span>Request Cash Advance</span>
+        </a>
+    </li>
+
     <li class="nav-item <?php echo isActive('request_leave', $current_page); ?>">
         <a class="nav-link" href="request_leave.php">
             <i class="fas fa-fw fa-paper-plane"></i>

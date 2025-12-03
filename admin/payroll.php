@@ -185,9 +185,7 @@ try {
                     <div class="mb-3">
                         <label class="form-label fw-bold text-xs text-uppercase">Payroll Type</label>
                         <select name="payroll_type" class="form-select">
-                            <option value="semi-monthly">Semi-Monthly (15th/30th)</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="special">13th Month / Special</option>
+                            <option value="semi-monthly" selected>Semi-Monthly (15th/30th)</option>
                         </select>
                     </div>
 
