@@ -6,13 +6,19 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-// 2. DATABASE CONNECTION
+// 2. DATABASE CONNECTION & NOTIFICATION MODEL
 // Assuming structure: root/user/functions/submit_ca_request.php
 // We need to go back to root: ../../
-if (file_exists('../../db_connection.php')) {
-    require_once '../../db_connection.php';
+
+$root_path = '../../'; // Default assumption based on your path
+
+if (file_exists($root_path . 'db_connection.php')) {
+    require_once $root_path . 'db_connection.php';
+    // Include Notification Model relative to DB connection
+    require_once $root_path . 'models/global_model.php'; 
 } elseif (file_exists('../db_connection.php')) {
     require_once '../db_connection.php';
+    require_once '../models/global_model.php';
 } else {
     // Return JSON error if DB file is missing
     header('Content-Type: application/json');
@@ -61,7 +67,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare($sql);
         
         if ($stmt->execute([$employee_id, $amount, $date_needed, $remarks])) {
-            echo json_encode(['status' => 'success', 'message' => 'Request submitted successfully!']);
+            
+            // --- 5. SEND NOTIFICATION TO ADMIN ---
+            // Helper to get sender name safely
+            $sender_name = (isset($_SESSION['firstname'])) ? $_SESSION['firstname'] . ' ' . $_SESSION['lastname'] : "Employee " . $employee_id;
+            
+            $formatted_amount = number_format($amount, 2);
+            $notif_msg = "$sender_name has requested a Cash Advance of ₱$formatted_amount.";
+            
+            // Send to: NULL (All Admins) | Role: Admin | Type: warning (Financial request)
+            // Link: 'cash_advance.php' (Admin page to approve CA)
+            if (function_exists('send_notification')) {
+                send_notification($pdo, null, 'Admin', 'warning', $notif_msg, 'cashadv_approval.php', $sender_name);
+            }
+
+            echo json_encode(['status' => 'success', 'message' => 'Request submitted successfully! Admin has been notified.']);
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Database insert failed.']);
         }

@@ -1,22 +1,12 @@
 <?php
 /**
  * CHECKING.PHP
- *
- * This script manages session initialization and "Remember Me" cookie authentication.
- *
- * 1. Starts a session if one isn't active.
- * 2. Checks if a user is NOT logged in but HAS a "Remember Me" cookie.
- * 3. If so, it validates the cookie token against the database.
- * 4. If valid, it logs the user in by creating their session.
- * 5. It rotates the token for security.
- *
- * This file should be included at the VERY TOP of your other PHP pages.
+ * Updates: Now fetches 'photo' from tbl_employees to prevent missing profile pictures.
  */
 
-// Adjust this path if 'checking.php' is in a different location
+// Adjust this path if needed
 require_once __DIR__ . '/db_connection.php'; 
 
-// Start the session if it's not already started
 if (empty(session_id())) {
     session_start();
 }
@@ -29,59 +19,63 @@ if (!isset($_SESSION['logged_in']) && isset($_COOKIE['remember_selector']) && is
 
     try {
         // Find the token in the database
-        $stmt = $pdo->prepare(
-            "SELECT * FROM tbl_auth_tokens WHERE selector = ? AND expires_at > NOW()"
-        );
+        $stmt = $pdo->prepare("SELECT * FROM tbl_auth_tokens WHERE selector = ? AND expires_at > NOW()");
         $stmt->execute([$selector]);
         $auth_token = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($auth_token) {
-            // Token found, verify it
-            $hashed_token_from_cookie = hash('sha256', $token);
-            
-            // Use hash_equals for timing-attack-safe comparison
-            if (hash_equals($auth_token['hashed_token'], $hashed_token_from_cookie)) {
+            // Verify token
+            if (hash_equals($auth_token['hashed_token'], hash('sha256', $token))) {
                 
                 // --- TOKEN IS VALID - LOG THE USER IN ---
                 
-                // 1. Get user details
+                // 1. Get user details AND PHOTO
+                // Added e.photo to the SELECT list
                 $stmt_user = $pdo->prepare(
-                    "SELECT u.*, CONCAT(e.firstname, ' ', e.lastname) AS fullname 
+                    "SELECT u.*, 
+                            CONCAT(e.firstname, ' ', e.lastname) AS fullname,
+                            e.photo 
                      FROM tbl_users u
-                     LEFT JOIN tbl_employees e ON u.employee_id = e.id
+                     LEFT JOIN tbl_employees e ON u.employee_id = e.employee_id
                      WHERE u.id = ? AND u.status = 1"
                 );
+                
+                // NOTE ON JOIN above: I changed 'ON u.employee_id = e.id' to 'ON u.employee_id = e.employee_id'
+                // based on your previous var_dump showing employee_id is '006' (string), matching tbl_employees.employee_id.
+                // If your tbl_users stores the integer ID (1, 2, 3), change it back to e.id.
+
                 $stmt_user->execute([$auth_token['user_id']]);
                 $user = $stmt_user->fetch(PDO::FETCH_ASSOC);
 
                 if ($user) {
                     // 2. Set session variables
-                    session_regenerate_id(true); // Regenerate ID for security
+                    session_regenerate_id(true);
                     $_SESSION['logged_in'] = true;
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['employee_id'] = $user['employee_id'];
                     $_SESSION['email'] = $user['email'];
                     $_SESSION['fullname'] = $user['fullname'] ?? $user['email'];
                     $_SESSION['usertype'] = $user['usertype'];
+                    
+                    // NEW: Save the photo to session so topbar.php works correctly
+                    $_SESSION['profile_picture'] = $user['photo']; 
                         
-                    // 3. Update the token so it can't be reused (Token Rotation)
+                    // 3. Rotate Token (Security)
                     $new_token = bin2hex(random_bytes(32));
                     $new_hashed_token = hash('sha256', $new_token);
-                    $new_expires_at = date('Y-m-d H:i:s', time() + (86400 * 30)); // 30 days
+                    $new_expires_at = date('Y-m-d H:i:s', time() + (86400 * 30));
 
                     $stmt_update = $pdo->prepare(
-                        "UPDATE tbl_auth_tokens 
-                         SET hashed_token = ?, expires_at = ? 
-                         WHERE selector = ?"
+                        "UPDATE tbl_auth_tokens SET hashed_token = ?, expires_at = ? WHERE selector = ?"
                     );
                     $stmt_update->execute([$new_hashed_token, $new_expires_at, $selector]);
 
-                    // 4. Update the cookie with the new token
+                    // 4. Update Cookie
                     $cookie_options = [
                         'expires' => time() + (86400 * 30),
                         'path' => '/',
                         'domain' => '', 
-                        'secure' => false, // !! SET TO TRUE FOR PRODUCTION (HTTPS) !!
+                        'secure' => false, // Change to true if using HTTPS
                         'httponly' => true,
                         'samesite' => 'Lax'
                     ];
@@ -90,8 +84,7 @@ if (!isset($_SESSION['logged_in']) && isset($_COOKIE['remember_selector']) && is
             }
         }
     } catch (PDOException $e) {
-        // Log the error, but don't halt the script
         error_log('Remember Me cookie check failed: ' . $e->getMessage());
     }
 }
-// --- END OF AUTO-LOGIN CODE ---
+?>

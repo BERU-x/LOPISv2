@@ -1,15 +1,3 @@
-<?php
-// 1. LOGIC: Generate Initials (e.g., "Admin User" -> "AU")
-$display_initials = 'AD'; // Default
-if (!empty($fullname)) {
-    $parts = explode(' ', trim($fullname));
-    $display_initials = strtoupper(substr($parts[0], 0, 1));
-    if (isset($parts[1])) {
-        $display_initials .= strtoupper(substr($parts[1], 0, 1));
-    }
-}
-?>
-
 <div id="content-wrapper" class="d-flex flex-column min-vh-100">
 
     <div id="content" class="flex-grow-1">
@@ -27,54 +15,131 @@ if (!empty($fullname)) {
             <ul class="navbar-nav ms-auto">
 
                 <li class="nav-item dropdown no-arrow mx-1">
-                    <a class="nav-link dropdown-toggle" href="#" id="alertsDropdown" role="button"
+                    <a class="nav-link" href="#" id="alertsDropdown" role="button"
                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <i class="fas fa-bell fa-fw text-gray-400"></i>
-                        <span class="badge badge-danger badge-counter">3+</span>
+                        
+                        <?php 
+                        // $notif_count comes from header.php
+                        $display_count = $notif_count ?? 0;
+                        if ($display_count > 0): 
+                        ?>
+                            <span class="badge badge-danger badge-counter">
+                                <?php echo $display_count . ($display_count >= 5 ? '+' : ''); ?>
+                            </span>
+                        <?php endif; ?>
                     </a>
+                    
                     <div class="dropdown-list dropdown-menu dropdown-menu-end shadow animated--grow-in"
                         aria-labelledby="alertsDropdown">
-                        <h6 class="dropdown-header bg-info border-0" style="background-color: #0CC0DF !important;">
+                        <h6 class="dropdown-header border-0" style="background-color: #0CC0DF !important;">
                             Notifications
                         </h6>
-                        <a class="dropdown-item d-flex align-items-center" href="#">
-                            <div class="me-3">
-                                <div class="icon-circle bg-primary text-white rounded-circle p-2">
-                                    <i class="fas fa-file-alt"></i>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="small text-gray-500">December 12, 2025</div>
-                                <span class="font-weight-bold">Payroll report generated.</span>
-                            </div>
-                        </a>
-                        <a class="dropdown-item d-flex align-items-center" href="#">
-                            <div class="me-3">
-                                <div class="icon-circle bg-success text-white rounded-circle p-2">
-                                    <i class="fas fa-user-plus"></i>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="small text-gray-500">December 7, 2025</div>
-                                New employee profile created.
-                            </div>
-                        </a>
-                        <a class="dropdown-item text-center small text-gray-500" href="#">Show All Alerts</a>
+
+                        <?php 
+                        if (isset($notifications) && is_array($notifications) && count($notifications) > 0): 
+                        ?>
+                            <?php foreach ($notifications as $notif): ?>
+                                <?php 
+                                    $iconClass = 'fa-info-circle';
+                                    $bgClass = 'bg-primary';
+                                    
+                                    if($notif['type'] == 'payroll') { $iconClass = 'fa-file-invoice-dollar'; $bgClass = 'bg-success'; }
+                                    if($notif['type'] == 'leave')   { $iconClass = 'fa-calendar-times';      $bgClass = 'bg-warning'; }
+                                    if($notif['type'] == 'employee'){ $iconClass = 'fa-user-plus';           $bgClass = 'bg-info'; }
+                                    
+                                    $encoded_link = urlencode($notif['link']);
+                                    $handler_url = 'mark_read.php?id=' . $notif['id'] . '&link=' . $encoded_link;
+                                ?>
+
+                                <a class="dropdown-item d-flex align-items-center" href="<?php echo $handler_url; ?>">
+                                    <div class="me-3">
+                                        <div class="icon-circle <?php echo $bgClass; ?> text-white rounded-circle p-2">
+                                            <i class="fas <?php echo $iconClass; ?>"></i>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="small text-gray-500">
+                                            <?php echo time_elapsed_string($notif['created_at']); ?>
+                                        </div>
+                                        <span class="font-weight-bold">
+                                            <?php echo htmlspecialchars($notif['message']); ?>
+                                        </span>
+                                    </div>
+                                </a>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <a class="dropdown-item text-center small text-gray-500" href="#">No new notifications</a>
+                        <?php endif; ?>
+
+                        <a class="dropdown-item text-center small text-gray-500" href="notifications.php">Show All Alerts</a>
                     </div>
                 </li>
-
+                
                 <div class="topbar-divider d-none d-sm-block"></div>
 
                 <li class="nav-item dropdown no-arrow">
-                    <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button"
+                    <a class="nav-link d-flex align-items-center" href="#" id="userDropdown" role="button"
                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         
                         <span class="me-2 d-none d-lg-inline text-gray-600 small font-weight-bold">
-                            <?php echo htmlspecialchars($fullname); ?>
+                            <?php echo htmlspecialchars($_SESSION['fullname'] ?? 'User'); ?>
                         </span>
                         
-                        <div class="topbar-avatar shadow-sm">
-                            <?php echo $display_initials; ?>
+                        <div class="topbar-avatar shadow-sm overflow-hidden">
+                            <?php 
+                                // --- IMAGE LOGIC START (Robust PDO Version) ---
+                                
+                                // 1. Initialize Default
+                                $img_file_name = 'default.png';
+
+                                // 2. Try Variables Priority
+                                // $profile_picture is set in header.php
+                                if (!empty($profile_picture) && $profile_picture !== 'default.png') {
+                                    $img_file_name = $profile_picture;
+                                } elseif (!empty($_SESSION['profile_picture'])) {
+                                    $img_file_name = $_SESSION['profile_picture'];
+                                }
+
+                                // 3. SAFETY NET
+                                // If default is still selected, verify with DB using PDO (Since admin uses checking.php which has $pdo)
+                                if ($img_file_name === 'default.png' && isset($_SESSION['user_id']) && isset($pdo)) {
+                                    try {
+                                        $uid = $_SESSION['user_id'];
+                                        // Use JOIN to find the photo from tbl_employees connected to this user
+                                        $stmt_img = $pdo->prepare("
+                                            SELECT e.photo 
+                                            FROM tbl_employees e 
+                                            JOIN tbl_users u ON u.employee_id = e.employee_id 
+                                            WHERE u.id = ?
+                                        ");
+                                        $stmt_img->execute([$uid]);
+                                        $img_row = $stmt_img->fetch(PDO::FETCH_ASSOC);
+
+                                        if ($img_row && !empty($img_row['photo'])) {
+                                            $img_file_name = $img_row['photo'];
+                                            $_SESSION['profile_picture'] = $img_file_name; // Fix session
+                                        }
+                                    } catch (Exception $e) {
+                                        // Silent fail
+                                    }
+                                }
+
+                                // 4. Physical File Check
+                                // Goes up 2 levels: template -> admin -> root -> assets
+                                $physical_path = __DIR__ . '/../../assets/images/' . $img_file_name;
+                                
+                                if (file_exists($physical_path) && $img_file_name !== 'default.png') {
+                                    $web_path = '../assets/images/' . $img_file_name;
+                                } else {
+                                    $web_path = '../assets/images/default.png';
+                                }
+                                // --- IMAGE LOGIC END ---
+                            ?>
+                            
+                            <img src="<?php echo htmlspecialchars($web_path); ?>" 
+                                alt="Profile" 
+                                style="width: 100%; height: 100%; object-fit: cover;">
                         </div>
                     </a>
 
@@ -82,8 +147,12 @@ if (!empty($fullname)) {
                         aria-labelledby="userDropdown" style="border-radius: 1rem;">
                         
                         <div class="px-3 py-2 bg-light rounded-top">
-                            <div class="small text-muted text-uppercase font-weight-bold">Administrator</div>
-                            <div class="text-truncate font-weight-bold text-dark"><?php echo htmlspecialchars($email); ?></div>
+                            <div class="small text-muted text-uppercase font-weight-bold">
+                                <?php echo (isset($_SESSION['usertype']) && ($_SESSION['usertype'] == 0 || $_SESSION['usertype'] == 1)) ? 'Administrator' : 'Employee'; ?>
+                            </div>
+                            <div class="text-truncate font-weight-bold text-dark">
+                                <?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>
+                            </div>
                         </div>
 
                         <div class="dropdown-divider mt-0"></div>

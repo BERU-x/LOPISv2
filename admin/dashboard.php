@@ -19,12 +19,16 @@ $upcoming_holidays = get_upcoming_holidays($pdo, 5);
 $active_employees_count = $metrics['active_employees'];
 $new_hires_month_count  = $metrics['new_hires_month'];
 $pending_leave_count    = $metrics['pending_leave_count'];
-$payroll_status         = $metrics['payroll_status'];
 $attendance_today       = $metrics['attendance_today'];
 
-// Determine Payroll Card Color
-$payroll_text_color = ($payroll_status === 'Completed') ? 'text-success' : 'text-warning';
-$payroll_icon_bg    = ($payroll_status === 'Completed') ? 'bg-soft-success' : 'bg-soft-warning';
+// ✅ NEW: Cash Advance Data
+$pending_ca_count       = $metrics['pending_ca_count'];
+
+// ✅ NEW: Determine Cash Advance Card Color
+// If there are pending requests, show Warning (Yellow), otherwise Success (Teal/Green)
+$ca_text_color = ($pending_ca_count > 0) ? 'text-warning' : 'text-success';
+$ca_icon_bg    = ($pending_ca_count > 0) ? 'bg-soft-warning' : 'bg-soft-success';
+$ca_icon       = ($pending_ca_count > 0) ? 'fa-hand-holding-usd' : 'fa-check-circle';
 
 // Prepare Chart JSON Data
 $dept_labels = json_encode(array_keys($dept_data));
@@ -77,22 +81,26 @@ require 'template/topbar.php';
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="icon-box <?php echo $payroll_icon_bg; ?> me-3">
-                            <i class="fas fa-file-invoice-dollar"></i>
+                        <div class="icon-box <?php echo $ca_icon_bg; ?> me-3">
+                            <i class="fas <?php echo $ca_icon; ?>"></i>
                         </div>
                         <div>
-                            <div class="text-label">Payroll (<?php echo date('M Y'); ?>)</div>
-                            <div class="h5 font-weight-bold mb-0 <?php echo $payroll_text_color; ?>">
-                                <?php echo $payroll_status; ?>
+                            <div class="text-label">Cash Advances</div>
+                            <div class="h5 font-weight-bold mb-0 <?php echo $ca_text_color; ?>">
+                                <?php echo number_format($pending_ca_count); ?> <small class="text-muted text-xs font-weight-normal">Pending</small>
                             </div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
-                        <?php if($payroll_status == 'Pending'): ?>
+                        <?php if($pending_ca_count > 0): ?>
                             <span class="text-warning font-weight-bold">Action Required</span>
                         <?php else: ?>
-                            <span class="text-success font-weight-bold">Disbursed</span>
+                            <span class="text-success font-weight-bold">All Cleared</span>
                         <?php endif; ?>
+                        
+                        <a href="cashadv_approval.php" class="text-decoration-none text-muted ms-2">
+                            Review &rarr;
+                        </a>
                     </div>
                 </div>
             </div>

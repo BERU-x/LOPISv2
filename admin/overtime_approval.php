@@ -124,10 +124,33 @@ $(document).ready(function() {
                 { 
                     data: 'employee_name',
                     render: function(data, type, row) {
-                        return `<div class="fw-bold text-dark">${data}</div>
-                                <div class="small text-muted">${row.employee_id}</div>`;
+                        // 1. Safe Image Path Logic
+                        // Check if row.photo is not null AND not just empty whitespace
+                        var hasPhoto = row.photo && row.photo.trim() !== '';
+                        
+                        // 2. Define the image source
+                        // JS paths are relative to the admin folder (e.g. admin/overtime_approval.php)
+                        var imgPath = hasPhoto ? '../assets/images/' + row.photo : '../assets/images/default.png';
+                        
+                        // 3. Define the Employee ID
+                        var empId = row.employee_id ? row.employee_id : '';
+
+                        return `
+                            <div class="d-flex align-items-center">
+                                <img src="${imgPath}" 
+                                     class="rounded-circle me-3 border shadow-sm" 
+                                     style="width: 40px; height: 40px; object-fit: cover;" 
+                                     alt="User"
+                                     onerror="this.onerror=null; this.src='../assets/images/default.png';">
+                                <div>
+                                    <div class="fw-bold text-dark">${data}</div>
+                                    <div class="small text-muted">${empId}</div>
+                                </div>
+                            </div>
+                        `;
                     }
                 },
+
                 // Col 1: Date
                 { data: 'ot_date', className: 'text-center' },
                 
@@ -176,18 +199,32 @@ $(document).ready(function() {
 
                 // Col 8: Actions (Approval Buttons)
                 { 
-                    data: 'raw_data',
+                    data: null, // <--- MUST BE null to access the whole row object
                     orderable: false,
                     searchable: false,
                     className: 'text-center',
                     render: function(data, type, row) {
-                        if (data.status === 'Pending') {
+                        // Safety check: ensure 'row' exists before checking 'status'
+                        if (!row) return ''; 
+
+                        if (row.status === 'Pending') {
                             return `
-                                <button class="btn btn-sm btn-teal btn-approve mb-1" data-id="${data.id}" data-requested="${data.hours_requested}">Approve</button>
-                                <button class="btn btn-sm btn-danger btn-reject" data-id="${data.id}">Reject</button>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-teal btn-approve text-white" 
+                                            data-id="${row.id}" 
+                                            data-requested="${row.hours_requested}"
+                                            title="Approve">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger btn-reject" 
+                                            data-id="${row.id}"
+                                            title="Reject">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
                             `;
                         } else {
-                            return `<span class="text-muted small">${data.status}</span>`;
+                            return '<span class="text-muted small"><i class="fas fa-lock me-1"></i>Locked</span>';
                         }
                     }
                 }

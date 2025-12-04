@@ -2,22 +2,22 @@
 // file_overtime.php (Employee Portal)
 
 // --- TEMPLATE INCLUDES & INITIAL SETUP ---
-// NOTE: 'template/header.php' is assumed to include 'checking.php' 
-// and handle session authorization before this script runs.
+// header.php establishes $pdo, session, and includes global_model.php for notifications
 require 'template/header.php'; 
+
+// 1. REMOVED REDUNDANT GLOBAL MODEL INCLUDE
+// require_once 'models/global_model.php'; // REMOVED - Relies on header.php
 
 // Assuming database connection ($pdo) is available after header inclusion.
 date_default_timezone_set('Asia/Manila');
 
-// --- 1. GET AUTHENTICATED EMPLOYEE ID ---
-// The security checks (logged_in, usertype check, etc.) happen inside header.php -> checking.php.
-if (!isset($_SESSION['employee_id'])) {
+// --- GET AUTHENTICATED EMPLOYEE ID ---
+// The header ensures authentication, so employee_id is safe here.
+$employee_id = $_SESSION['employee_id'] ?? ($_SESSION['user_id'] ?? null); 
+if (!$employee_id) { // Added null check just in case
     header('Location: ../index.php'); 
     exit();
 }
-
-// Define the local $employee_id variable from the guaranteed session value.
-$employee_id = $_SESSION['employee_id']; 
 
 $page_title = 'File Overtime';
 $current_page = 'file_overtime'; 
@@ -38,7 +38,7 @@ if (isset($_POST['submit_ot'])) {
         $submission_message = ['type' => 'danger', 'text' => 'Requested hours must be a valid number between 0.5 and 8.'];
     } else {
         try {
-            // 🛑 VALIDATION 1: Check if the employee clocked raw OT hours (overtime_hr > 0) on this date.
+            // 🛑 VALIDATION 1: Check if the employee clocked raw OT hours
             $raw_ot_check = $pdo->prepare(
                 "SELECT overtime_hr FROM tbl_attendance WHERE employee_id = ? AND date = ?"
             );
@@ -48,7 +48,7 @@ if (isset($_POST['submit_ot'])) {
             if (!$attendance_record || $attendance_record['overtime_hr'] <= 0) {
                  $submission_message = ['type' => 'danger', 'text' => 'You must have calculated raw overtime recorded on this date to file a request.'];
             } else {
-                // 🛑 VALIDATION 2: Check for existing Pending OT request in tbl_overtime.
+                // 🛑 VALIDATION 2: Check for existing Pending OT request
                 $check_existing = $pdo->prepare(
                     "SELECT id FROM tbl_overtime WHERE employee_id = ? AND ot_date = ? AND status = 'Pending'"
                 );
@@ -70,7 +70,16 @@ if (isset($_POST['submit_ot'])) {
                         $reason
                     ]); 
 
-                    $submission_message = ['type' => 'success', 'text' => 'Overtime request submitted successfully! It is now pending approval.'];
+                    // --- 3. SEND NOTIFICATION TO ADMIN ---
+                    // Helper to get name safely
+                    $sender_name = (isset($_SESSION['firstname'])) ? $_SESSION['firstname'] . ' ' . $_SESSION['lastname'] : "Employee " . $employee_id;
+                    $notif_msg = "$sender_name has filed an Overtime Request ($ot_hours hrs) for $ot_date.";
+                    
+                    // Send to: NULL (All Admins) | Role: Admin | Type: warning (to grab attention)
+                    // send_notification() is assumed to exist via header.php inclusion
+                    send_notification($pdo, null, 'Admin', 'warning', $notif_msg, '../admin/overtime_approval.php', $sender_name);
+
+                    $submission_message = ['type' => 'success', 'text' => 'Overtime request submitted successfully! Admin has been notified.'];
                 }
             }
         } catch (PDOException $e) {
@@ -153,8 +162,7 @@ require 'template/topbar.php';
                             <th class="border-0 text-center">Requested Hrs</th>
                             <th class="border-0 text-center">Approved Hrs</th>
                             <th class="border-0 text-center">Status</th>
-                            <th class="border-0 text-center">Action</th>
-                        </tr>
+                            </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
@@ -170,7 +178,6 @@ require 'template/topbar.php';
 $(document).ready(function() {
     
     if ($('#otHistoryTable').length) {
-        // Destroy existing DataTables instance if it exists
         if ($.fn.DataTable.isDataTable('#otHistoryTable')) {
             $('#otHistoryTable').DataTable().destroy();
         }
@@ -182,73 +189,41 @@ $(document).ready(function() {
             dom: 'rtip', 
             
             ajax: {
-                url: "../admin/fetch/overtime_ssp.php", // Connects to your SSP script
+                // FIXED URL: Pointing to the Employee-specific SSP file
+                url: "fetch/overtime_ssp.php", 
                 type: "GET",
-                data: function (d) {
-                    // 🛑 Pass the authenticated employee_id to filter results
-                    d.employee_id = '<?php echo $employee_id; ?>'; 
-                    // Set a non-existent search term for name/status/ID so it only fetches this user's data
-                    d.search.value = d.employee_id; 
-                }
+                // Removed redundant filter data function as the SSP script should handle filtering internally via SESSION
             },
             
             columns: [
-                // Col 0: ot_date
                 { data: 'ot_date' }, 
-                
-                // Col 1: Raw OT (Time Log) - Maps to 'raw_ot_hr' from SSP
                 { 
                     data: 'raw_ot_hr',
                     className: 'text-center text-danger fw-bold',
                     render: function(data) {
-                        return data === '0.00 hrs' || data === '0.00' ? '—' : data;
+                        // Check for '—' in raw_ot_hr since it's formatted on the server side now
+                        return data === '—' || data === '0.00 hrs' || data === '0.00' ? '—' : data;
                     }
                 },
-                
-                // Col 2: Reason
                 { 
                     data: 'reason',
                     orderable: false, 
                 },
-                
-                // Col 3: Requested Hrs
                 { 
                     data: 'hours_requested',
                     className: 'text-center fw-bold text-teal' 
                 },
-                
-                // Col 4: Approved Hrs
                 { 
                     data: 'hours_approved',
                     className: 'text-center fw-bold text-success',
                     render: function(data) {
-                        return data === '—' ? '—' : data;
+                        return data === '—' || data === '0.00 hrs' ? '—' : data;
                     }
                 },
-                
-                // Col 5: Status (HTML badge from SSP)
                 { 
                     data: 'status',
                     className: 'text-center'
                 },
-                
-                // Col 6: Action (File CTO Link) - Custom rendering based on approved status
-                { 
-                    data: 'raw_data',
-                    orderable: false,
-                    searchable: false,
-                    className: 'text-center',
-                    render: function(data, type, row) {
-                        // Check if status is Approved AND hours are > 0
-                        if (data.status === 'Approved' && parseInt(data.hours_approved) > 0) {
-                            return `<a href="file_leave.php?date=${data.ot_date}&type=CTO" class="btn btn-sm btn-outline-teal fw-bold">
-                                        File CTO
-                                    </a>`;
-                        } else {
-                            return '—';
-                        }
-                    }
-                }
             ],
             
             language: {
@@ -256,13 +231,6 @@ $(document).ready(function() {
                 emptyTable: "No overtime requests submitted yet."
             }
         });
-        
-        // --- 🛑 IMPORTANT: RE-AJAX SETUP FOR EMPLOYEE PORTAL 🛑 ---
-        // Since you are using a single SSP file for both Admin (all data) and Employee (filtered data),
-        // we must ensure the employee filter is always active. A cleaner way is to handle the filter
-        // directly in the DataTables 'data' function and restrict the SSP query,
-        // which the Admin view may not handle correctly.
-        // For a permanent Employee Portal, a dedicated SSP file for the user is best.
     }
 });
 </script>

@@ -119,12 +119,33 @@ $(document).ready(function() {
             { 
                 data: 'employee_name',
                 render: function(data, type, row) {
-                    return `<div>
-                                <span class="fw-bold text-dark">${data ?? 'Unknown'}</span><br>
-                                <span class="small text-muted">${row.employee_id}</span>
-                            </div>`;
+                    // 1. Safe Image Path Logic
+                    // Check if row.photo is not null AND not just empty whitespace
+                    var hasPhoto = row.photo && row.photo.trim() !== '';
+                    
+                    // 2. Define the image source
+                    // JS paths are relative to the admin folder
+                    var imgPath = hasPhoto ? '../assets/images/' + row.photo : '../assets/images/default.png';
+                    
+                    // 3. Define the Employee ID
+                    var empId = row.employee_id ? row.employee_id : '';
+
+                    return `
+                        <div class="d-flex align-items-center">
+                            <img src="${imgPath}" 
+                                 class="rounded-circle me-3 border shadow-sm" 
+                                 style="width: 40px; height: 40px; object-fit: cover;" 
+                                 alt="User"
+                                 onerror="this.onerror=null; this.src='../assets/images/default.png';">
+                            <div>
+                                <div class="fw-bold text-dark">${data ?? 'Unknown'}</div>
+                                <div class="small text-muted">${empId}</div>
+                            </div>
+                        </div>
+                    `;
                 }
             },
+
             // Col 1: Date Requested (Mapped from Date Needed)
             { data: 'date_needed', className: 'text-center small' },
             

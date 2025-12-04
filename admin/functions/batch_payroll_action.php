@@ -1,6 +1,8 @@
 <?php
 // functions/batch_payroll_action.php
 require_once '../../db_connection.php';
+// 1. INCLUDE NOTIFICATION MODEL
+require_once '../models/global_model.php'; 
 
 header('Content-Type: application/json');
 
@@ -21,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
             $approved_count = 0;
 
             foreach ($ids as $payroll_id) {
-                // 1. Fetch Status, Employee ID, Net Pay AND Date Range (Added cut_off dates)
+                // 1. Fetch Status, Employee ID, Net Pay AND Date Range
                 $stmt = $pdo->prepare("SELECT id, employee_id, status, net_pay, cut_off_start, cut_off_end FROM tbl_payroll WHERE id = ?");
                 $stmt->execute([$payroll_id]);
                 $payroll = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -33,6 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
                     $net_pay = floatval($payroll['net_pay']);
                     $start_date = $payroll['cut_off_start'];
                     $end_date = $payroll['cut_off_end'];
+                    
+                    // Format dates for notification (e.g., "Dec 01 - Dec 15")
+                    $period_str = date("M d", strtotime($start_date)) . " - " . date("M d", strtotime($end_date));
 
                     // --- A. HANDLE NEGATIVE NET PAY (Incur New Debt) ---
                     if ($net_pay < 0) {
@@ -94,12 +99,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
                     $update_stmt = $pdo->prepare("UPDATE tbl_payroll SET status = 1 WHERE id = ?");
                     $update_stmt->execute([$payroll_id]);
                     
+                    // --- E. SEND NOTIFICATION ---
+                    $notif_msg = "Your Payslip for period {$period_str} is now available.";
+                    // We link them to 'payslips.php' or wherever they view their own salary
+                    send_notification($pdo, $emp_id, 'Employee', 'payroll', $notif_msg, 'payslips.php', 'Admin');
+                    
                     $approved_count++;
                 }
             }
             
             $pdo->commit();
-            echo json_encode(['success' => true, 'message' => "$approved_count records approved. Loans updated & Cash Advances marked as Paid."]);
+            echo json_encode(['success' => true, 'message' => "$approved_count records approved. Loans updated & Notifications sent."]);
 
         } 
         elseif ($action === 'send_email') {

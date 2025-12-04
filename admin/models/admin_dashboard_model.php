@@ -6,15 +6,14 @@ function get_admin_dashboard_metrics($pdo) {
         'active_employees' => 0,
         'new_hires_month' => 0,
         'pending_leave_count' => 0,
-        'payroll_status' => 'Pending',
-        'attendance_today' => 0 // <--- NEW KEY
+        'pending_ca_count' => 0, // <--- CHANGED KEY
+        'attendance_today' => 0 
     ];
 
     try {
         // 1. Active Employees
         $stmt = $pdo->query("SELECT COUNT(id) FROM tbl_employees WHERE employment_status < 5");
         $metrics['active_employees'] = (int)$stmt->fetchColumn();
-        
 
         // 2. New Hires This Month
         $stmt = $pdo->query("SELECT COUNT(id) FROM tbl_employees WHERE MONTH(created_on) = MONTH(NOW()) AND YEAR(created_on) = YEAR(NOW())");
@@ -24,16 +23,12 @@ function get_admin_dashboard_metrics($pdo) {
         $stmt = $pdo->query("SELECT COUNT(id) FROM tbl_leave WHERE status = 0");
         $metrics['pending_leave_count'] = (int)$stmt->fetchColumn();
         
-        // 4. Payroll Status
-        $stmt = $pdo->prepare("SELECT COUNT(id) FROM tbl_payroll 
-                              WHERE MONTH(cut_off_end) = MONTH(NOW()) 
-                              AND YEAR(cut_off_end) = YEAR(NOW()) 
-                              AND status = 1");
-        $stmt->execute();
-        $metrics['payroll_status'] = ((int)$stmt->fetchColumn() > 0) ? 'Completed' : 'Pending';
+        // 4. ✅ REPLACED: Pending Cash Advances
+        // Based on tbl_cash_advances structure provided
+        $stmt = $pdo->query("SELECT COUNT(id) FROM tbl_cash_advances WHERE status = 'Pending'");
+        $metrics['pending_ca_count'] = (int)$stmt->fetchColumn();
 
-        // 5. ✅ NEW: Today's Attendance
-        // Counts distinct employees who have a record for today
+        // 5. Today's Attendance
         $stmt = $pdo->prepare("SELECT COUNT(DISTINCT employee_id) FROM tbl_attendance WHERE date = CURDATE()");
         $stmt->execute();
         $metrics['attendance_today'] = (int)$stmt->fetchColumn();

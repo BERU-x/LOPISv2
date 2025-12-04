@@ -95,12 +95,12 @@ $stmt->execute($where_bindings);
 $recordsFiltered = $stmt->fetchColumn();
 
 // C. Fetch Data
-// We fetch columns needed for display. 
-// Note: Your schema doesn't have 'amount_approved' or 'created_at', so we use defaults or re-use existing cols.
+// 🛑 UPDATED: Added e.photo to the select list
 $sql_data = "SELECT 
                 a.id, 
                 a.employee_id, 
                 CONCAT(e.lastname, ', ', e.firstname) AS employee_name, 
+                e.photo, /* 🛑 NEW: Fetch photo */
                 a.date_requested, 
                 a.amount, 
                 a.status, 
@@ -123,8 +123,6 @@ foreach ($raw_data as $row) {
     $amount_req = number_format((float)$row['amount'], 2, '.', ',');
     
     // Logic for "Amount Approved"
-    // Since your DB doesn't have an approved column, we assume:
-    // If 'Deducted' (Approved), the full amount is approved. Otherwise '--'.
     $amount_app = ($row['status'] === 'Deducted') ? $amount_req : '—';
 
     // Status Badge Logic
@@ -142,7 +140,6 @@ foreach ($raw_data as $row) {
     $status_badge = '<span class="badge bg-soft-'.$badge_class.' text-'.$badge_class.' border border-'.$badge_class.' px-2 rounded-pill">'.$status_str.'</span>';
 
     // Raw data object for the frontend JS buttons
-    // Note: JS expects "amount_requested" (from previous code), mapping it here
     $raw_data_obj = [
         'id' => $row['id'],
         'status' => $row['status'],
@@ -151,13 +148,14 @@ foreach ($raw_data as $row) {
 
     $formatted_data[] = [
         'employee_name'    => $row['employee_name'],
-        'employee_id'      => $row['employee_id'], // Needed for JS render
+        'employee_id'      => $row['employee_id'], 
+        'photo'            => $row['photo'], // 🛑 NEW: Pass photo to frontend
         'date_needed'      => date('M d, Y', strtotime($row['date_requested'])),
-        'amount_requested' => $row['amount'], // Send raw number for JS formatting, or pre-format here if you prefer
+        'amount_requested' => $row['amount'], 
         'purpose'          => $row['remarks'] ?? '--',
         'amount_approved'  => $amount_app, 
         'status'           => $status_badge,
-        'created_at'       => date('M d, Y', strtotime($row['date_requested'])), // Fallback since no created_at
+        'created_at'       => date('M d, Y', strtotime($row['date_requested'])),
         'raw_data'         => $raw_data_obj
     ];
 }

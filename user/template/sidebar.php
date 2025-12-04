@@ -75,13 +75,6 @@ function isActive($page_name, $current_page) {
         </a>
     </li>
 
-    <li class="nav-item <?php echo isActive('leave_balances', $current_page); ?>">
-        <a class="nav-link" href="leave_balances.php">
-            <i class="fas fa-fw fa-umbrella-beach"></i>
-            <span>Leave Balances</span>
-        </a>
-    </li>
-
     <div class="sidebar-heading">
         Organization
     </div>

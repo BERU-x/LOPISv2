@@ -15,18 +15,19 @@ class OvertimeRepository {
         LEFT JOIN tbl_attendance ta ON ot.employee_id = ta.employee_id AND ot.ot_date = ta.date
     ";
 
-    // 🛑 UPDATED: Added ta.overtime_hr to the selection list
+    // 🛑 UPDATED: Added e.photo to selection list
     private $data_fields = "
         ot.id, 
         ot.employee_id, 
         CONCAT_WS(' ', e.firstname, e.middlename, e.lastname) AS employee_name, 
-        ot.ot_date,          /* Date of the overtime */
-        ot.hours_requested,  /* Hours requested by employee */
-        ot.hours_approved,   /* Final hours approved by Admin */
-        ot.status,           /* e.g., Pending, Approved, Rejected */
-        ot.reason,           /* Reason for OT */
+        e.photo,                     /* 🛑 NEW: Fetch employee photo */
+        ot.ot_date,                  /* Date of the overtime */
+        ot.hours_requested,          /* Hours requested by employee */
+        ot.hours_approved,           /* Final hours approved by Admin */
+        ot.status,                   /* e.g., Pending, Approved, Rejected */
+        ot.reason,                   /* Reason for OT */
         ot.created_at,
-        ta.overtime_hr       /* 🛑 NEW: Raw calculated OT from the attendance log */
+        ta.overtime_hr               /* Raw calculated OT from the attendance log */
     ";
     
     // -------------------------------------------------------------------------
@@ -38,7 +39,7 @@ class OvertimeRepository {
     }
 
     // -------------------------------------------------------------------------
-    // PUBLIC METHODS (Logic remains the same, only the queries are updated via $sql_details)
+    // PUBLIC METHODS
     // -------------------------------------------------------------------------
 
     /**
@@ -46,7 +47,6 @@ class OvertimeRepository {
      * @return int
      */
     public function getTotalRecords(): int {
-        // We still count records from the primary table (tbl_overtime)
         $sql = "SELECT COUNT(ot.id) " . $this->sql_details;
         $stmt = $this->pdo->query($sql);
         return (int)$stmt->fetchColumn();
@@ -75,10 +75,10 @@ class OvertimeRepository {
      */
     public function getPaginatedData(string $where_sql, string $order_sql, string $limit_sql, array $bindings): array {
         $sql = "SELECT " . $this->data_fields . " "
-              . $this->sql_details 
-              . $where_sql 
-              . $order_sql 
-              . $limit_sql;
+             . $this->sql_details 
+             . $where_sql 
+             . $order_sql 
+             . $limit_sql;
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($bindings);

@@ -6,7 +6,7 @@ $current_page = 'leave_management';
 
 require 'template/header.php'; 
 require 'models/leave_model.php'; 
-
+require_once 'models/global_model.php'; // <--- ADD THIS LINE
 // ---------------------------------------------------------
 // 1. HANDLE FORM SUBMISSION (CREATE NEW LEAVE)
 // ---------------------------------------------------------
@@ -54,8 +54,13 @@ if (isset($_POST['apply_leave'])) {
             'reason'      => trim($_POST['reason'])
         ];
 
-        if (create_leave_request($pdo, $data)) {
+    if (create_leave_request($pdo, $data)) {
             $_SESSION['message'] = "Leave request submitted successfully!";
+
+            // --- NOTIFY THE EMPLOYEE ---
+            $msg = "Admin has filed a {$l_type} for you (Starting: {$s_date}).";
+            send_notification($pdo, $emp_id, 'Employee', 'leave', $msg, 'my_leaves.php', 'HR Admin');
+            
         } else {
             $_SESSION['error'] = "Failed to submit leave request.";
         }
@@ -73,6 +78,38 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     $status_code = ($_GET['action'] == 'approve') ? 1 : 2; 
 
     if (update_leave_status($pdo, $leave_id, $status_code)) {
+        
+        // --- START NOTIFICATION LOGIC ---
+        // 1. Fetch the employee ID and details associated with this leave
+        // (We need to know WHO to notify)
+        try {
+            $stmt = $pdo->prepare("SELECT employee_id, leave_type, start_date FROM tbl_leave WHERE id = ?");
+            $stmt->execute([$leave_id]);
+            $leave_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($leave_data) {
+                $status_text = ($status_code == 1) ? "APPROVED" : "REJECTED";
+                
+                // Message: "Your Vacation Leave (Dec 05) has been APPROVED."
+                $msg = "Your {$leave_data['leave_type']} ({$leave_data['start_date']}) has been {$status_text}.";
+                
+                // Send to: The Employee | Role: Employee | Type: leave
+                send_notification(
+                    $pdo, 
+                    $leave_data['employee_id'], 
+                    'Employee', 
+                    'leave', 
+                    $msg, 
+                    'request_leave.php', // Link where employee views their leaves
+                    'Admin'       // Sender Name
+                );
+            }
+        } catch (Exception $e) {
+            // Silently fail notification so it doesn't break the approval process
+            error_log("Notification Failed: " . $e->getMessage());
+        }
+        // --- END NOTIFICATION LOGIC ---
+
         $_SESSION['message'] = "Leave status updated successfully!";
     } else {
         $_SESSION['error'] = "Error updating status. Please try again.";

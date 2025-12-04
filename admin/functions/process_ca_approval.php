@@ -1,15 +1,16 @@
 <?php
 // functions/process_ca_approval.php
-// DEBUGGING BLOCK
+
 require_once '../../db_connection.php'; 
+// 1. INCLUDE NOTIFICATION MODEL
+require_once '../models/global_model.php'; 
+
 session_start();
 
 header('Content-Type: application/json');
 
 // --- DEBUG CHECK ---
-// This checks if 'usertype' exists. If not, it shows you what DOES exist.
 if (!isset($_SESSION['usertype'])) {
-    // This sends the list of active session variables back to the browser
     echo json_encode([
         'status' => 'error', 
         'message' => 'Unauthorized. Active Session Variables: ' . json_encode($_SESSION)
@@ -34,10 +35,9 @@ if (!$id || !$action) {
 }
 
 try {
-    // 3. CHECK CURRENT STATUS
-    // We only want to modify requests that are currently 'Pending'.
-    // This prevents race conditions where two admins might try to approve the same request.
-    $stmt = $pdo->prepare("SELECT id, status, amount FROM tbl_cash_advances WHERE id = ?");
+    // 3. CHECK CURRENT STATUS & FETCH EMPLOYEE DETAILS
+    // Added 'employee_id' and 'date_requested' to the select query so we can notify them
+    $stmt = $pdo->prepare("SELECT id, status, amount, employee_id, date_requested FROM tbl_cash_advances WHERE id = ?");
     $stmt->execute([$id]);
     $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -51,6 +51,10 @@ try {
         exit;
     }
 
+    // Prepare Notification Data
+    $emp_id = $request['employee_id'];
+    $req_date = date("M d, Y", strtotime($request['date_requested']));
+
     // 4. PROCESS LOGIC
     if ($action === 'approve') {
         
@@ -60,19 +64,26 @@ try {
             exit;
         }
 
-        // Logic: Update status to 'Approved' (Standard for Approved CA)
-        // We also update the 'amount' to the approved amount in case it was modified by the admin.
-        $new_status = 'Deducted';
+        // Logic: Update status to 'Deducted' (or Approved)
+        $new_status = 'Deducted'; 
+        // Note: In some systems 'Deducted' means it's taken from salary. If this is just approval, maybe 'Approved'. 
+        // Keeping 'Deducted' as per your original code.
         
         $update_sql = "UPDATE tbl_cash_advances SET status = :status, amount = :amount WHERE id = :id";
         $update_stmt = $pdo->prepare($update_sql);
         $result = $update_stmt->execute([
             ':status' => $new_status,
-            ':amount' => $approved_amount, // Save the finalized approved amount
+            ':amount' => $approved_amount, 
             ':id'     => $id
         ]);
         
         $msg = "Cash Advance approved successfully with amount ₱" . number_format($approved_amount, 2);
+
+        // --- SEND NOTIFICATION (APPROVED) ---
+        if ($result) {
+            $notif_msg = "Your Cash Advance request for {$req_date} has been APPROVED (₱" . number_format($approved_amount, 2) . ").";
+            send_notification($pdo, $emp_id, 'Employee', 'info', $notif_msg, 'request_ca.php', 'Admin');
+        }
 
     } elseif ($action === 'reject') {
         
@@ -88,6 +99,12 @@ try {
         
         $msg = "Cash Advance request has been rejected.";
 
+        // --- SEND NOTIFICATION (REJECTED) ---
+        if ($result) {
+            $notif_msg = "Your Cash Advance request for {$req_date} has been REJECTED.";
+            send_notification($pdo, $emp_id, 'Employee', 'warning', $notif_msg, 'cash_advance.php', 'Finance Admin');
+        }
+
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Unknown action type.']);
         exit;
@@ -95,19 +112,13 @@ try {
 
     // 5. SUCCESS RESPONSE
     if ($result) {
-        // Optional: Log this action to an audit trail table if you have one
-        // logAction($_SESSION['user_id'], "Processed CA ID $id as $new_status");
-
         echo json_encode(['status' => 'success', 'message' => $msg]);
     } else {
         echo json_encode(['status' => 'error', 'message' => 'Database update failed.']);
     }
 
 } catch (PDOException $e) {
-    // Log the actual error internally
     error_log("Database Error in process_ca_approval: " . $e->getMessage());
-    
-    // Return a generic error to the user
     echo json_encode(['status' => 'error', 'message' => 'A database error occurred.']);
 }
 ?>
