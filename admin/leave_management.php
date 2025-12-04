@@ -6,120 +6,10 @@ $current_page = 'leave_management';
 
 require 'template/header.php'; 
 require 'models/leave_model.php'; 
-require_once 'models/global_model.php'; // <--- ADD THIS LINE
-// ---------------------------------------------------------
-// 1. HANDLE FORM SUBMISSION (CREATE NEW LEAVE)
-// ---------------------------------------------------------
-if (isset($_POST['apply_leave'])) {
-    $emp_id = $_POST['employee_id'];
-    $l_type = $_POST['leave_type'];
-    $s_date = $_POST['start_date'];
-    $e_date = $_POST['end_date'];
-
-    // A. Calculate requested days
-    $start = new DateTime($s_date);
-    $end = new DateTime($e_date);
-    
-    if ($end < $start) {
-        $_SESSION['error'] = "End date cannot be before start date.";
-        header("Location: leave_management.php");
-        exit;
-    }
-
-    $diff = $start->diff($end);
-    $days_requested = $diff->days + 1;
-
-    // B. Fetch Current Balance for Validation
-    $balances = get_leave_balance($pdo, $emp_id);
-    $error = null;
-
-    // C. Check Credits
-    if ($l_type != 'Unpaid Leave' && $l_type != 'Maternity/Paternity') {
-        if (isset($balances[$l_type])) {
-            $remaining = $balances[$l_type]['remaining'];
-            if ($days_requested > $remaining) {
-                $error = "Insufficient credits! Requested $days_requested days, but only $remaining days remaining for $l_type.";
-            }
-        }
-    }
-
-    if ($error) {
-        $_SESSION['error'] = $error;
-    } else {
-        $data = [
-            'employee_id' => $emp_id,
-            'leave_type'  => $l_type,
-            'start_date'  => $s_date,
-            'end_date'    => $e_date,
-            'reason'      => trim($_POST['reason'])
-        ];
-
-    if (create_leave_request($pdo, $data)) {
-            $_SESSION['message'] = "Leave request submitted successfully!";
-
-            // --- NOTIFY THE EMPLOYEE ---
-            $msg = "Admin has filed a {$l_type} for you (Starting: {$s_date}).";
-            send_notification($pdo, $emp_id, 'Employee', 'leave', $msg, 'my_leaves.php', 'HR Admin');
-            
-        } else {
-            $_SESSION['error'] = "Failed to submit leave request.";
-        }
-    }
-    
-    header("Location: leave_management.php");
-    exit;
-}
+// Note: Global model included in header/functions
 
 // ---------------------------------------------------------
-// 2. HANDLE APPROVE/REJECT - Now handled by MODAL action
-// ---------------------------------------------------------
-if (isset($_GET['action']) && isset($_GET['id'])) {
-    $leave_id = (int)$_GET['id'];
-    $status_code = ($_GET['action'] == 'approve') ? 1 : 2; 
-
-    if (update_leave_status($pdo, $leave_id, $status_code)) {
-        
-        // --- START NOTIFICATION LOGIC ---
-        // 1. Fetch the employee ID and details associated with this leave
-        // (We need to know WHO to notify)
-        try {
-            $stmt = $pdo->prepare("SELECT employee_id, leave_type, start_date FROM tbl_leave WHERE id = ?");
-            $stmt->execute([$leave_id]);
-            $leave_data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($leave_data) {
-                $status_text = ($status_code == 1) ? "APPROVED" : "REJECTED";
-                
-                // Message: "Your Vacation Leave (Dec 05) has been APPROVED."
-                $msg = "Your {$leave_data['leave_type']} ({$leave_data['start_date']}) has been {$status_text}.";
-                
-                // Send to: The Employee | Role: Employee | Type: leave
-                send_notification(
-                    $pdo, 
-                    $leave_data['employee_id'], 
-                    'Employee', 
-                    'leave', 
-                    $msg, 
-                    'request_leave.php', // Link where employee views their leaves
-                    'Admin'       // Sender Name
-                );
-            }
-        } catch (Exception $e) {
-            // Silently fail notification so it doesn't break the approval process
-            error_log("Notification Failed: " . $e->getMessage());
-        }
-        // --- END NOTIFICATION LOGIC ---
-
-        $_SESSION['message'] = "Leave status updated successfully!";
-    } else {
-        $_SESSION['error'] = "Error updating status. Please try again.";
-    }
-    header("Location: leave_management.php");
-    exit;
-}
-
-// ---------------------------------------------------------
-// 3. FETCH DATA
+// FETCH DATA
 // ---------------------------------------------------------
 $leaves = get_all_leaves($pdo);
 $employee_list = get_employee_dropdown($pdo); 
@@ -271,7 +161,7 @@ require 'template/topbar.php';
             </div>
             <div class="modal-footer bg-light d-flex justify-content-between" id="modal-footer-actions">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -284,7 +174,7 @@ require 'template/topbar.php';
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
-            <form action="leave_management.php" method="POST">
+            <form action="functions/create_leave_admin.php" method="POST">
                 <div class="modal-body">
                     <p class="text-muted small mb-4">Submit a leave request on behalf of an employee.</p>
                     <div class="mb-3">
@@ -308,9 +198,6 @@ require 'template/topbar.php';
                             <option value="Maternity/Paternity">Maternity/Paternity</option>
                             <option value="Unpaid Leave">Unpaid Leave (LWOP)</option>
                         </select>
-                        <div id="credit_info" class="mt-2 small fw-bold text-teal" style="display:none;">
-                            Available Credits: <span id="credit_count">0</span>
-                        </div>
                     </div>
                     <div class="row">
                         <div class="col-6 mb-3">
@@ -320,11 +207,6 @@ require 'template/topbar.php';
                         <div class="col-6 mb-3">
                             <label class="form-label fw-bold text-xs text-uppercase">End Date</label>
                             <input type="date" name="end_date" id="end_date" class="form-control" required>
-                        </div>
-                        <div class="col-12 text-end mb-2">
-                            <span class="badge bg-light text-dark border" id="days_display" style="display:none;">
-                                Requested: <span id="days_count">0</span> days
-                            </span>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -349,7 +231,7 @@ require 'template/footer.php';
 ?>
 
 <script>
-    // Global functions required by the modal buttons
+    // UPDATED: Use AJAX for Approve/Reject instead of window.location
     function confirmAction(action, id) {
         let titleText = action === 'approve' ? 'Approve this leave?' : 'Reject this leave?';
         let btnColor = action === 'approve' ? '#1cc88a' : '#e74a3b';
@@ -364,24 +246,40 @@ require 'template/footer.php';
             confirmButtonText: 'Yes, ' + action
         }).then((result) => {
             if (result.isConfirmed) {
-                // Redirects to handle PHP logic
-                window.location.href = 'leave_management.php?action=' + action + '&id=' + id;
+                // AJAX REQUEST
+                $.ajax({
+                    url: 'functions/process_leave_approval.php',
+                    type: 'POST',
+                    data: { id: id, action: action },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            Swal.fire('Success', response.message, 'success').then(() => {
+                                location.reload(); // Reload to show new status
+                            });
+                        } else {
+                            Swal.fire('Error', response.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error', 'Server error processing request.', 'error');
+                    }
+                });
             }
         });
     }
 
-    // New function to load details into the modal
+    // (viewLeaveDetails function remains exactly the same as your previous code)
     function viewLeaveDetails(leave_id, employee_id) {
         const contentDiv = $('#leave-details-content');
         const actionsFooter = $('#modal-footer-actions');
         
-        // Show loading state and clear previous actions
         contentDiv.html('<div class="text-center py-5"><div class="spinner-border text-teal" role="status"></div><p class="mt-2 text-muted">Loading details...</p></div>');
         actionsFooter.find('.btn-success, .btn-danger').remove(); 
-        actionsFooter.find('.btn-secondary').text('Close'); // Reset close button text
+        actionsFooter.find('.btn-secondary').text('Close'); 
 
         $.ajax({
-            url: 'fetch/get_leave_details.php', // *** You need to create this SSP file ***
+            url: 'fetch/get_leave_details.php', 
             method: 'POST',
             data: { leave_id: leave_id, employee_id: employee_id },
             dataType: 'json',
@@ -431,7 +329,7 @@ require 'template/footer.php';
 
                     // Insert Action Buttons only if status is Pending (0)
                     if (data.status == 0) {
-                        actionsFooter.find('.btn-secondary').text('Cancel'); // Change close button text
+                        actionsFooter.find('.btn-secondary').text('Cancel'); 
                         actionsFooter.append(`
                             <button onclick="confirmAction('reject', ${data.leave_id})" class="btn btn-danger fw-bold shadow-sm">
                                 <i class="fas fa-times me-1"></i> Reject
@@ -453,7 +351,6 @@ require 'template/footer.php';
         });
     }
 
-    // Standard JavaScript for existing functionalities
     $(document).ready(function() {
         var table = $('#leaveTable').DataTable({
             "order": [[ 1, "desc" ]], 
@@ -466,14 +363,7 @@ require 'template/footer.php';
             table.search(this.value).draw();
         });
 
-        var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
-        var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
-            return new bootstrap.Popover(popoverTriggerEl)
-        });
-        
-        // Date Validation and Credit Checker logic remains unchanged here...
-        
-        // Toast Messages
+        // Flash Messages
         const successMsg = <?php echo $msg_json; ?>;
         const errorMsg = <?php echo $err_json; ?>;
         if(successMsg) Swal.fire({ icon: 'success', title: successMsg, toast: true, position: 'top-end', showConfirmButton: false, timer: 3000 });

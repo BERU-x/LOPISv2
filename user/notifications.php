@@ -1,6 +1,6 @@
 <?php
 // user/notifications.php
-$page_title = 'My Notifications - LOPISv2';
+$page_title = 'Notifications';
 $current_page = 'notifications';
 
 // The header handles session/auth and includes the global model
@@ -76,10 +76,10 @@ require 'template/topbar.php';
 <div class="container-fluid">
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">My Notifications</h1>
+        <h1 class="h3 mb-0 text-gray-800">Notifications</h1>
         
         <?php if(count($all_notifications) > 0): ?>
-            <a href="notifications.php?action=mark_all_read" class="btn btn-sm btn-primary shadow-sm">
+            <a href="notifications.php?action=mark_all_read" class="btn btn-sm btn-teal shadow-sm">
                 <i class="fas fa-check-double fa-sm text-white-50 me-2"></i>Mark All as Read
             </a>
         <?php endif; ?>
@@ -87,7 +87,7 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Recent Alerts</h6>
+            <h6 class="m-0 font-weight-bold text-label">Recent Alerts</h6>
         </div>
         <div class="card-body p-0">
             <div class="list-group list-group-flush">
@@ -97,9 +97,9 @@ require 'template/topbar.php';
                         <?php 
                             // Style Logic
                             $is_read = $notif['is_read'] == 1;
-                            $bg_style = $is_read ? 'bg-white' : 'background-color: #f8f9fc; border-left: 4px solid #4e73df;'; 
+                            $bg_style = $is_read ? 'bg-white' : 'background-color: #f8f9fc; border-left: 4px solid #0CC0DF;'; 
                             $text_class = $is_read ? 'text-muted' : 'text-dark font-weight-bold';
-                            $icon_color = $is_read ? 'text-gray-400' : 'text-primary';
+                            $icon_color = $is_read ? 'text-gray-400' : 'text-teal';
                             
                             // Icon Selection
                             $icon = 'fa-info-circle';
@@ -137,7 +137,7 @@ require 'template/topbar.php';
                             <div class="dropdown no-arrow">
                                 <?php if (!$is_read): ?>
                                     <a href="notifications.php?action=mark_read&id=<?php echo $notif['id']; ?>" 
-                                        class="btn btn-sm btn-light text-primary" 
+                                        class="btn btn-sm btn-light text-teal" 
                                         title="Mark as Read">
                                         <i class="fas fa-check"></i>
                                     </a>

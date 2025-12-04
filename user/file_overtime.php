@@ -2,19 +2,14 @@
 // file_overtime.php (Employee Portal)
 
 // --- TEMPLATE INCLUDES & INITIAL SETUP ---
-// header.php establishes $pdo, session, and includes global_model.php for notifications
 require 'template/header.php'; 
 
-// 1. REMOVED REDUNDANT GLOBAL MODEL INCLUDE
-// require_once 'models/global_model.php'; // REMOVED - Relies on header.php
-
-// Assuming database connection ($pdo) is available after header inclusion.
+// Note: global_model.php is included inside header.php, so send_notification() is available.
 date_default_timezone_set('Asia/Manila');
 
 // --- GET AUTHENTICATED EMPLOYEE ID ---
-// The header ensures authentication, so employee_id is safe here.
 $employee_id = $_SESSION['employee_id'] ?? ($_SESSION['user_id'] ?? null); 
-if (!$employee_id) { // Added null check just in case
+if (!$employee_id) { 
     header('Location: ../index.php'); 
     exit();
 }
@@ -33,9 +28,13 @@ if (isset($_POST['submit_ot'])) {
     
     // Input validation 
     if (empty($ot_date) || empty($ot_hours) || empty($reason)) {
-        $submission_message = ['type' => 'danger', 'text' => 'Please fill out all required fields.'];
+        // Redirect with error
+        header("Location: file_overtime.php?status=error&msg=empty");
+        exit();
     } elseif (!is_numeric($ot_hours) || $ot_hours <= 0 || $ot_hours > 8) {
-        $submission_message = ['type' => 'danger', 'text' => 'Requested hours must be a valid number between 0.5 and 8.'];
+        // Redirect with error
+        header("Location: file_overtime.php?status=error&msg=invalid_hours");
+        exit();
     } else {
         try {
             // 🛑 VALIDATION 1: Check if the employee clocked raw OT hours
@@ -46,7 +45,8 @@ if (isset($_POST['submit_ot'])) {
             $attendance_record = $raw_ot_check->fetch(PDO::FETCH_ASSOC);
 
             if (!$attendance_record || $attendance_record['overtime_hr'] <= 0) {
-                 $submission_message = ['type' => 'danger', 'text' => 'You must have calculated raw overtime recorded on this date to file a request.'];
+                 header("Location: file_overtime.php?status=error&msg=no_raw_ot");
+                 exit();
             } else {
                 // 🛑 VALIDATION 2: Check for existing Pending OT request
                 $check_existing = $pdo->prepare(
@@ -55,41 +55,74 @@ if (isset($_POST['submit_ot'])) {
                 $check_existing->execute([$employee_id, $ot_date]);
 
                 if ($check_existing->fetch(PDO::FETCH_ASSOC)) {
-                     $submission_message = ['type' => 'warning', 'text' => 'An unapproved overtime request already exists for this date.'];
+                     header("Location: file_overtime.php?status=warning&msg=existing_pending");
+                     exit();
                 } else {
-                     // Insert the request into tbl_overtime
+                    // Insert the request into tbl_overtime
                     $insert_stmt = $pdo->prepare("
                         INSERT INTO tbl_overtime (employee_id, ot_date, hours_requested, reason, status, created_at) 
                         VALUES (?, ?, ?, ?, 'Pending', NOW())
                     ");
                     
-                    $insert_stmt->execute([
-                        $employee_id, 
-                        $ot_date, 
-                        $ot_hours, 
-                        $reason
-                    ]); 
+                    if ($insert_stmt->execute([$employee_id, $ot_date, $ot_hours, $reason])) {
 
-                    // --- 3. SEND NOTIFICATION TO ADMIN ---
-                    // Helper to get name safely
-                    $sender_name = (isset($_SESSION['firstname'])) ? $_SESSION['firstname'] . ' ' . $_SESSION['lastname'] : "Employee " . $employee_id;
-                    $notif_msg = "$sender_name has filed an Overtime Request ($ot_hours hrs) for $ot_date.";
-                    
-                    // Send to: NULL (All Admins) | Role: Admin | Type: warning (to grab attention)
-                    // send_notification() is assumed to exist via header.php inclusion
-                    send_notification($pdo, null, 'Admin', 'warning', $notif_msg, '../admin/overtime_approval.php', $sender_name);
+                        // --- 3. SEND NOTIFICATION TO ADMIN ---
+                        // Simplified Logic: Let global_model fetch the name automatically by passing null
+                        $notif_msg = "An employee has filed an Overtime Request ($ot_hours hrs) for $ot_date.";
+                        
+                        // Note: If you want the specific name in the message text itself, we can fetch it briefly:
+                         $sender_name = $_SESSION['employee_id']; // Default
+                         $stmt_name = $pdo->prepare("SELECT firstname, lastname FROM tbl_employees WHERE employee_id = ?");
+                         $stmt_name->execute([$employee_id]);
+                         $u = $stmt_name->fetch(PDO::FETCH_ASSOC);
+                         if($u) { $sender_name = $u['firstname'] . ' ' . $u['lastname']; }
 
-                    $submission_message = ['type' => 'success', 'text' => 'Overtime request submitted successfully! Admin has been notified.'];
+                        $notif_msg = "$sender_name has filed an Overtime Request ($ot_hours hrs) for $ot_date.";
+
+                        if (function_exists('send_notification')) {
+                            send_notification($pdo, null, 'Admin', 'warning', $notif_msg, '../admin/overtime_approval.php');
+                        }
+
+                        // --- PRG REDIRECT SUCCESS ---
+                        header("Location: file_overtime.php?status=success");
+                        exit();
+                    } else {
+                        header("Location: file_overtime.php?status=error&msg=db_error");
+                        exit();
+                    }
                 }
             }
         } catch (PDOException $e) {
             error_log('OT Submission Error: ' . $e->getMessage()); 
+            header("Location: file_overtime.php?status=error&msg=db_exception");
+            exit();
+        }
+    }
+}
+
+// --- 3. HANDLE GET PARAMETERS FOR ALERTS ---
+if (isset($_GET['status'])) {
+    $status = $_GET['status'];
+    $msg_code = $_GET['msg'] ?? '';
+
+    if ($status === 'success') {
+        $submission_message = ['type' => 'success', 'text' => 'Overtime request submitted successfully! Admin has been notified.'];
+    } elseif ($status === 'warning' && $msg_code === 'existing_pending') {
+        $submission_message = ['type' => 'warning', 'text' => 'An unapproved overtime request already exists for this date.'];
+    } elseif ($status === 'error') {
+        if ($msg_code === 'empty') {
+            $submission_message = ['type' => 'danger', 'text' => 'Please fill out all required fields.'];
+        } elseif ($msg_code === 'invalid_hours') {
+            $submission_message = ['type' => 'danger', 'text' => 'Requested hours must be a valid number between 0.5 and 8.'];
+        } elseif ($msg_code === 'no_raw_ot') {
+            $submission_message = ['type' => 'danger', 'text' => 'You must have calculated raw overtime recorded on this date to file a request.'];
+        } else {
             $submission_message = ['type' => 'danger', 'text' => 'A database error occurred. Could not submit request.'];
         }
     }
 }
 
-// --- 3. TEMPLATE INCLUDES (Structure) ---
+// --- 4. TEMPLATE INCLUDES (Structure) ---
 require 'template/sidebar.php';
 require 'template/topbar.php';
 ?>
@@ -192,7 +225,6 @@ $(document).ready(function() {
                 // FIXED URL: Pointing to the Employee-specific SSP file
                 url: "fetch/overtime_ssp.php", 
                 type: "GET",
-                // Removed redundant filter data function as the SSP script should handle filtering internally via SESSION
             },
             
             columns: [
@@ -201,7 +233,6 @@ $(document).ready(function() {
                     data: 'raw_ot_hr',
                     className: 'text-center text-danger fw-bold',
                     render: function(data) {
-                        // Check for '—' in raw_ot_hr since it's formatted on the server side now
                         return data === '—' || data === '0.00 hrs' || data === '0.00' ? '—' : data;
                     }
                 },

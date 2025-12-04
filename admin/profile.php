@@ -118,27 +118,32 @@ $photo_src = (!empty($profile['photo']) && file_exists(__DIR__ . '/../assets/ima
 
     <div class="row mb-4"> 
         <div class="col-xl-4 col-lg-5">
-            <div class="card shadow h-100"> <div class="card-body text-center p-5 d-flex flex-column justify-content-center"> 
+            <div class="card shadow h-100"> 
+                <div class="card-body text-center p-5 d-flex flex-column justify-content-center"> 
+                    
                     <div class="position-relative d-inline-block mb-3">
                         <img class="img-profile rounded-circle shadow-lg border-white border border-4" 
                             src="<?php echo $photo_src; ?>" 
                             style="width: 160px; height: 160px; object-fit: cover;">
                         
-                        <button class="btn btn-sm btn-teal rounded-circle position-absolute bottom-0 end-0 mb-2 me-2 shadow" 
-                                data-bs-toggle="modal" data-bs-target="#photoModal" title="Change Photo">
-                            <i class="fas fa-camera"></i>
-                        </button>
-                    </div>
+                        </div>
 
                     <h4 class="font-weight-bold text-dark mb-1">
                         <?php echo htmlspecialchars($profile['firstname'] . ' ' . $profile['lastname']); ?>
                     </h4>
                     <p class="text-muted mb-3"><?php echo htmlspecialchars($profile['position'] ?? 'Administrator'); ?></p>
 
-                    <div class="d-flex justify-content-center align-items-center gap-2 w-100">
-                        <span class="badge bg-secondary px-3 py-2">ID: <?php echo htmlspecialchars($profile['employee_id']); ?></span>
+                    <button class="btn btn-teal btn-sm fw-bold w-75 mx-auto mb-3" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#photoModal">
+                        <i class="fas fa-camera me-1"></i> Change Profile Pic
+                    </button>
+                    
+                    <hr class="mb-3 mt-0"> <div class="card-body text-center p-1 d-flex flex-column justify-content-center border-bottom-0">
+                        <span class="badge bg-secondary px-3 py-2">Employee ID: <?php echo htmlspecialchars($profile['employee_id']); ?></span>
                         <span class="badge bg-teal px-3 py-2"><?php echo htmlspecialchars($profile['department'] ?? 'Admin Dept'); ?></span>
                     </div>
+
                 </div>
             </div>
         </div>

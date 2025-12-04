@@ -38,22 +38,35 @@ if (isset($_POST['submit_leave'])) {
 
         try {
             // Insert Request (Status 0 = Pending)
-            $sql = "INSERT INTO tbl_leave (employee_id, leave_type, start_date, end_date, days_count, reason, status, date_filed) 
+            $sql = "INSERT INTO tbl_leave (employee_id, leave_type, start_date, end_date, days_count, reason, status, created_on) 
                     VALUES (?, ?, ?, ?, ?, ?, 0, NOW())";
             $stmt = $pdo->prepare($sql);
             
             if ($stmt->execute([$employee_id, $leave_type, $start_date, $end_date, $days_count, $reason])) {
                 
-                // --- SEND NOTIFICATION TO ADMIN ---
-                $sender_name = $_SESSION['firstname'] . ' ' . $_SESSION['lastname'];
+                // --- FETCH SENDER NAME FROM DB (Fixes ID showing issue) ---
+                $sender_name = $employee_id; // Default fallback
+                
+                // Query tbl_employees to get the real name
+                $stmt_name = $pdo->prepare("SELECT firstname, lastname FROM tbl_employees WHERE employee_id = ?");
+                $stmt_name->execute([$employee_id]);
+                $user_info = $stmt_name->fetch(PDO::FETCH_ASSOC);
+
+                if ($user_info) {
+                    $sender_name = $user_info['firstname'] . ' ' . $user_info['lastname'];
+                }
+
+                // --- SEND NOTIFICATION ---
                 $notif_msg = "$sender_name has requested $days_count day(s) of $leave_type.";
                 
-                // Send to: NULL (All Admins) | Role: Admin | Type: leave
                 if(function_exists('send_notification')) {
                     send_notification($pdo, null, 'Admin', 'leave', $notif_msg, 'leave_management.php', $sender_name);
                 }
 
-                $message = ['type' => 'success', 'text' => 'Leave request submitted successfully! Waiting for approval.'];
+                // --- DUPLICATE PREVENTION FIX (PRG Pattern) ---
+                header("Location: request_leave.php?status=success");
+                exit();
+                
             } else {
                 $message = ['type' => 'danger', 'text' => 'Database insert failed.'];
             }
@@ -62,6 +75,11 @@ if (isset($_POST['submit_leave'])) {
             $message = ['type' => 'danger', 'text' => 'Error: ' . $e->getMessage()];
         }
     }
+}
+
+// --- DISPLAY SUCCESS MESSAGE AFTER REDIRECT ---
+if (isset($_GET['status']) && $_GET['status'] == 'success') {
+    $message = ['type' => 'success', 'text' => 'Leave request submitted successfully! Waiting for approval.'];
 }
 
 require 'template/sidebar.php';
@@ -203,7 +221,7 @@ require 'template/topbar.php';
                                 </tr>
                             </thead>
                             <tbody>
-                                </tbody>
+                            </tbody>
                         </table>
                     </div>
                 </div>

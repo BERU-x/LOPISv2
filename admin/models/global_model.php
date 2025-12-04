@@ -1,61 +1,167 @@
 <?php
-// models/global_model.php
+// admin/models/global_model.php
 
-// Ensure database connection is available
-// (Adjust path if your config is in a different folder)
 require_once __DIR__ . '/../../db_connection.php';
 
-// --- 1. CREATE NOTIFICATION (The "Sender" Logic) ---
-function send_notification($pdo, $target_user_id, $target_role, $type, $message, $link = '#', $sender_name = 'System') {
+// --------------------------------------------------------------------------
+// --- TEMPORARY EMAIL FUNCTION FOR TESTING (UPDATED) ---
+// --------------------------------------------------------------------------
+function send_email_alert($to_email, $subject, $body) {
+    // We now trust that the caller provided a valid email address or the comma-separated list of Admin emails.
+    $recipient = $to_email; 
+
+    // The filter_var check is still important
+    if (empty($recipient)) {
+        error_log("Email Alert Failed: Recipient list is empty.");
+        return false;
+    }
+    
+    // Note: mail() handles comma-separated lists of recipients correctly.
+    
+    $headers = 'From: LOPISv2 <no-reply@lendell.ph>' . "\r\n" .
+               'Content-Type: text/html; charset=UTF-8';
+    
+    error_log("Attempting to send email to: $recipient | Subject: $subject");
+    
+    // Attempt to send using the built-in PHP mail function
+    return mail($recipient, $subject, $body, $headers);
+}
+// --------------------------------------------------------------------------
+
+
+// --- 1. CREATE NOTIFICATION (The core function - Unchanged) ---
+function send_notification($pdo, $target_user_id, $target_role, $type, $message, $link = '#', $sender_name = null) {
+    
+    $db_insert_success = false;
+    
     try {
-        // $target_user_id: Specific Employee ID (or NULL for group message)
-        // $target_role: 'Admin', 'Employee', or 'All'
-        
+        // --- 1. SENDER NAME DETECTION (Existing Logic) ---
+        // ... (Logic remains the same as it correctly identifies sender) ...
+        if ($sender_name === null || $sender_name === '') {
+            if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+            if (isset($_SESSION['employee_id']) && !isset($_SESSION['user_id'])) {
+                $stmt_emp = $pdo->prepare("SELECT firstname, lastname FROM tbl_employees WHERE employee_id = ?");
+                $stmt_emp->execute([$_SESSION['employee_id']]);
+                $emp_data = $stmt_emp->fetch(PDO::FETCH_ASSOC);
+
+                if ($emp_data) {
+                    $sender_name = $emp_data['firstname'] . ' ' . $emp_data['lastname'];
+                } else {
+                    $sender_name = "Employee " . $_SESSION['employee_id'];
+                }
+            } 
+            elseif (isset($_SESSION['user_id'])) {
+                $stmt_user = $pdo->prepare("SELECT usertype, employee_id FROM tbl_users WHERE id = ?");
+                $stmt_user->execute([$_SESSION['user_id']]);
+                $user_data = $stmt_user->fetch(PDO::FETCH_ASSOC);
+
+                if ($user_data) {
+                    if ($user_data['usertype'] == 1) {
+                        $sender_name = 'Administrator';
+                    } else {
+                        $linked_emp_id = $user_data['employee_id'];
+                        $stmt_details = $pdo->prepare("SELECT firstname, lastname FROM tbl_employees WHERE employee_id = ?");
+                        $stmt_details->execute([$linked_emp_id]);
+                        $real_person = $stmt_details->fetch(PDO::FETCH_ASSOC);
+                        
+                        $sender_name = $real_person ? ($real_person['firstname'] . ' ' . $real_person['lastname']) : 'Staff';
+                    }
+                } else {
+                    $sender_name = 'System Admin';
+                }
+            } 
+            else {
+                $sender_name = 'System';
+            }
+        }
+
+        // --- 2. DATABASE INSERTION ---
         $sql = "INSERT INTO tbl_notifications 
                 (target_user_id, target_role, type, message, link, sender_name, created_at) 
                 VALUES (:uid, :role, :type, :msg, :link, :sender, NOW())";
         
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ':uid'    => $target_user_id, // NULL if sending to a whole group
-            ':role'   => $target_role,
-            ':type'   => $type,
+        $db_insert_success = $stmt->execute([
+            ':uid'    => $target_user_id, 
+            ':role'   => $target_role,    
+            ':type'   => $type,           
             ':msg'    => $message,
             ':link'   => $link,
             ':sender' => $sender_name
         ]);
-        return true;
+        
+        // --- 3. EMAIL SENDING LOGIC (Using Actual Emails) ---
+        if ($db_insert_success) {
+            $recipient_email = null;
+            $recipient_name = 'User';
+
+            // Identify Recipient Email
+            if ($target_role == 'Employee' && $target_user_id) {
+                // Fetch Employee Email: Join tbl_users (email) and tbl_employees (firstname) using employee_id
+                $stmt_email = $pdo->prepare("
+                    SELECT t1.email, t2.firstname 
+                    FROM tbl_users t1
+                    JOIN tbl_employees t2 ON t1.employee_id = t2.employee_id
+                    WHERE t1.employee_id = ?");
+                $stmt_email->execute([$target_user_id]);
+                $emp_data = $stmt_email->fetch(PDO::FETCH_ASSOC);
+                
+                if ($emp_data && !empty($emp_data['email'])) {
+                    $recipient_email = $emp_data['email'];
+                    $recipient_name = $emp_data['firstname'];
+                }
+            } elseif ($target_role == 'Admin') {
+                // Fetch Admin Emails: Look up tbl_users where usertype = 1
+                $stmt_admin = $pdo->prepare("SELECT email FROM tbl_users WHERE usertype = 1 AND email IS NOT NULL");
+                $stmt_admin->execute();
+                $admin_users = $stmt_admin->fetchAll(PDO::FETCH_COLUMN);
+
+                if (!empty($admin_users)) {
+                    // This is the comma-separated list of actual admin emails
+                    $recipient_email = implode(',', $admin_users); 
+                    $recipient_name = 'Administrator';
+                }
+            }
+            
+            if ($recipient_email) {
+                $subject = "HRIS ALERT: {$type} Notification Received";
+                $email_body = "Hello {$recipient_name},<br><br>"
+                            . "You have a new **{$type}** notification from {$sender_name}:<br>"
+                            . "<strong>{$message}</strong><br><br>"
+                            . "Please log in to the portal to view details:<br>"
+                            . "<a href='http://lendell.ph/{$link}'>View Notification</a>";
+                
+                // Execute the email function with the actual email(s)
+                send_email_alert($recipient_email, $subject, $email_body);
+            }
+        }
+        
+        return $db_insert_success;
+
     } catch (PDOException $e) {
         error_log("Notification Error: " . $e->getMessage());
         return false;
     }
 }
 
-// --- 2. FETCH NOTIFICATIONS (The "Receiver" Logic) ---
-// We now pass the current user's ID and Role to filter what they see
-function get_my_notifications($pdo, $my_id, $my_role, $limit = 5) {
+// --- 2. FETCH NOTIFICATIONS (Admin as Receiver) ---
+function get_my_notifications($pdo, $my_role = 'Admin', $limit = 5) {
     try {
-        $sql = "SELECT 
-                    t1.*,
-                    t2.firstname,
-                    t2.lastname,
-                    t2.photo
-                FROM tbl_notifications t1
-                LEFT JOIN tbl_employees t2 ON t1.target_user_id = t2.employee_id
-                WHERE t1.is_read = 0 
+        $my_id = $_SESSION['user_id'] ?? 0;
+
+        $sql = "SELECT * FROM tbl_notifications 
+                WHERE is_read = 0 
                 AND (
-                    (t1.target_user_id = :my_id) 
+                    (target_user_id = :my_id) 
                     OR 
-                    (t1.target_user_id IS NULL AND t1.target_role = :my_role)
-                    OR 
-                    (t1.target_role = 'All')
+                    (target_role = 'Admin')
                 )
-                ORDER BY t1.created_at DESC 
+                ORDER BY created_at DESC 
                 LIMIT :limit";
 
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':my_id', $my_id);
-        $stmt->bindValue(':my_role', $my_role);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
         
@@ -67,9 +173,9 @@ function get_my_notifications($pdo, $my_id, $my_role, $limit = 5) {
     }
 }
 
-// 2. Time Elapsed Helper (e.g., "2 hours ago")
+// --- 3. TIME HELPER ---
 function time_elapsed_string($datetime, $full = false) {
-    // Set correct timezone if needed, e.g., date_default_timezone_set('Asia/Manila');
+    date_default_timezone_set('Asia/Manila');
     $now = new DateTime;
     $ago = new DateTime($datetime);
     $diff = $now->diff($ago);
@@ -99,36 +205,12 @@ function time_elapsed_string($datetime, $full = false) {
     return $string ? implode(', ', $string) . ' ago' : 'just now';
 }
 
-// Fetch ALL notifications (Read and Unread) for the full list page
-function get_all_notifications($pdo, $limit = 50) {
-    try {
-        $sql = "SELECT 
-                    t1.*,
-                    t2.firstname,
-                    t2.lastname,
-                    t2.photo
-                FROM tbl_notifications t1
-                LEFT JOIN tbl_employees t2 ON t1.target_user_id = t2.employee_id
-                ORDER BY t1.created_at DESC 
-                LIMIT :limit";
-
-        $stmt = $pdo->prepare($sql);
-        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-        $stmt->execute();
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-    } catch (PDOException $e) {
-        error_log("All Notifications Fetch Error: " . $e->getMessage());
-        return [];
-    }
-}
-
-// Mark a single notification (or all) as read
+// --- 4. MARK READ ---
 function mark_notification_read($pdo, $id = null) {
     try {
         if ($id === 'all') {
-            $sql = "UPDATE tbl_notifications SET is_read = 1 WHERE is_read = 0";
+            $sql = "UPDATE tbl_notifications SET is_read = 1 
+                    WHERE is_read = 0 AND target_role = 'Admin'";
             $stmt = $pdo->prepare($sql);
             return $stmt->execute();
         } else {

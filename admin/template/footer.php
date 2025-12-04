@@ -10,7 +10,7 @@
 
 <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
     aria-hidden="true">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
             
             <div class="modal-header border-bottom-0">
@@ -58,6 +58,43 @@
         0: 'Probationary', 1: 'Regular', 2: 'Part-time', 3: 'Contractual', 
         4: 'OJT', 5: 'Resigned', 6: 'Terminated'
     };
+
+    function fetchNotifications() {
+        $.ajax({
+            // Adjust this path if your file is in a sub-folder (e.g., ../fetch/fetch_navbar_notifs.php)
+            url: 'fetch/fetch_navbar_notifs.php', 
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                // A. Update Badge Count
+                let badge = $('#notif-badge');
+                
+                // Only show badge if count > 0
+                if (response.count > 0) {
+                    badge.text(response.count);
+                    badge.show(); // Ensure it's visible
+                } else {
+                    badge.hide(); // Hide if 0
+                }
+
+                // B. Update Dropdown List content
+                // Check if the element exists to prevent errors
+                if ($('#notif-list').length) {
+                    $('#notif-list').html(response.html);
+                }
+            },
+            error: function(xhr, status, error) {
+                // Silent failure in console is better than alerting the user every 5 seconds
+                console.log("Notification sync warning: " + error);
+            }
+        });
+    }
+
+    // Run immediately on page load
+    fetchNotifications();
+
+    // Run every 5 seconds (5000ms)
+    setInterval(fetchNotifications, 5000);
 
     // --- Dropify Initialization ---
     $('.dropify').dropify({

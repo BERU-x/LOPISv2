@@ -66,7 +66,7 @@ function isActive($page_name, $current_page) {
         </a>
     </li>
 
-    <li class="nav-item <?php echo isActive('cashadv_approval', $current_page); ?>">
+    <li class="nav-item <?php echo isActive('cash_advance_approval', $current_page); ?>">
         <a class="nav-link" href="cashadv_approval.php">
             <i class="fas fa-money-bill"></i>
             <span>Cash Advance Management</span>

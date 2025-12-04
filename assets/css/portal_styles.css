@@ -587,3 +587,109 @@ div.dataTables_wrapper div.dataTables_filter input:focus {
     /* Targets the file name text when a file is uploaded */
     font-size: 0.9rem;
 }
+/* --- Notification Bell & Badge --- */
+.nav-link .fa-bell {
+    font-size: 1.2rem;
+    transition: transform 0.2s ease-in-out;
+}
+
+.nav-link:hover .fa-bell {
+    transform: rotate(15deg); /* Slight tilt on hover */
+    color: #0CC0DF !important; /* Teal color on hover */
+}
+
+/* Badge styling to make it pop */
+.badge-counter {
+    position: absolute;
+    transform: scale(0.7);
+    transform-origin: top right;
+    top: .25rem;
+    right: .25rem;
+    background-color: #e74a3b; /* Danger Red */
+    border: 2px solid #fff; /* White border to separate from icon */
+    border-radius: 50%;
+    padding: 0.25em 0.6em;
+    animation: pulse-red 2s infinite;
+}
+
+/* --- Dropdown Container --- */
+.dropdown-list {
+    width: 20rem !important;
+    padding: 0;
+    border: none;
+    box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.15) !important;
+    border-radius: 0.5rem;
+    overflow: hidden; /* Clips corners */
+}
+
+.dropdown-header {
+    background-color: #0CC0DF !important;
+    border: 1px solid #0CC0DF;
+    padding: 0.75rem 1rem;
+    color: #fff !important;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+}
+
+/* --- Notification List Area (Scrollable) --- */
+#notif-list {
+    max-height: 300px; /* Limit height to prevent page stretching */
+    overflow-y: auto;  /* Enable vertical scrolling */
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Custom Scrollbar for Chrome/Safari */
+#notif-list::-webkit-scrollbar {
+    width: 6px;
+}
+#notif-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+#notif-list::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+#notif-list::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* --- Individual Items --- */
+.dropdown-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e3e6f0;
+    transition: background-color 0.2s ease;
+    white-space: normal; /* Allows text to wrap */
+}
+
+.dropdown-item:last-child {
+    border-bottom: none;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fc;
+    text-decoration: none;
+}
+
+/* Unread item background (slightly darker than read) */
+.dropdown-item.bg-light {
+    background-color: #f4f6fd !important; /* Very light blue tint */
+}
+.dropdown-item.bg-light:hover {
+    background-color: #eaecf4 !important;
+}
+
+/* --- Animations --- */
+@keyframes pulse-red {
+    0% {
+        box-shadow: 0 0 0 0 rgba(231, 74, 59, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(231, 74, 59, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(231, 74, 59, 0);
+    }
+}

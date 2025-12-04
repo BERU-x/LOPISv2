@@ -2,12 +2,34 @@
 // models/global_model.php
 
 // Ensure database connection is available
-// (Adjust path if your config is in a different folder)
 require_once __DIR__ . '/../../db_connection.php';
 
-// --- 1. CREATE NOTIFICATION (The "Sender" Logic) ---
-function send_notification($pdo, $target_user_id, $target_role, $type, $message, $link = '#', $sender_name = 'System') {
+// --- 1. CREATE NOTIFICATION (Updated Sender Logic) ---
+function send_notification($pdo, $target_user_id, $target_role, $type, $message, $link = '#', $sender_name = null) {
     try {
+        // AUTOMATIC NAME FETCHING LOGIC:
+        // If no sender name is provided, try to find it based on the logged-in user
+        if ($sender_name === null || $sender_name === '') {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+
+            if (isset($_SESSION['employee_id'])) {
+                // Fetch the real name from DB to be safe
+                $stmt_sender = $pdo->prepare("SELECT firstname, lastname FROM tbl_employees WHERE employee_id = ?");
+                $stmt_sender->execute([$_SESSION['employee_id']]);
+                $sender_info = $stmt_sender->fetch(PDO::FETCH_ASSOC);
+
+                if ($sender_info) {
+                    $sender_name = $sender_info['firstname'] . ' ' . $sender_info['lastname'];
+                } else {
+                    $sender_name = $_SESSION['employee_id']; // Fallback to ID
+                }
+            } else {
+                $sender_name = 'System'; // Fallback if no user is logged in
+            }
+        }
+
         // $target_user_id: Specific Employee ID (or NULL for group message)
         // $target_role: 'Admin', 'Employee', or 'All'
         
@@ -32,7 +54,6 @@ function send_notification($pdo, $target_user_id, $target_role, $type, $message,
 }
 
 // --- 2. FETCH NOTIFICATIONS (The "Receiver" Logic) ---
-// We now pass the current user's ID and Role to filter what they see
 function get_my_notifications($pdo, $my_id, $my_role, $limit = 5) {
     try {
         $sql = "SELECT 
@@ -67,9 +88,9 @@ function get_my_notifications($pdo, $my_id, $my_role, $limit = 5) {
     }
 }
 
-// 2. Time Elapsed Helper (e.g., "2 hours ago")
+// 2. Time Elapsed Helper
 function time_elapsed_string($datetime, $full = false) {
-    // Set correct timezone if needed, e.g., date_default_timezone_set('Asia/Manila');
+    date_default_timezone_set('Asia/Manila'); // Ensure timezone is set
     $now = new DateTime;
     $ago = new DateTime($datetime);
     $diff = $now->diff($ago);

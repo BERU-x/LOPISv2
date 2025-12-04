@@ -16,63 +16,23 @@
 
                 <li class="nav-item dropdown no-arrow mx-1">
                     <a class="nav-link" href="#" id="alertsDropdown" role="button"
-                        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <i class="fas fa-bell fa-fw text-gray-400"></i>
                         
-                        <?php 
-                        // $notif_count comes from header.php
-                        $display_count = $notif_count ?? 0;
-                        if ($display_count > 0): 
-                        ?>
-                            <span class="badge badge-danger badge-counter">
-                                <?php echo $display_count . ($display_count >= 5 ? '+' : ''); ?>
-                            </span>
-                        <?php endif; ?>
+                        <span class="badge badge-danger badge-counter" id="notif-badge" style="display:none;">
+                            0
+                        </span>
                     </a>
                     
                     <div class="dropdown-list dropdown-menu dropdown-menu-end shadow animated--grow-in"
                         aria-labelledby="alertsDropdown">
-                        <h6 class="dropdown-header border-0" style="background-color: #0CC0DF !important;">
-                            Notifications
-                        </h6>
 
-                        <?php 
-                        if (isset($notifications) && is_array($notifications) && count($notifications) > 0): 
-                        ?>
-                            <?php foreach ($notifications as $notif): ?>
-                                <?php 
-                                    $iconClass = 'fa-info-circle';
-                                    $bgClass = 'bg-primary';
-                                    
-                                    if($notif['type'] == 'payroll') { $iconClass = 'fa-file-invoice-dollar'; $bgClass = 'bg-success'; }
-                                    if($notif['type'] == 'leave')   { $iconClass = 'fa-calendar-times';      $bgClass = 'bg-warning'; }
-                                    if($notif['type'] == 'employee'){ $iconClass = 'fa-user-plus';           $bgClass = 'bg-info'; }
-                                    
-                                    $encoded_link = urlencode($notif['link']);
-                                    $handler_url = 'mark_read.php?id=' . $notif['id'] . '&link=' . $encoded_link;
-                                ?>
-
-                                <a class="dropdown-item d-flex align-items-center" href="<?php echo $handler_url; ?>">
-                                    <div class="me-3">
-                                        <div class="icon-circle <?php echo $bgClass; ?> text-white rounded-circle p-2">
-                                            <i class="fas <?php echo $iconClass; ?>"></i>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div class="small text-gray-500">
-                                            <?php echo time_elapsed_string($notif['created_at']); ?>
-                                        </div>
-                                        <span class="font-weight-bold">
-                                            <?php echo htmlspecialchars($notif['message']); ?>
-                                        </span>
-                                    </div>
-                                </a>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <a class="dropdown-item text-center small text-gray-500" href="#">No new notifications</a>
-                        <?php endif; ?>
-
-                        <a class="dropdown-item text-center small text-gray-500" href="notifications.php">Show All Alerts</a>
+                        <div id="notif-list">
+                            <a class="dropdown-item text-center small text-gray-500" href="#">
+                                Loading...
+                            </a>
+                        </div>
+                        
                     </div>
                 </li>
                 
@@ -160,10 +120,6 @@
                         <a class="dropdown-item py-2" href="profile.php">
                             <i class="fas fa-user fa-sm fa-fw me-2 text-gray-400"></i>
                             Profile
-                        </a>
-                        <a class="dropdown-item py-2" href="settings.php">
-                            <i class="fas fa-cogs fa-sm fa-fw me-2 text-gray-400"></i>
-                            Settings
                         </a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item py-2 text-danger" href="#" data-bs-toggle="modal" data-bs-target="#logoutModal">

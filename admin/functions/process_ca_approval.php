@@ -1,24 +1,27 @@
 <?php
 // functions/process_ca_approval.php
 
-require_once '../../db_connection.php'; 
-// 1. INCLUDE NOTIFICATION MODEL
-require_once '../models/global_model.php'; 
-
+// 1. SESSION & HEADERS
 session_start();
-
 header('Content-Type: application/json');
 
-// --- DEBUG CHECK ---
-if (!isset($_SESSION['usertype'])) {
+// 2. INCLUDES
+require_once '../../db_connection.php'; 
+require_once '../models/global_model.php'; 
+
+date_default_timezone_set('Asia/Manila');
+
+// 3. AUTH CHECK (Admin Only)
+// Ensure the user is logged in and has a usertype (Admin)
+if (!isset($_SESSION['usertype']) || !isset($_SESSION['user_id'])) {
     echo json_encode([
         'status' => 'error', 
-        'message' => 'Unauthorized. Active Session Variables: ' . json_encode($_SESSION)
+        'message' => 'Unauthorized access.'
     ]);
     exit;
 }
 
-// 2. INPUT VALIDATION
+// 4. INPUT VALIDATION
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['status' => 'error', 'message' => 'Invalid request method.']);
     exit;
@@ -35,8 +38,7 @@ if (!$id || !$action) {
 }
 
 try {
-    // 3. CHECK CURRENT STATUS & FETCH EMPLOYEE DETAILS
-    // Added 'employee_id' and 'date_requested' to the select query so we can notify them
+    // 5. CHECK CURRENT STATUS & FETCH DETAILS
     $stmt = $pdo->prepare("SELECT id, status, amount, employee_id, date_requested FROM tbl_cash_advances WHERE id = ?");
     $stmt->execute([$id]);
     $request = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -55,7 +57,10 @@ try {
     $emp_id = $request['employee_id'];
     $req_date = date("M d, Y", strtotime($request['date_requested']));
 
-    // 4. PROCESS LOGIC
+    // 6. PROCESS LOGIC
+    $msg = "";
+    $result = false;
+
     if ($action === 'approve') {
         
         // Validation: Ensure amount is valid
@@ -64,10 +69,8 @@ try {
             exit;
         }
 
-        // Logic: Update status to 'Deducted' (or Approved)
+        // Update status to 'Deducted' (Active/Approved)
         $new_status = 'Deducted'; 
-        // Note: In some systems 'Deducted' means it's taken from salary. If this is just approval, maybe 'Approved'. 
-        // Keeping 'Deducted' as per your original code.
         
         $update_sql = "UPDATE tbl_cash_advances SET status = :status, amount = :amount WHERE id = :id";
         $update_stmt = $pdo->prepare($update_sql);
@@ -82,12 +85,14 @@ try {
         // --- SEND NOTIFICATION (APPROVED) ---
         if ($result) {
             $notif_msg = "Your Cash Advance request for {$req_date} has been APPROVED (₱" . number_format($approved_amount, 2) . ").";
-            send_notification($pdo, $emp_id, 'Employee', 'info', $notif_msg, 'request_ca.php', 'Admin');
+            
+            // PASS NULL for sender so it auto-detects 'Administrator' or Admin Name
+            send_notification($pdo, $emp_id, 'Employee', 'info', $notif_msg, 'request_ca.php', null);
         }
 
     } elseif ($action === 'reject') {
         
-        // Logic: Update status to 'Cancelled'
+        // Update status to 'Cancelled'
         $new_status = 'Cancelled';
         
         $update_sql = "UPDATE tbl_cash_advances SET status = :status WHERE id = :id";
@@ -102,7 +107,9 @@ try {
         // --- SEND NOTIFICATION (REJECTED) ---
         if ($result) {
             $notif_msg = "Your Cash Advance request for {$req_date} has been REJECTED.";
-            send_notification($pdo, $emp_id, 'Employee', 'warning', $notif_msg, 'cash_advance.php', 'Finance Admin');
+            
+            // PASS NULL for sender so it auto-detects 'Administrator' or Admin Name
+            send_notification($pdo, $emp_id, 'Employee', 'warning', $notif_msg, 'cash_advance.php', null);
         }
 
     } else {
@@ -110,7 +117,7 @@ try {
         exit;
     }
 
-    // 5. SUCCESS RESPONSE
+    // 7. SUCCESS RESPONSE
     if ($result) {
         echo json_encode(['status' => 'success', 'message' => $msg]);
     } else {

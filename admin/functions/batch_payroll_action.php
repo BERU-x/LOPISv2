@@ -99,10 +99,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ids']) && isset($_POS
                     $update_stmt = $pdo->prepare("UPDATE tbl_payroll SET status = 1 WHERE id = ?");
                     $update_stmt->execute([$payroll_id]);
                     
-                    // --- E. SEND NOTIFICATION ---
+                    // --- E. SEND NOTIFICATION (Updated) ---
                     $notif_msg = "Your Payslip for period {$period_str} is now available.";
-                    // We link them to 'payslips.php' or wherever they view their own salary
-                    send_notification($pdo, $emp_id, 'Employee', 'payroll', $notif_msg, 'payslips.php', 'Admin');
+                    
+                    // PASS NULL for sender name so the global model auto-detects the Admin's name
+                    send_notification($pdo, $emp_id, 'Employee', 'payroll', $notif_msg, 'payslips.php', null);
                     
                     $approved_count++;
                 }
