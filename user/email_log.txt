@@ -1,0 +1,18 @@
+
+
+--- EMAIL SENT @ 2025-12-05 09:37:09 ---
+To: conrad.villena@lendell.ph,delia.javier@lendell.ph,dennis.gayapa@lendell.ph,ella.sepe@lendell.ph,janica.laurente@lendell.ph,andy.coma@lendell.ph,juliet.bautista@lendell.ph,jmarvin.peralta@lendell.ph,mark_olegario@lendell.ph,rowena.quevedo@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification from Aljhon Mark Alvior:Aljhon Mark Alvior has requested 1 day(s) of Vacation Leave.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-05 09:38:56 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification from Aljhon Mark Alvior:Aljhon Mark Alvior has requested 1 day(s) of Vacation Leave.Please log in to the portal to view details:View Notification
+--------------------------------------

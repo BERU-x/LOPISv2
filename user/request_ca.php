@@ -41,7 +41,7 @@ require 'template/topbar.php';
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Request</div>
+                            <div class="text-xs font-weight-bold text-label  text-uppercase mb-1">Pending Request</div>
                             <?php
                                 $stmt = $pdo->prepare("SELECT SUM(amount) FROM tbl_cash_advances WHERE employee_id = ? AND status = 'Pending'");
                                 $stmt->execute([$current_employee_id]);
@@ -60,7 +60,7 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 bg-white border-bottom-0">
-            <h6 class="m-0 font-weight-bold text-teal"><i class="fas fa-history me-2"></i>My Request History</h6>
+            <h6 class="m-0 font-weight-bold text-label"><i class="fas fa-history me-2"></i>My Request History</h6>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -90,7 +90,7 @@ require 'template/topbar.php';
                         <tr>
                             <td class="fw-bold text-gray-700"><?= date('M d, Y', strtotime($row['date_requested'])) ?></td>
                             
-                            <td class="text-center text-teal fw-bold">₱<?= number_format($row['amount'], 2) ?></td>
+                            <td class="text-center fw-bold">₱<?= number_format($row['amount'], 2) ?></td>
                             
                             <td class="small text-muted"><?= htmlspecialchars($row['remarks']) ?></td>
                             
@@ -117,7 +117,7 @@ require 'template/topbar.php';
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header border-bottom-0">
-                <h5 class="modal-title fw-bold text-teal"><i class="fas fa-hand-holding-usd me-2"></i>Request Cash Advance</h5>
+                <h5 class="modal-title fw-bold text-label"><i class="fas fa-hand-holding-usd me-2"></i>Request Cash Advance</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">

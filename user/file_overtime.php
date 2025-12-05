@@ -131,7 +131,7 @@ require 'template/topbar.php';
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <div>
-            <h1 class="h3 mb-0 text-gray-800 font-weight-bold">📝 File Overtime Request</h1>
+            <h1 class="h3 mb-0 text-gray-800 font-weight-bold">File Overtime Request</h1>
             <p class="mb-0 text-muted">Submit manual overtime hours for review.</p>
         </div>
     </div>
@@ -145,8 +145,8 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 bg-white border-bottom-0">
-            <h6 class="m-0 font-weight-bold text-teal">
-                <i class="fas fa-edit me-2 text-teal"></i>New Request Form
+            <h6 class="m-0 font-weight-bold text-label">
+                <i class="fas fa-edit me-2 text-label"></i>New Request Form
             </h6>
         </div>
         <div class="card-body bg-light rounded-bottom">
@@ -181,13 +181,13 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 bg-white">
-            <h6 class="m-0 font-weight-bold text-teal"><i class="fas fa-calendar-alt me-2"></i>My Overtime Request History</h6>
+            <h6 class="m-0 font-weight-bold text-label"><i class="fas fa-calendar-alt me-2"></i>My Overtime Request History</h6>
         </div>
 
         <div class="card-body">
             <div class="table-responsive">
                 <table class="table table-striped table-hover align-middle" id="otHistoryTable" width="100%" cellspacing="0">
-                    <thead class="bg-light text-uppercase text-gray-600 text-xs font-weight-bold">
+                    <thead class="bg-light text-uppercase text-label text-xs font-weight-bold">
                         <tr>
                             <th class="border-0">Date</th>
                             <th class="border-0 text-center">Raw OT (Log)</th>
@@ -231,7 +231,7 @@ $(document).ready(function() {
                 { data: 'ot_date' }, 
                 { 
                     data: 'raw_ot_hr',
-                    className: 'text-center text-danger fw-bold',
+                    className: 'text-center',
                     render: function(data) {
                         return data === '—' || data === '0.00 hrs' || data === '0.00' ? '—' : data;
                     }
@@ -242,11 +242,11 @@ $(document).ready(function() {
                 },
                 { 
                     data: 'hours_requested',
-                    className: 'text-center fw-bold text-teal' 
+                    className: 'text-center' 
                 },
                 { 
                     data: 'hours_approved',
-                    className: 'text-center fw-bold text-success',
+                    className: 'text-center',
                     render: function(data) {
                         return data === '—' || data === '0.00 hrs' ? '—' : data;
                     }

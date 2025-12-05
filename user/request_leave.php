@@ -109,7 +109,7 @@ require 'template/topbar.php';
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Vacation Leave</div>
+                            <div class="text-xs font-weight-bold text-label text-uppercase mb-1">Vacation Leave</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 <span id="vl_remaining">0</span> <small class="text-muted text-xs">/ <span id="vl_total">0</span></small>
                             </div>
@@ -125,7 +125,7 @@ require 'template/topbar.php';
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Sick Leave</div>
+                            <div class="text-xs font-weight-bold text-label text-uppercase mb-1">Sick Leave</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 <span id="sl_remaining">0</span> <small class="text-muted text-xs">/ <span id="sl_total">0</span></small>
                             </div>
@@ -141,7 +141,7 @@ require 'template/topbar.php';
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Emergency Leave</div>
+                            <div class="text-xs font-weight-bold text-label text-uppercase mb-1">Emergency Leave</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 <span id="el_remaining">0</span> <small class="text-muted text-xs">/ <span id="el_total">0</span></small>
                             </div>
@@ -156,7 +156,7 @@ require 'template/topbar.php';
     <div class="row">
         <div class="col-lg-5 mb-4">
             <div class="card shadow mb-4">
-                <div class="card-header py-3 bg-teal text-white">
+                <div class="card-header py-3 bg-teal text-label">
                     <h6 class="m-0 font-weight-bold"><i class="fas fa-edit me-2"></i>Application Form</h6>
                 </div>
                 <div class="card-body">
@@ -207,7 +207,7 @@ require 'template/topbar.php';
         <div class="col-lg-7">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Recent Requests</h6>
+                    <h6 class="m-0 font-weight-bold text-label">Recent Requests</h6>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">

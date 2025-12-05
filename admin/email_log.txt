@@ -1,0 +1,9 @@
+
+
+--- EMAIL SENT @ 2025-12-05 09:26:34 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:Your Vacation Leave (Dec 06) has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------

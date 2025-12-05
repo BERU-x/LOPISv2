@@ -7,24 +7,42 @@ require_once __DIR__ . '/../../db_connection.php';
 // --- TEMPORARY EMAIL FUNCTION FOR TESTING (UPDATED) ---
 // --------------------------------------------------------------------------
 function send_email_alert($to_email, $subject, $body) {
-    // We now trust that the caller provided a valid email address or the comma-separated list of Admin emails.
+    // ... (Existing checks remain the same) ...
     $recipient = $to_email; 
 
-    // The filter_var check is still important
     if (empty($recipient)) {
         error_log("Email Alert Failed: Recipient list is empty.");
         return false;
     }
-    
-    // Note: mail() handles comma-separated lists of recipients correctly.
     
     $headers = 'From: LOPISv2 <no-reply@lendell.ph>' . "\r\n" .
                'Content-Type: text/html; charset=UTF-8';
     
     error_log("Attempting to send email to: $recipient | Subject: $subject");
     
-    // Attempt to send using the built-in PHP mail function
-    return mail($recipient, $subject, $body, $headers);
+    // -----------------------------------------------------------------
+    // >>> MODIFICATION START: Log email to a file for localhost testing
+    // -----------------------------------------------------------------
+    $log_file = __DIR__ . '/../email_log.txt';
+    $log_content = "\n\n--- EMAIL SENT @ " . date('Y-m-d H:i:s') . " ---\n"
+                 . "To: " . $recipient . "\n"
+                 . "Subject: " . $subject . "\n"
+                 . "Headers: " . str_replace("\r\n", " | ", $headers) . "\n"
+                 . "Body:\n" . strip_tags($body) . "\n" // Log plain text for simplicity
+                 . "--------------------------------------\n";
+
+    // Append to the log file
+    file_put_contents($log_file, $log_content, FILE_APPEND);
+    
+    // Return true to simulate a successful mail() call
+    return true; 
+    
+    // -----------------------------------------------------------------
+    // >>> MODIFICATION END
+    // -----------------------------------------------------------------
+    
+    // // REMOVE OR COMMENT OUT THE LINE BELOW WHEN USING THE LOGGING APPROACH:
+    // return mail($recipient, $subject, $body, $headers);
 }
 // --------------------------------------------------------------------------
 
@@ -180,10 +198,20 @@ function time_elapsed_string($datetime, $full = false) {
     $ago = new DateTime($datetime);
     $diff = $now->diff($ago);
 
-    $diff->w = floor($diff->d / 7);
-    $diff->d -= $diff->w * 7;
+    $weeks = floor($diff->d / 7);
+    $days = $diff->d - ($weeks * 7);
 
     $string = array(
+        'y' => 'year',
+        'm' => 'month',
+        'w' => $weeks,
+        'd' => $days,
+        'h' => 'hour',
+        'i' => 'minute',
+        's' => 'second',
+    );
+    
+    $labels = array(
         'y' => 'year',
         'm' => 'month',
         'w' => 'week',
@@ -193,16 +221,19 @@ function time_elapsed_string($datetime, $full = false) {
         's' => 'second',
     );
     
-    foreach ($string as $k => &$v) {
-        if ($diff->$k) {
-            $v = $diff->$k . ' ' . $v . ($diff->$k > 1 ? 's' : '');
-        } else {
-            unset($string[$k]);
+    $result = array();
+    foreach ($string as $k => $v) {
+        if (in_array($k, ['w', 'd']) || $diff->$k) {
+            $label = $labels[$k];
+            $count = in_array($k, ['w', 'd']) ? $v : $diff->$k;
+            if ($count > 0) {
+                $result[] = $count . ' ' . $label . ($count > 1 ? 's' : '');
+            }
         }
     }
 
-    if (!$full) $string = array_slice($string, 0, 1);
-    return $string ? implode(', ', $string) . ' ago' : 'just now';
+    if (!$full) $result = array_slice($result, 0, 1);
+    return $result ? implode(', ', $result) . ' ago' : 'just now';
 }
 
 // --- 4. MARK READ ---

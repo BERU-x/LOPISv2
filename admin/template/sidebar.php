@@ -73,6 +73,13 @@ function isActive($page_name, $current_page) {
         </a>
     </li>
 
+    <li class="nav-item <?php echo isActive('holidays', $current_page); ?>">
+        <a class="nav-link" href="holidays.php">
+            <i class="fas fa-calendar-alt"></i>
+            <span>Holiday Management</span>
+        </a>
+    </li>
+
     <li class="nav-item <?php echo isActive('payroll', $current_page); ?>">
         <a class="nav-link" href="payroll.php">
             <i class="fas fa-fw fa-file-invoice-dollar"></i>

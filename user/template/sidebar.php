@@ -30,13 +30,6 @@ function isActive($page_name, $current_page) {
         My Account
     </div>
 
-    <li class="nav-item <?php echo isActive('profile', $current_page); ?>">
-        <a class="nav-link" href="profile.php">
-            <i class="fas fa-fw fa-user-circle"></i>
-            <span>Profile</span>
-        </a>
-    </li>
-
     <li class="nav-item <?php echo isActive('payslips', $current_page); ?>">
         <a class="nav-link" href="payslips.php">
             <i class="fas fa-fw fa-receipt"></i>
@@ -75,19 +68,26 @@ function isActive($page_name, $current_page) {
         </a>
     </li>
 
+    <li class="nav-item <?php echo isActive('balances', $current_page); ?>">
+        <a class="nav-link" href="balances.php">
+            <i class="fas fa-fw fa-plus-minus"></i>
+            <span>Balances</span>
+        </a>
+    </li>
+
     <div class="sidebar-heading">
         Organization
     </div>
 
     <li class="nav-item <?php echo isActive('directory', $current_page); ?>">
-        <a class="nav-link" href="directory.php">
+        <a class="nav-link" href="coming_soon.php?feature=Team%20Directory">
             <i class="fas fa-fw fa-users"></i>
             <span>Team Directory</span>
         </a>
     </li>
 
     <li class="nav-item <?php echo isActive('documents', $current_page); ?>">
-        <a class="nav-link" href="documents.php">
+        <a class="nav-link" href="coming_soon.php?feature=Docs%20%26%20Policies">
             <i class="fas fa-fw fa-folder-open"></i>
             <span>Docs & Policies</span>
         </a>
@@ -96,7 +96,7 @@ function isActive($page_name, $current_page) {
     <hr class="sidebar-divider mt-3">
 
     <li class="nav-item <?php echo isActive('help', $current_page); ?>">
-        <a class="nav-link" href="help.php">
+        <a class="nav-link" href="coming_soon.php?feature=Help%20%26%20Support">
             <i class="far fa-fw fa-life-ring"></i>
             <span>Help & Support</span>
         </a>

@@ -26,9 +26,9 @@ $pending_ca_count       = $metrics['pending_ca_count'];
 
 // ✅ NEW: Determine Cash Advance Card Color
 // If there are pending requests, show Warning (Yellow), otherwise Success (Teal/Green)
-$ca_text_color = ($pending_ca_count > 0) ? 'text-warning' : 'text-success';
-$ca_icon_bg    = ($pending_ca_count > 0) ? 'bg-soft-warning' : 'bg-soft-success';
-$ca_icon       = ($pending_ca_count > 0) ? 'fa-hand-holding-usd' : 'fa-check-circle';
+// $ca_text_color = ($pending_ca_count > 0) ? 'text-teal' : 'text-success';
+// $ca_icon_bg    = ($pending_ca_count > 0) ? 'bg-soft-teal' : 'bg-soft-success';
+// $ca_icon       = ($pending_ca_count > 0) ? 'fa-hand-holding-usd' : 'fa-check-circle';
 
 // Prepare Chart JSON Data
 $dept_labels = json_encode(array_keys($dept_data));
@@ -60,7 +60,7 @@ require 'template/topbar.php';
             <div class="card h-100 border-left-teal shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="icon-box bg-soft-primary me-3">
+                        <div class="icon-box bg-soft-teal me-3">
                             <i class="fas fa-users"></i>
                         </div>
                         <div>
@@ -69,37 +69,11 @@ require 'template/topbar.php';
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
-                        <span class="text-success font-weight-bold">
+                        <span class="text-teal font-weight-bold">
                             <i class="fas fa-plus"></i> <?php echo number_format($new_hires_month_count); ?>
                         </span> new this month
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
-            <div class="card h-100 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="icon-box <?php echo $ca_icon_bg; ?> me-3">
-                            <i class="fas <?php echo $ca_icon; ?>"></i>
-                        </div>
-                        <div>
-                            <div class="text-label">Cash Advances</div>
-                            <div class="h5 font-weight-bold mb-0 <?php echo $ca_text_color; ?>">
-                                <?php echo number_format($pending_ca_count); ?> <small class="text-muted text-xs font-weight-normal">Pending</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-3 mb-0 text-muted text-xs">
-                        <?php if($pending_ca_count > 0): ?>
-                            <span class="text-warning font-weight-bold">Action Required</span>
-                        <?php else: ?>
-                            <span class="text-success font-weight-bold">All Cleared</span>
-                        <?php endif; ?>
-                        
-                        <a href="cashadv_approval.php" class="text-decoration-none text-muted ms-2">
-                            Review &rarr;
+                        <a href="employee_management.php" class="text-decoration-none text-muted ms-2">
+                            View Details &rarr;
                         </a>
                     </div>
                 </div>
@@ -110,7 +84,35 @@ require 'template/topbar.php';
             <div class="card h-100 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex align-items-center">
-                        <div class="icon-box bg-soft-danger me-3">
+                        <div class="icon-box bg-soft-teal me-3">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                        <div>
+                            <div class="text-label">Pending Cash Adv</div>
+                            <div class="text-value">
+                                <?php echo number_format($pending_ca_count); ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 mb-0 text-muted text-xs">
+                        <?php if($pending_ca_count > 0): ?>
+                        <?php else: ?>
+                            <span class="text-success font-weight-bold">All Cleared</span>
+                        <?php endif; ?>
+                        
+                        <a href="cashadv_approval.php" class="text-decoration-none text-muted ms-2">
+                            View Details &rarr;
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-box bg-soft-teal me-3">
                             <i class="fas fa-calendar-times"></i>
                         </div>
                         <div>
@@ -203,7 +205,7 @@ require 'template/topbar.php';
                                         <h6 class="mb-0 text-gray-800"><?php echo htmlspecialchars($leave['firstname'] . ' ' . $leave['lastname']); ?></h6>
                                         <small class="text-muted"><?php echo htmlspecialchars($leave['leave_type']); ?></small>
                                     </div>
-                                    <span class="badge bg-soft-danger text-danger p-2">
+                                    <span class="badge bg-soft-teal text-danger p-2">
                                         <?php echo date("M d", strtotime($leave['start_date'])); ?> 
                                         <?php echo ($leave['start_date'] != $leave['end_date']) ? ' - ' . date("M d", strtotime($leave['end_date'])) : ''; ?>
                                     </span>
@@ -235,7 +237,7 @@ require 'template/topbar.php';
                                         <h6 class="mb-0 text-gray-800"><?php echo htmlspecialchars($holiday['holiday_name']); ?></h6>
                                         <small class="text-muted"><?php echo htmlspecialchars($holiday['holiday_type']); ?></small>
                                     </div>
-                                    <span class="badge bg-soft-primary text-primary p-2">
+                                    <span class="badge bg-soft-teal text-primary p-2">
                                         <?php echo date("M d, Y", strtotime($holiday['holiday_date'])); ?>
                                     </span>
                                 </li>
