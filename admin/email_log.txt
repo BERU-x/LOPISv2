@@ -7,3 +7,66 @@ Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=
 Body:
 Hello Aljhon Mark,You have a new **leave** notification from Administrator:Your Vacation Leave (Dec 06) has been APPROVED.Please log in to the portal to view details:View Notification
 --------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-05 13:52:00 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:Your Vacation Leave request for Dec 08 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-05 13:54:15 ---
+To: conrad.villena@lendell.ph,delia.javier@lendell.ph,dennis.gayapa@lendell.ph,ella.sepe@lendell.ph,janica.laurente@lendell.ph,andy.coma@lendell.ph,juliet.bautista@lendell.ph,jmarvin.peralta@lendell.ph,mark_olegario@lendell.ph,rowena.quevedo@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Administrator,You have a new **leave** notification from Administrator:New Vacation Leave request filed for Employee 125.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-05 13:59:30 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Administrator,You have a new **leave** notification from Administrator:New Vacation Leave request filed for Aljhon Mark Alvior.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-05 13:59:30 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:An administrator has filed a Vacation Leave request on your behalf.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-05 14:00:02 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:Your Vacation Leave request for Jan 05 has been REJECTED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-05 14:13:03 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:Your Vacation Leave request for Dec 08 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-05 14:27:02 ---
+To: alvior01aljhon@gmail.com
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Sample,You have a new **overtime** notification from Administrator:Your Overtime request for Nov 27 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------

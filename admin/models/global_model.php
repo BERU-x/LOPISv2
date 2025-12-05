@@ -21,40 +21,33 @@ function send_email_alert($to_email, $subject, $body) {
     error_log("Attempting to send email to: $recipient | Subject: $subject");
     
     // -----------------------------------------------------------------
-    // >>> MODIFICATION START: Log email to a file for localhost testing
+    // LOGGING MODE (For Testing)
     // -----------------------------------------------------------------
     $log_file = __DIR__ . '/../email_log.txt';
     $log_content = "\n\n--- EMAIL SENT @ " . date('Y-m-d H:i:s') . " ---\n"
                  . "To: " . $recipient . "\n"
                  . "Subject: " . $subject . "\n"
                  . "Headers: " . str_replace("\r\n", " | ", $headers) . "\n"
-                 . "Body:\n" . strip_tags($body) . "\n" // Log plain text for simplicity
+                 . "Body:\n" . strip_tags($body) . "\n" 
                  . "--------------------------------------\n";
 
-    // Append to the log file
     file_put_contents($log_file, $log_content, FILE_APPEND);
     
-    // Return true to simulate a successful mail() call
     return true; 
     
-    // -----------------------------------------------------------------
-    // >>> MODIFICATION END
-    // -----------------------------------------------------------------
-    
-    // // REMOVE OR COMMENT OUT THE LINE BELOW WHEN USING THE LOGGING APPROACH:
+    // UNCOMMENT FOR PRODUCTION:
     // return mail($recipient, $subject, $body, $headers);
 }
+
 // --------------------------------------------------------------------------
-
-
-// --- 1. CREATE NOTIFICATION (The core function - Unchanged) ---
+// --- 1. CREATE NOTIFICATION (CORE FUNCTION) ---
+// --------------------------------------------------------------------------
 function send_notification($pdo, $target_user_id, $target_role, $type, $message, $link = '#', $sender_name = null) {
     
     $db_insert_success = false;
     
     try {
         // --- 1. SENDER NAME DETECTION (Existing Logic) ---
-        // ... (Logic remains the same as it correctly identifies sender) ...
         if ($sender_name === null || $sender_name === '') {
             if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
@@ -109,14 +102,13 @@ function send_notification($pdo, $target_user_id, $target_role, $type, $message,
             ':sender' => $sender_name
         ]);
         
-        // --- 3. EMAIL SENDING LOGIC (Using Actual Emails) ---
+        // --- 3. EMAIL SENDING LOGIC ---
         if ($db_insert_success) {
             $recipient_email = null;
             $recipient_name = 'User';
 
-            // Identify Recipient Email
+            // A. EMPLOYEE LOGIC
             if ($target_role == 'Employee' && $target_user_id) {
-                // Fetch Employee Email: Join tbl_users (email) and tbl_employees (firstname) using employee_id
                 $stmt_email = $pdo->prepare("
                     SELECT t1.email, t2.firstname 
                     FROM tbl_users t1
@@ -129,19 +121,21 @@ function send_notification($pdo, $target_user_id, $target_role, $type, $message,
                     $recipient_email = $emp_data['email'];
                     $recipient_name = $emp_data['firstname'];
                 }
-            } elseif ($target_role == 'Admin') {
-                // Fetch Admin Emails: Look up tbl_users where usertype = 1
-                $stmt_admin = $pdo->prepare("SELECT email FROM tbl_users WHERE usertype = 1 AND email IS NOT NULL");
-                $stmt_admin->execute();
-                $admin_users = $stmt_admin->fetchAll(PDO::FETCH_COLUMN);
+            } 
+            // B. ADMIN LOGIC (HARDCODED)
+            elseif ($target_role == 'Admin') {
+                
+                // 🛑 MODIFICATION: Use hardcoded emails instead of DB lookup
+                $admin_emails = [
+                    'dennis.gayapa@lendell.ph',
+                    'ella.sepe@lendell.ph'
+                ];
 
-                if (!empty($admin_users)) {
-                    // This is the comma-separated list of actual admin emails
-                    $recipient_email = implode(',', $admin_users); 
-                    $recipient_name = 'Administrator';
-                }
+                $recipient_email = implode(',', $admin_emails); 
+                $recipient_name = 'Administrator';
             }
             
+            // SEND EMAIL
             if ($recipient_email) {
                 $subject = "HRIS ALERT: {$type} Notification Received";
                 $email_body = "Hello {$recipient_name},<br><br>"
@@ -150,7 +144,6 @@ function send_notification($pdo, $target_user_id, $target_role, $type, $message,
                             . "Please log in to the portal to view details:<br>"
                             . "<a href='http://lendell.ph/{$link}'>View Notification</a>";
                 
-                // Execute the email function with the actual email(s)
                 send_email_alert($recipient_email, $subject, $email_body);
             }
         }
@@ -191,7 +184,7 @@ function get_my_notifications($pdo, $my_role = 'Admin', $limit = 5) {
     }
 }
 
-// --- 3. TIME HELPER ---
+// --- 3. TIME HELPER (Unchanged) ---
 function time_elapsed_string($datetime, $full = false) {
     date_default_timezone_set('Asia/Manila');
     $now = new DateTime;
@@ -201,25 +194,8 @@ function time_elapsed_string($datetime, $full = false) {
     $weeks = floor($diff->d / 7);
     $days = $diff->d - ($weeks * 7);
 
-    $string = array(
-        'y' => 'year',
-        'm' => 'month',
-        'w' => $weeks,
-        'd' => $days,
-        'h' => 'hour',
-        'i' => 'minute',
-        's' => 'second',
-    );
-    
-    $labels = array(
-        'y' => 'year',
-        'm' => 'month',
-        'w' => 'week',
-        'd' => 'day',
-        'h' => 'hour',
-        'i' => 'minute',
-        's' => 'second',
-    );
+    $string = array('y' => 'year', 'm' => 'month', 'w' => $weeks, 'd' => $days, 'h' => 'hour', 'i' => 'minute', 's' => 'second');
+    $labels = array('y' => 'year', 'm' => 'month', 'w' => 'week', 'd' => 'day', 'h' => 'hour', 'i' => 'minute', 's' => 'second');
     
     $result = array();
     foreach ($string as $k => $v) {
@@ -236,12 +212,11 @@ function time_elapsed_string($datetime, $full = false) {
     return $result ? implode(', ', $result) . ' ago' : 'just now';
 }
 
-// --- 4. MARK READ ---
+// --- 4. MARK READ (Unchanged) ---
 function mark_notification_read($pdo, $id = null) {
     try {
         if ($id === 'all') {
-            $sql = "UPDATE tbl_notifications SET is_read = 1 
-                    WHERE is_read = 0 AND target_role = 'Admin'";
+            $sql = "UPDATE tbl_notifications SET is_read = 1 WHERE is_read = 0 AND target_role = 'Admin'";
             $stmt = $pdo->prepare($sql);
             return $stmt->execute();
         } else {

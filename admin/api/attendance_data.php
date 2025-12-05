@@ -1,7 +1,7 @@
 <?php
 // attendance_ssp.php
 
-require_once '../../db_connection.php'; 
+require_once __DIR__ . '/../../db_connection.php'; 
 
 if (!isset($pdo)) {
     header('Content-Type: application/json');

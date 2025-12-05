@@ -45,8 +45,8 @@ function isActive($page_name, $current_page) {
         </a>
     </li>   
         
-    <li class="nav-item <?php echo isActive('attendance_management', $current_page); ?>">
-        <a class="nav-link" href="attendance_management.php">
+    <li class="nav-item <?php echo isActive('attendance_logs', $current_page); ?>">
+        <a class="nav-link" href="attendance_logs.php">
             <i class="fas fa-fw fa-clipboard-list"></i>
             <span>Attendance Logs</span>
         </a>
@@ -59,15 +59,15 @@ function isActive($page_name, $current_page) {
         </a>
     </li>
     
-    <li class="nav-item <?php echo isActive('overtime_approval', $current_page); ?>">
-        <a class="nav-link" href="overtime_approval.php">
+    <li class="nav-item <?php echo isActive('overtime_management', $current_page); ?>">
+        <a class="nav-link" href="overtime_management.php">
             <i class="fas fa-business-time"></i>
             <span>Overtime Management</span>
         </a>
     </li>
 
-    <li class="nav-item <?php echo isActive('cash_advance_approval', $current_page); ?>">
-        <a class="nav-link" href="cashadv_approval.php">
+    <li class="nav-item <?php echo isActive('ca_management', $current_page); ?>">
+        <a class="nav-link" href="ca_management.php">
             <i class="fas fa-money-bill"></i>
             <span>Cash Advance Management</span>
         </a>

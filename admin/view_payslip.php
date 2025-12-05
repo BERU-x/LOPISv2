@@ -158,6 +158,9 @@ try {
     <div class="d-sm-flex align-items-center justify-content-between mb-4 no-print">
         <div>
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Payslip Details</h1>
+            <a href="payroll.php" class="text-decoration-none text-gray-600 small">
+                <i class="fas fa-arrow-left me-1"></i> Back to Payroll Management
+            </a>
         </div>
         
         <div class="d-flex gap-2">

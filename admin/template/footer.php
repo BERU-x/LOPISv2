@@ -37,6 +37,8 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script src="../assets/js/jquery-3.7.1.min.js"></script> 
 
 <script src="../assets/vendor/bs5/js/bootstrap.bundle.min.js"></script>
