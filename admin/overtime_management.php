@@ -16,9 +16,6 @@ require 'template/topbar.php';
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Overtime Requests</h1>
             <p class="mb-0 text-muted">Review, filter, and approve submitted employee overtime requests.</p>
         </div>
-        <button class="btn btn-teal shadow-sm fw-bold">
-             <i class="fas fa-file-export me-2"></i> Export Report
-        </button>
     </div>
 
     <div class="card shadow mb-4">

@@ -1,10 +1,44 @@
 <script>
+// --- GLOBAL STATE VARIABLES AND HELPERS ---
 var caTable;
 var currentCAId;
 
+// 1. NEW: Global variable to track when the spin started
+let spinnerStartTime = 0; 
+
+// 2. HELPER FUNCTION: Updates the final timestamp text
+function updateLastSyncTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    $('#last-updated-time').text(timeString);
+}
+
+// 3. HELPER FUNCTION: Stops the spinner only after the minimum time has passed (500ms)
+function stopSpinnerSafely() {
+    const icon = $('#refresh-spinner');
+    const minDisplayTime = 1000; 
+    const timeElapsed = new Date().getTime() - spinnerStartTime;
+
+    const finalizeStop = () => {
+        icon.removeClass('fa-spin text-teal');
+        updateLastSyncTime(); 
+    };
+
+    if (timeElapsed < minDisplayTime) {
+        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
+    } else {
+        finalizeStop();
+    }
+}
+// ---------------------------------------------------
+
 $(document).ready(function() {
     
-    // 1. INITIALIZE DATATABLE
+    // 2. INITIALIZE DATATABLE
     caTable = $('#caTable').DataTable({
         processing: true,
         serverSide: true,
@@ -18,10 +52,24 @@ $(document).ready(function() {
                 d.end_date = $('#filter_end_date').val();
             }
         },
+
+        // ⭐ CRITICAL MODIFICATION: Conditional drawCallback
+        drawCallback: function(settings) {
+            const icon = $('#refresh-spinner');
+            // Check if spinning to avoid running stop logic on first load cleanup
+            if (icon.hasClass('fa-spin')) {
+                stopSpinnerSafely();
+            } else {
+                // Initial load: Just set the current time
+                updateLastSyncTime(); 
+            }
+        },
+        // --------------------------------
+
         columns: [
             // Col 0: Employee
             { 
-                data: 'employee_id', // Using ID as key, renderer uses full data
+                data: 'employee_id', 
                 render: function(data, type, row) {
                     var imgPath = (row.photo && row.photo.trim() !== '') ? '../assets/images/' + row.photo : '../assets/images/default.png';
                     return `
@@ -48,7 +96,6 @@ $(document).ready(function() {
                 data: 'status', 
                 className: 'text-center',
                 render: function(data) {
-                    let cls = 'secondary';
                     if (data === 'Paid') return '<span class="badge bg-secondary">Paid</span>';
                     if (data === 'Deducted') return '<span class="badge bg-success">Approved</span>';
                     if (data === 'Pending') return '<span class="badge bg-warning text-dark">Pending</span>';
@@ -75,11 +122,30 @@ $(document).ready(function() {
         var val = this.value;
         searchTimeout = setTimeout(function() { caTable.search(val).draw(); }, 400); 
     });
-    $('#applyFilterBtn').click(function() { caTable.ajax.reload(); });
+    
+    // Use the hook function for filter buttons
+    $('#applyFilterBtn').click(function() { 
+        window.refreshPageContent(); 
+    });
+    
     $('#clearFilterBtn').click(function() {
         $('#filter_start_date, #filter_end_date, #customSearch').val(''); 
-        caTable.search('').ajax.reload();
+        caTable.search('').draw(); 
+        window.refreshPageContent();
     });
+
+    // 3. MASTER REFRESHER HOOK (Modified)
+    window.refreshPageContent = function() {
+        // 1. Record Start Time
+        spinnerStartTime = new Date().getTime(); 
+        
+        // 2. Start Visual feedback & Text
+        $('#refresh-spinner').addClass('fa-spin text-teal');
+        $('#last-updated-time').text('Syncing...');
+        
+        // 3. Reload Table
+        caTable.ajax.reload(null, false);
+    };
 
 });
 
@@ -162,7 +228,8 @@ function processCA(type) {
                     if(res.status === 'success') {
                         Swal.fire('Success', res.message, 'success');
                         $('#viewCAModal').modal('hide');
-                        caTable.ajax.reload(null, false);
+                        // Reload using the hook to ensure spinner runs
+                        window.refreshPageContent();
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }

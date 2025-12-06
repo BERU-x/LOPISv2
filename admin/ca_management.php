@@ -18,9 +18,6 @@ require 'template/topbar.php';
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Cash Advance Requests</h1>
             <p class="mb-0 text-muted">Review, filter, and approve submitted employee cash advance requests.</p>
         </div>
-        <a href="#" class="btn btn-teal shadow-sm fw-bold">
-             <i class="fas fa-file-export me-2"></i> Export Report
-        </a>
     </div>
 
     <div class="card shadow mb-4">

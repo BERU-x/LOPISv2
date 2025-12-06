@@ -1,15 +1,55 @@
 <script>
+// NEW: Global variable to track when the spin started
+let spinnerStartTime = 0; 
+
 // Global Chart Instances (so we can destroy/update them)
 let payrollChart = null;
 let deptChart = null;
 
-$(document).ready(function() {
-    loadDashboardData();
-});
+// ⭐ MODIFIED: This function now updates the time after the spinner stops
+function stopSpinnerSafely() {
+    const icon = $('#refresh-spinner');
+    const minDisplayTime = 1000; 
+    const timeElapsed = new Date().getTime() - spinnerStartTime;
+
+    // Function to handle the final time update
+    const updateTime = () => {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        $('#last-updated-time').text(timeString);
+    };
+
+    // Remove the spin class and update the time
+    const finalizeStop = () => {
+        icon.removeClass('fa-spin text-teal');
+        updateTime();
+    };
+
+    // Check if enough time has passed
+    if (timeElapsed < minDisplayTime) {
+        // Wait the remainder before stopping
+        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
+    } else {
+        // Stop immediately
+        finalizeStop();
+    }
+}
 
 function loadDashboardData() {
+    // 1. Start Timer & Visual Feedback
+    spinnerStartTime = new Date().getTime(); 
+    const icon = $('#refresh-spinner');
+    icon.addClass('fa-spin text-teal'); 
+
+    // ⭐ NEW: Change text to 'Syncing...' immediately
+    $('#last-updated-time').text('Syncing...'); 
+
     $.ajax({
-        url: 'api/get_dashboard_data.php', // Adjust path if needed
+        url: 'api/get_dashboard_data.php',
         type: 'GET',
         dataType: 'json',
         success: function(response) {
@@ -18,13 +58,29 @@ function loadDashboardData() {
             renderDeptChart(response.dept_data);
             renderLeavesList(response.upcoming_leaves);
             renderHolidaysList(response.upcoming_holidays);
+
+            // 2. Success: Stop spin & Update Time using the safe function
+            stopSpinnerSafely();
         },
         error: function(err) {
             console.error("Error loading dashboard data", err);
-            // Optional: Show error toast
+            // On error, stop spin immediately and show error time
+            $('#refresh-spinner').removeClass('fa-spin text-teal');
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'});
+            $('#last-updated-time').text(`Error @ ${timeString}`);
         }
     });
 }
+
+// --- INITIALIZATION ---
+$(document).ready(function() {
+    // 1. Load data immediately when page opens
+    loadDashboardData();
+
+    // 2. CONNECT THE MASTER REFRESHER
+    window.refreshPageContent = loadDashboardData;
+});
 
 function updateMetrics(metrics) {
     $('#val-active-employees').text(Number(metrics.active_employees).toLocaleString());

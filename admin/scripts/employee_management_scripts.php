@@ -13,16 +13,87 @@ var employmentStatuses = {
     <?php foreach ($employment_statuses as $id => $name) { echo "$id: '$name',"; } ?>
 };
 
+// Function to safely reset and re-initialize Dropify
+function resetDropify(targetId, defaultFile = null) {
+    const $dropify = $(`#${targetId}`);
+    
+    $dropify.dropify('destroy'); 
+    $dropify.removeAttr('data-default-file'); // Clear previous default file path
+    
+    if (defaultFile) {
+        $dropify.attr('data-default-file', defaultFile);
+    }
+    
+    // Re-initialize Dropify
+    $dropify.dropify(); 
+}
+
+// Global function to call for fetching details and opening the Edit Modal
+window.editEmployee = function(id) {
+    
+    Swal.fire({
+        title: 'Loading Profile',
+        text: `Fetching details for employee ID: ${id}...`,
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+    
+    $.ajax({
+        url: 'api/employee_action.php?action=get_details',
+        type: 'POST',
+        data: { employee_id: id },
+        dataType: 'json',
+        success: function(response) {
+            Swal.close();
+            if(response.status === 'success' && response.data) {
+                const data = response.data;
+                const form = $('#editEmployeeForm');
+                
+                // --- CRITICAL: Set Hidden ID and Read-only ID ---
+                $('#edit_employee_id_hidden').val(data.employee_id);
+                $('#edit_employee_id_display').val(data.employee_id);
+                
+                // --- Populate Fields (Personal Info) ---
+                form.find('#edit_firstname').val(data.firstname);
+                form.find('#edit_middlename').val(data.middlename);
+                form.find('#edit_lastname').val(data.lastname);
+                form.find('#edit_suffix').val(data.suffix);
+                form.find('#edit_birthdate').val(data.birthdate);
+                form.find('#edit_gender').val(data.gender);
+                form.find('#edit_contact_info').val(data.contact_info);
+                form.find('#edit_address').val(data.address);
+                
+                // --- Populate Fields (Employment Info) ---
+                form.find('#edit_position').val(data.position);
+                form.find('#edit_department').val(data.department);
+                form.find('#edit_employment_status').val(data.employment_status);
+                
+                // --- Dropify Update ---
+                const photoUrl = data.photo ? '../assets/images/' + data.photo : null;
+                resetDropify('photo_edit', photoUrl); 
+
+                $('#editModal').modal('show');
+
+            } else {
+                Swal.fire('Error', response.message || 'Failed to fetch employee details.', 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('Error', 'Server request failed while fetching details.', 'error');
+        }
+    });
+};
+
+
 $(document).ready(function() {
 
-    // --- INITIALIZE DROPIRY ONCE (Standard Init) ---
+    // --- INITIALIZE DROPIFY ONCE (Standard Init) ---
     if(typeof $('.dropify').dropify === 'function') {
         $('.dropify').dropify();
     }
     
     // --- 1. Initialize DataTable (Server-Side) ---
     employeesTable = $('#employeesTable').DataTable({
-        // ... (DataTable settings remain the same) ...
         processing: true,
         serverSide: true,
         ordering: true, 
@@ -32,9 +103,8 @@ $(document).ready(function() {
             type: "GET"
         },
         columns: [
-            // Col 0: ID
+             // Col 0: ID
             { data: 'employee_id', className: 'fw-bold text-gray-700' },
-            
             // Col 1: Name & Position
             { 
                 data: 'lastname', 
@@ -53,17 +123,7 @@ $(document).ready(function() {
                     `;
                 }
             },
-            
-            // Col 2: Daily Rate
-            { 
-                data: 'daily_rate', 
-                className: 'text-end fw-bold',
-                render: function(data) {
-                    return '₱' + parseFloat(data || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
-                }
-            },
-            
-            // Col 3: Status
+            // Col 2: Status
             { 
                 data: 'employment_status', 
                 className: 'text-center',
@@ -73,8 +133,7 @@ $(document).ready(function() {
                     return `<span class="badge bg-soft-${cls} text-${cls} border border-${cls} px-2 rounded-pill">${statusName}</span>`;
                 }
             },
-            
-            // Col 4: Actions (View/Edit)
+            // Col 3: Actions
             {
                 data: 'employee_id',
                 orderable: false,
@@ -96,24 +155,21 @@ $(document).ready(function() {
         employeesTable.search(this.value).draw();
     });
 
-    // --- 3. Handle Form Submission (Unified CREATE/UPDATE Logic) ---
+    // --- 3. Handle Form Submission: CREATE (Add Modal) ---
     $('#addEmployeeForm').on('submit', function(e) {
         e.preventDefault();
         
-        const actionType = $('#form_action_type').val();
-        const apiAction = actionType === 'update' ? 'update' : 'create';
-
         var formData = new FormData(this);
 
         Swal.fire({
-            title: actionType === 'update' ? 'Updating Profile...' : 'Saving Employee...',
+            title: 'Saving Employee...',
             text: 'Processing data and handling photo upload...',
             allowOutsideClick: false,
             didOpen: () => { Swal.showLoading(); }
         });
 
         $.ajax({
-            url: `api/employee_action.php?action=${apiAction}`,
+            url: `api/employee_action.php?action=create`, // Dedicated CREATE action
             type: 'POST',
             data: formData,
             dataType: 'json',
@@ -122,117 +178,65 @@ $(document).ready(function() {
             success: function(res) {
                 if(res.status === 'success') {
                     Swal.fire('Success', res.message, 'success');
-                    $('#addEmployeeModal').modal('hide');
+                    $('#addModal').modal('hide');
                     employeesTable.ajax.reload(null, false); 
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
             },
-            error: function(xhr) {
-                Swal.fire('Error', 'Server request failed. Check console for details.', 'error');
-                console.error("AJAX Error:", xhr.responseText);
+            error: function() {
+                Swal.fire('Error', 'Server request failed.', 'error');
             }
         });
     });
 
-    // --- 4. Function to Fetch Details and Open Modal for Editing (Fixed Dropify Logic) ---
-    window.editEmployee = function(id) {
+    // --- 4. Handle Form Submission: UPDATE (Edit Modal) ---
+    $('#editEmployeeForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        var formData = new FormData(this);
         
         Swal.fire({
-            title: 'Loading Profile',
-            text: `Fetching details for employee ID: ${id}...`,
+            title: 'Updating Profile...',
+            text: 'Processing changes and updating records...',
             allowOutsideClick: false,
             didOpen: () => { Swal.showLoading(); }
         });
-        
+
         $.ajax({
-            url: 'api/employee_action.php?action=get_details',
+            url: `api/employee_action.php?action=update`, // Dedicated UPDATE action
             type: 'POST',
-            data: { employee_id: id },
+            data: formData,
             dataType: 'json',
-            success: function(response) {
-                Swal.close();
-                if(response.status === 'success' && response.data) {
-                    const data = response.data;
-                    const form = $('#addEmployeeForm');
-                    
-                    // A. Set form mode to UPDATE
-                    $('#form_action_type').val('update');
-                    
-                    // B. Populate Fields
-                    form.find('#employee_id').val(data.employee_id).prop('readonly', true);
-                    form.find('#firstname').val(data.firstname);
-                    form.find('#middlename').val(data.middlename);
-                    form.find('#lastname').val(data.lastname);
-                    form.find('#suffix').val(data.suffix);
-                    form.find('#birthdate').val(data.birthdate);
-                    form.find('#gender').val(data.gender);
-                    form.find('#contact_info').val(data.contact_info);
-                    form.find('#address').val(data.address);
-                    
-                    form.find('#position').val(data.position);
-                    form.find('#department').val(data.department);
-                    form.find('#employment_status').val(data.employment_status);
-                    
-                    form.find('#daily_rate').val(data.daily_rate);
-                    form.find('#monthly_rate').val(data.monthly_rate);
-                    form.find('#food_allowance').val(data.food_allowance);
-                    form.find('#transpo_allowance').val(data.transpo_allowance);
-                    
-                    form.find('input[name="bank_name"]').val(data.bank_name);
-                    form.find('input[name="account_number"]').val(data.account_number);
-
-                    // C. Stable Dropify Update Logic (Using jQuery wrapper)
-                    const photoUrl = data.photo ? '../assets/images/' + data.photo : null;
-                    
-                    // 1. Clear current preview safely
-                    $('#photo').dropify('clear'); 
-
-                    if (photoUrl) {
-                         // 2. Set the default file attribute value
-                        $('#photo').attr('data-default-file', photoUrl); 
-                        // 3. Force Dropify to load the new file from the attribute
-                        $('#photo').dropify('destroy').dropify(); 
-                    } else {
-                        // Ensure the attribute is clean if no photo exists
-                        $('#photo').removeAttr('data-default-file');
-                        $('#photo').dropify('destroy').dropify(); 
-                    }
-
-                    // D. Update Modal UI
-                    $('#addEmployeeModalLabel').html('<i class="fas fa-user-edit me-3"></i> Edit Employee Profile: ' + data.employee_id);
-                    $('button[name="add_employee"]').html('<i class="fas fa-save me-2"></i> Update Employee');
-
-                    $('#addEmployeeModal').modal('show');
-
+            processData: false, 
+            contentType: false, 
+            success: function(res) {
+                if(res.status === 'success') {
+                    Swal.fire('Success', res.message, 'success');
+                    $('#editModal').modal('hide');
+                    employeesTable.ajax.reload(null, false); 
                 } else {
-                    Swal.fire('Error', response.message || 'Failed to fetch employee details.', 'error');
+                    Swal.fire('Error', res.message, 'error');
                 }
             },
-            error: function(xhr) {
-                Swal.fire('Error', 'Server request failed while fetching details.', 'error');
+            error: function() {
+                Swal.fire('Error', 'Server request failed.', 'error');
             }
         });
-    };
-    
-    // --- 5. Modal Hide Listener (Stable Dropify Reset) ---
-    $('#addEmployeeModal').on('hidden.bs.modal', function() {
-        const form = $('#addEmployeeForm');
-        
-        // Reset form fields
-        form[0].reset();
-        
-        // Stable Dropify Reset: Clear preview and reset to initial state
-        // Use destroy/re-init pattern here as well for consistency, but focused on reset
-        $('#photo').dropify('clear'); // Safely clear preview
-        $('#photo').removeAttr('data-default-file'); // Clear file path attribute
-        $('#photo').dropify('destroy').dropify(); // Reset to clean state
+    });
 
-        // Reset Form Mode and UI for CREATE
-        form.find('#employee_id').prop('readonly', false);
-        $('#form_action_type').val('create');
-        $('#addEmployeeModalLabel').html('<i class="fas fa-user-plus me-3"></i> Add New Employee Profile');
-        $('button[name="add_employee"]').html('<i class="fas fa-save me-2"></i> Save New Employee');
+    // --- 5. Modal Hide Listeners (Resets forms after closing) ---
+
+    // A. Add Modal Hide Listener
+    $('#addModal').on('hidden.bs.modal', function() {
+        $('#addEmployeeForm')[0].reset();
+        resetDropify('photo'); // Reset Dropify on the ADD modal
+    });
+
+    // B. Edit Modal Hide Listener
+    $('#editModal').on('hidden.bs.modal', function() {
+        $('#editEmployeeForm')[0].reset();
+        resetDropify('photo_edit'); // Reset Dropify on the EDIT modal
     });
 });
 </script>

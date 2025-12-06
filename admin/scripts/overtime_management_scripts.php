@@ -1,10 +1,47 @@
 <script>
+// --- GLOBAL STATE VARIABLES AND HELPERS ---
 var otTable;
 var currentOTId;
 
+// 1. NEW: Global variable to track when the spin started
+let spinnerStartTime = 0; 
+
+// 2. HELPER FUNCTION: Updates the final timestamp text
+function updateLastSyncTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    $('#last-updated-time').text(timeString);
+}
+
+// 3. HELPER FUNCTION: Stops the spinner only after the minimum time has passed (500ms)
+function stopSpinnerSafely() {
+    const icon = $('#refresh-spinner');
+    const minDisplayTime = 1000; 
+    const timeElapsed = new Date().getTime() - spinnerStartTime;
+
+    const finalizeStop = () => {
+        icon.removeClass('fa-spin text-teal');
+        updateLastSyncTime(); 
+    };
+
+    // Check if network fetch was faster than 500ms
+    if (timeElapsed < minDisplayTime) {
+        // Wait the remaining time before stopping
+        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
+    } else {
+        // Stop immediately
+        finalizeStop();
+    }
+}
+// ---------------------------------------------------
+
 $(document).ready(function() {
 
-    // 1. Initialize DataTable
+    // 4. INITIALIZE DATATABLE
     otTable = $('#overtimeTable').DataTable({
         processing: true,
         serverSide: true,
@@ -18,6 +55,20 @@ $(document).ready(function() {
                 d.end_date = $('#filter_end_date').val();
             }
         },
+
+        // ⭐ CRITICAL MODIFICATION: Conditional drawCallback
+        drawCallback: function(settings) {
+            const icon = $('#refresh-spinner');
+            // Check if spinning to avoid running stop logic on first load cleanup
+            if (icon.hasClass('fa-spin')) {
+                stopSpinnerSafely();
+            } else {
+                // Initial load: Just set the current time
+                updateLastSyncTime(); 
+            }
+        },
+        // --------------------------------
+
         columns: [
             // Col 1: Employee
             {
@@ -48,7 +99,7 @@ $(document).ready(function() {
                     return '<span class="badge bg-warning text-dark">Pending</span>';
                 }
             },
-            // Col 5: Actions (View Button Only)
+            // Col 5: Actions
             {
                 data: 'id',
                 orderable: false,
@@ -60,18 +111,35 @@ $(document).ready(function() {
         ]
     });
 
-    // Filters
+    // Filters - Use the hook for reloads
     $('#customSearch').on('keyup', function() { otTable.search(this.value).draw(); });
-    $('#applyFilterBtn').on('click', function() { otTable.ajax.reload(); });
+    
+    $('#applyFilterBtn').on('click', function() { 
+        window.refreshPageContent(); // Use the hook 
+    });
+    
     $('#clearFilterBtn').on('click', function() { 
         $('#filter_start_date, #filter_end_date, #customSearch').val('');
         otTable.search('').draw();
-        otTable.ajax.reload(); 
+        window.refreshPageContent(); // Use the hook
     });
+
+    // 5. MASTER REFRESHER HOOK (Modified)
+    window.refreshPageContent = function() {
+        // 1. Record Start Time
+        spinnerStartTime = new Date().getTime(); 
+        
+        // 2. Start Visual feedback & Text
+        $('#refresh-spinner').addClass('fa-spin text-teal');
+        $('#last-updated-time').text('Syncing...');
+        
+        // 3. Reload Table
+        otTable.ajax.reload(null, false);
+    };
 
 });
 
-// --- VIEW DETAILS LOGIC ---
+// --- VIEW DETAILS LOGIC (No change needed) ---
 function viewOT(id) {
     currentOTId = id;
     
@@ -150,7 +218,7 @@ function processOT(action) {
                     if(res.status === 'success') {
                         Swal.fire('Success', res.message, 'success');
                         $('#viewOTModal').modal('hide');
-                        otTable.ajax.reload(null, false);
+                        window.refreshPageContent(); // Use the hook for refresh
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }

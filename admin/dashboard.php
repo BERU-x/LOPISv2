@@ -1,6 +1,6 @@
 <?php
 // dashboard.php
-$page_title = 'LOPISv2 - Admin Dashboard';
+$page_title = 'LOPISv2 - Dashboard';
 $current_page = 'dashboard';
 require 'template/header.php';
 require 'template/sidebar.php';
@@ -14,9 +14,6 @@ require 'template/topbar.php';
                 <h1 class="h3 font-weight-bold mb-1">Dashboard Overview</h1>
                 <p class="mb-0 opacity-75">Welcome back! Here's what's happening today.</p>
             </div>
-            <button onclick="loadDashboardData()" class="btn btn-light text-teal font-weight-bold shadow-sm border-0">
-                <i class="fas fa-sync-alt me-2"></i> Refresh Data
-            </button>
         </div>
     </div>
     

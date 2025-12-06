@@ -32,9 +32,8 @@ require 'template/topbar.php';
                             <th>Date</th>
                             <th>Holiday Name</th>
                             <th>Type</th>
-                            <th>Multiplier</th>
-                            <th class="text-center" width="120">Action</th>
-                        </tr>
+                            <th class="text-center" width="100">Action</th> 
+                            </tr>
                     </thead>
                     <tbody></tbody>
                 </table>

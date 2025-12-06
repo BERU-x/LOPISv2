@@ -1,15 +1,50 @@
 <script>
 let attendanceTable;
+let spinnerStartTime = 0; // Global variable to track when the spin started
+
+// ⭐ KEEP THIS FUNCTION EXACTLY AS IS
+function stopSpinnerSafely() {
+    const icon = $('#refresh-spinner');
+    // Your minDisplayTime is 1000ms (1 second)
+    const minDisplayTime = 1000; 
+    const timeElapsed = new Date().getTime() - spinnerStartTime;
+
+    // Function to handle the final time update
+    const updateTime = () => {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        $('#last-updated-time').text(timeString);
+    };
+
+    // Remove the spin class and update the time
+    const finalizeStop = () => {
+        icon.removeClass('fa-spin text-teal');
+        updateTime();
+    };
+
+    // Check if enough time has passed
+    if (timeElapsed < minDisplayTime) {
+        // Wait the remainder before stopping
+        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
+    } else {
+        // Stop immediately
+        finalizeStop();
+    }
+}
 
 $(document).ready(function() {
-    // 1. Initialize DataTable (Empty)
+    // 1. Initialize DataTable (Client-Side Mode)
     attendanceTable = $('#todayTable').DataTable({
-        "order": [[ 1, "desc" ]], // Sort by Time In initially
+        // ... (DataTable configuration is correct) ...
+        "order": [[ 1, "desc" ]], 
         "pageLength": 25,
         "dom": 'rtip', 
         "language": { "emptyTable": "No attendance records found for today." },
         "columns": [
-            // Column 0: Employee
             { 
                 data: null,
                 render: function (data, type, row) {
@@ -23,7 +58,6 @@ $(document).ready(function() {
                         </div>`;
                 }
             },
-            // Column 1: Time In
             { 
                 data: null,
                 render: function(data, type, row) {
@@ -33,7 +67,6 @@ $(document).ready(function() {
                     `;
                 }
             },
-            // Column 2: Time Out
             { 
                 data: null,
                 render: function(data, type, row) {
@@ -46,7 +79,6 @@ $(document).ready(function() {
                     `;
                 }
             },
-            // Column 3: Status (Badge Generation)
             { 
                 data: 'status_raw',
                 className: 'text-center',
@@ -72,7 +104,6 @@ $(document).ready(function() {
                     return badges;
                 }
             },
-            // Column 4: Hours
             { 
                 data: 'hours', 
                 className: 'fw-bold text-end text-gray-700' 
@@ -85,35 +116,56 @@ $(document).ready(function() {
         attendanceTable.search(this.value).draw(); 
     });
 
-    // 3. Load Data immediately
+    // 3. Initial Load
     reloadAttendanceData();
     
-    // Optional: Auto-refresh every 30 seconds
-    // setInterval(reloadAttendanceData, 30000);
+    // 4. CONNECT TO MASTER REFRESHER
+    window.refreshPageContent = reloadAttendanceData;
 });
 
+// ⭐ CORRECTED FUNCTION: Uses stopSpinnerSafely for cleanup
 function reloadAttendanceData() {
+    spinnerStartTime = new Date().getTime(); // 1. Record Start Time
+    const icon = $('#refresh-spinner');
+    icon.addClass('fa-spin text-teal'); 
+
+    // 2. Start Syncing Text
+    $('#last-updated-time').text('Syncing...'); 
+
+
     $.ajax({
         url: 'api/get_today_attendance.php',
         type: 'GET',
         dataType: 'json',
         success: function(response) {
-            // A. Update Stats Cards
+            
+            // B. Update Stats Cards
             $('#val-present').text(response.stats.present);
             $('#val-total').text(response.stats.total_employees);
             $('#val-absent').text(response.stats.absent);
             $('#val-late').text(response.stats.late);
             $('#val-ontime').text(response.stats.ontime);
 
-            // B. Update Table
-            attendanceTable.clear(); // Clear old rows
+            // C. Update Table Data
+            attendanceTable.clear(); 
             if (response.logs.length > 0) {
-                attendanceTable.rows.add(response.logs); // Add new rows
+                attendanceTable.rows.add(response.logs); 
             }
-            attendanceTable.draw(); // Redraw table
+            attendanceTable.draw(false); 
+
+            // D. CRITICAL: Hand off cleanup to the safe timer function
+            stopSpinnerSafely(); 
         },
         error: function(err) {
             console.error("Error fetching attendance:", err);
+            
+            // On Error, stop immediate (no need to wait 1s if it failed)
+            const icon = $('#refresh-spinner');
+            icon.removeClass('fa-spin text-teal');
+            
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'});
+            $('#last-updated-time').text(`Error @ ${timeString}`);
         }
     });
 }

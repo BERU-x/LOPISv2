@@ -115,7 +115,7 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $photo = null;
     $upload_path = null;
-    $upload_dir = __DIR__ . '/../assets/images/'; 
+    $upload_dir = __DIR__ . '/../../assets/images/'; 
 
     try {
         $pdo->beginTransaction();

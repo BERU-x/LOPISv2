@@ -4,6 +4,10 @@ ob_start();
 
 require_once __DIR__ . '/../../checking.php';
 
+// --- 1.5 TIMEZONE SETUP ---
+// Set default timezone to Philippines (UTC+8)
+date_default_timezone_set('Asia/Manila');
+
 // --- 2. SESSION AUTHENTICATION ---
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header("Location: ../index.php"); 

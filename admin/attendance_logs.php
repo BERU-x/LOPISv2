@@ -18,9 +18,6 @@ require 'template/topbar.php';
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Attendance Logs</h1>
             <p class="mb-0 text-muted">View and filter historical attendance records.</p>
         </div>
-        <a href="#" class="btn btn-teal shadow-sm fw-bold">
-            <i class="fas fa-download me-2"></i> Generate Report
-        </a>
     </div>
 
     <div class="card shadow mb-4">

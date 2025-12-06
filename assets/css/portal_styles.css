@@ -693,3 +693,19 @@ div.dataTables_wrapper div.dataTables_filter input:focus {
         box-shadow: 0 0 0 0 rgba(231, 74, 59, 0);
     }
 }
+
+/* 1. Green Dot Pulse Animation */
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 0 rgba(28, 200, 138, 0.7); }
+        70% { box-shadow: 0 0 0 5px rgba(28, 200, 138, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(28, 200, 138, 0); }
+    }
+    .live-dot {
+        animation: pulse-green 2s infinite;
+        border-radius: 50%;
+    }
+    
+    /* 2. Smooth Spinner Transition */
+    #refresh-spinner {
+        transition: transform 0.3s ease-in-out, color 0.3s;
+    }

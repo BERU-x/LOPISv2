@@ -1,21 +1,57 @@
 <script>
+// --- GLOBAL STATE VARIABLES ---
+let attendanceTable; 
+let spinnerStartTime = 0; // Global variable to track when the spin started
+
+// 1. HELPER FUNCTION: Updates the final timestamp text
+function updateLastSyncTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    $('#last-updated-time').text(timeString);
+}
+
+// 2. HELPER FUNCTION: Stops the spinner only after the minimum time has passed
+function stopSpinnerSafely() {
+    const icon = $('#refresh-spinner');
+    const minDisplayTime = 1000; 
+    const timeElapsed = new Date().getTime() - spinnerStartTime;
+
+    // Defines the final state (removing spin and updating time)
+    const finalizeStop = () => {
+        icon.removeClass('fa-spin text-teal');
+        updateLastSyncTime(); 
+    };
+
+    // Check if network fetch was faster than 500ms
+    if (timeElapsed < minDisplayTime) {
+        // Wait the remaining time before stopping (to guarantee animation visibility)
+        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
+    } else {
+        // Stop immediately
+        finalizeStop();
+    }
+}
+
 $(document).ready(function() {
-    
+
     // Check if table exists
     if ($('#attendanceTable').length) {
         
-        // Destroy existing if needed to prevent duplicates on reload
+        // Destroy existing if needed
         if ($.fn.DataTable.isDataTable('#attendanceTable')) {
             $('#attendanceTable').DataTable().destroy();
         }
 
-        var attendanceTable = $('#attendanceTable').DataTable({
+        // Initialize DataTable
+        attendanceTable = $('#attendanceTable').DataTable({
             processing: true,
             serverSide: true,
             destroy: true, 
-            ordering: false, // Server handles sorting
-            
-            // Clean DOM (Hides default search 'f' and length 'l')
+            ordering: false, 
             dom: 'rtip', 
 
             ajax: {
@@ -27,12 +63,24 @@ $(document).ready(function() {
                 }
             },
             
+            // ⭐ CRITICAL: Triggers the safe stop function after data is received and drawn
+            drawCallback: function(settings) {
+                const icon = $('#refresh-spinner');
+                
+                // CRITICAL FIX: Only run the time check if the icon is currently spinning.
+                if (icon.hasClass('fa-spin')) { 
+                    stopSpinnerSafely();
+                } else {
+                    // If not spinning (e.g., initial page load), just update the time immediately.
+                    // This ensures the time displays correctly on first load.
+                    updateLastSyncTime(); 
+                }
+            },
+
             columns: [
-                // Col 0: Employee
                 { 
                     data: 'employee_name',
                     render: function(data, type, row) {
-                        // Check if photo exists in row data, else use default
                         var photo = row.photo ? '../assets/images/' + row.photo : '../assets/images/default.png';
                         var id = row.employee_id ? row.employee_id : '';
 
@@ -49,35 +97,10 @@ $(document).ready(function() {
                         `;
                     }
                 },
-                
-                // Col 1: Date (Server formatted)
-                { 
-                    data: 'date',
-                    className: "text-nowrap"
-                },
-                
-                // Col 2: Time In (Server formatted)
-                { 
-                    data: 'time_in',
-                    className: "fw-bold text-dark"
-                },
-
-                // Col 3: Status (Server sends HTML Badge)
-                { 
-                    data: 'status', 
-                    className: "text-center",
-                    render: function (data) {
-                        return data; // Output the HTML directly
-                    }
-                }, 
-                
-                // Col 4: Time Out (Server formatted)
-                { 
-                    data: 'time_out',
-                    className: "fw-bold text-dark",
-                },
-
-                // Col 5: Hours
+                { data: 'date', className: "text-nowrap" },
+                { data: 'time_in', className: "fw-bold text-dark" },
+                { data: 'status', className: "text-center", render: function (data) { return data; } }, 
+                { data: 'time_out', className: "fw-bold text-dark" },
                 { 
                     data: 'num_hr',
                     className: "text-center fw-bold text-gray-700",
@@ -85,8 +108,6 @@ $(document).ready(function() {
                         return data > 0 ? parseFloat(data).toFixed(2) : '—';
                     }
                 },
-
-                // Col 6: Overtime
                 { 
                     data: 'overtime_hr',
                     render: function (data) {
@@ -96,7 +117,7 @@ $(document).ready(function() {
             ],
             
             language: {
-                processing: "<div class='spinner-border text-teal' role='status'><span class='visually-hidden'>Loading...</span></div>",
+                processing: "Loading...",
                 emptyTable: "No attendance records found.",
                 zeroRecords: "No matching records found."
             }
@@ -107,19 +128,15 @@ $(document).ready(function() {
             attendanceTable.search(this.value).draw();
         });
 
-        // --- Filter Button Logic ---
-        function toggleFilterButtons(isLoading) {
-            $('#applyFilterBtn').prop('disabled', isLoading).html(
-                isLoading ? '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' : '<i class="fas fa-filter me-1"></i> Apply'
-            );
-        }
-
+        // We still need the processing event for the filter button state
         attendanceTable.on('processing.dt', function (e, settings, processing) {
-            toggleFilterButtons(processing);
+            // Note: toggleProcessingState function is assumed to be defined elsewhere, 
+            // but we rely on the main refresher hook for the topbar spinner state.
         });
 
+        // --- Buttons ---
         $('#applyFilterBtn').off('click').on('click', function() {
-            attendanceTable.ajax.reload();
+            window.refreshPageContent(); // Use the hook to ensure animation fires
         });
         
         $('#clearFilterBtn').off('click').on('click', function() {
@@ -127,8 +144,21 @@ $(document).ready(function() {
             $('#filter_end_date').val('');
             $('#customSearch').val(''); 
             attendanceTable.search('').draw(); 
-            attendanceTable.ajax.reload();
+            window.refreshPageContent(); // Use the hook to ensure animation fires
         });
+
+        // ⭐ MODIFIED: The Hard Link (Master Refresher Trigger)
+        window.refreshPageContent = function() {
+            // 1. Record Start Time
+            spinnerStartTime = new Date().getTime(); 
+            
+            // 2. Start Visual feedback & Text
+            $('#refresh-spinner').addClass('fa-spin text-teal');
+            $('#last-updated-time').text('Syncing...');
+            
+            // 3. Reload table
+            attendanceTable.ajax.reload(null, false);
+        };
     }
 });
 </script>

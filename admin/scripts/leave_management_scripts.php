@@ -1,9 +1,46 @@
 <script>
+// --- GLOBAL STATE VARIABLES AND HELPERS ---
 var leaveTable;
+
+// 1. NEW: Global variable to track when the spin started
+let spinnerStartTime = 0; 
+
+// 2. HELPER FUNCTION: Updates the final timestamp text
+function updateLastSyncTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    $('#last-updated-time').text(timeString);
+}
+
+// 3. HELPER FUNCTION: Stops the spinner only after the minimum time has passed (500ms)
+function stopSpinnerSafely() {
+    const icon = $('#refresh-spinner');
+    const minDisplayTime = 1000; 
+    const timeElapsed = new Date().getTime() - spinnerStartTime;
+
+    const finalizeStop = () => {
+        icon.removeClass('fa-spin text-teal');
+        updateLastSyncTime(); 
+    };
+
+    // Check if network fetch was faster than 500ms
+    if (timeElapsed < minDisplayTime) {
+        // Wait the remaining time before stopping
+        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
+    } else {
+        // Stop immediately
+        finalizeStop();
+    }
+}
+// ---------------------------------------------------
 
 $(document).ready(function() {
 
-    // 1. POPULATE EMPLOYEE DROPDOWN (AJAX)
+    // 1. POPULATE EMPLOYEE DROPDOWN
     $.ajax({
         url: 'api/leave_action.php?action=fetch_employees',
         type: 'GET',
@@ -17,19 +54,35 @@ $(document).ready(function() {
         }
     });
 
-    // 2. INITIALIZE DATATABLE (AJAX)
+    // 2. INITIALIZE DATATABLE
     leaveTable = $('#leaveTable').DataTable({
         "ajax": {
             "url": "api/leave_action.php?action=fetch",
             "type": "GET",
             "dataSrc": function (json) {
-                // Update Stats Cards from the same response
-                $('#stat-pending').text(json.stats.pending);
-                $('#stat-approved').text(json.stats.approved);
-                return json.data; // Return the array for the table
+                // A. Update Stats Cards automatically on every reload
+                if (json.stats) {
+                    $('#stat-pending').text(json.stats.pending);
+                    $('#stat-approved').text(json.stats.approved);
+                }
+                return json.data; 
             }
         },
-        "order": [[ 1, "desc" ]], // Sort by date (requires parsing) or hidden created_on
+        
+        // --- B. VISUAL FEEDBACK DRAW CALLBACK ---
+        "drawCallback": function(settings) {
+            const icon = $('#refresh-spinner');
+            // CRITICAL: Only run the stop logic if the spin class is active
+            if (icon.hasClass('fa-spin')) {
+                stopSpinnerSafely();
+            } else {
+                // Initial load: Just set the current time
+                updateLastSyncTime(); 
+            }
+        },
+        // ------------------------------------------
+
+        "order": [[ 1, "desc" ]],
         "columns": [
             // Col 0: Employee
             {
@@ -50,7 +103,6 @@ $(document).ready(function() {
             {
                 "data": null,
                 "render": function(data, type, row) {
-                    // Format dates
                     let start = new Date(row.start_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
                     let end = new Date(row.end_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
                     return `
@@ -93,11 +145,11 @@ $(document).ready(function() {
         "language": { "emptyTable": "No leave requests found." }
     });
 
+    // 4. SEARCH & FORMS
     $('#customSearch').on('keyup', function() {
         leaveTable.search(this.value).draw();
     });
 
-    // 3. HANDLE FILE NEW LEAVE SUBMIT (AJAX)
     $('#applyLeaveForm').on('submit', function(e) {
         e.preventDefault();
         $.ajax({
@@ -110,7 +162,8 @@ $(document).ready(function() {
                     $('#applyLeaveModal').modal('hide');
                     $('#applyLeaveForm')[0].reset();
                     Swal.fire('Success', res.message, 'success');
-                    leaveTable.ajax.reload(); // Reload table & stats
+                    // Reload using the hook to ensure spinner works
+                    window.refreshPageContent(); 
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
@@ -120,9 +173,23 @@ $(document).ready(function() {
             }
         });
     });
+
+    // 5. MASTER REFRESHER HOOK
+    window.refreshPageContent = function() {
+        // 1. Record Start Time
+        spinnerStartTime = new Date().getTime(); 
+        
+        // 2. Start Visual feedback & Text
+        $('#refresh-spinner').addClass('fa-spin text-teal');
+        $('#last-updated-time').text('Syncing...');
+        
+        // 3. Reload Table
+        leaveTable.ajax.reload(null, false);
+    };
+
 });
 
-// 4. VIEW DETAILS LOGIC (Global Function)
+// 6. VIEW DETAILS LOGIC 
 function viewDetails(id) {
     const content = $('#leave-details-content');
     const footer = $('#modal-footer-actions');
@@ -183,7 +250,7 @@ function viewDetails(id) {
     });
 }
 
-// 5. UPDATE STATUS (Approve/Reject)
+// 7. UPDATE STATUS (Approve/Reject)
 function updateStatus(id, action) {
     Swal.fire({
         title: action === 'approve' ? 'Approve Request?' : 'Reject Request?',
@@ -203,7 +270,8 @@ function updateStatus(id, action) {
                     if(res.status === 'success') {
                         $('#detailsModal').modal('hide');
                         Swal.fire('Updated!', res.message, 'success');
-                        leaveTable.ajax.reload();
+                        // Reload using the hook to ensure spinner runs
+                        window.refreshPageContent(); 
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }

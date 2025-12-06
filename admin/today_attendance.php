@@ -15,9 +15,6 @@ require 'template/topbar.php';
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Attendance Monitor</h1>
             <p class="mb-0 text-muted">Date: <span class="fw-bold text-gray-600"><?php echo date('F d, Y'); ?></span></p>
         </div>
-        <button onclick="reloadAttendanceData()" class="btn btn-sm btn-teal shadow-sm fw-bold">
-            <i class="fas fa-sync-alt me-2"></i> Refresh Data 
-        </button>
     </div>
 
     <div class="row mb-4">
