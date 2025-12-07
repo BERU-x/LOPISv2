@@ -1,6 +1,8 @@
 <?php
 // admin/models/global_model.php
 
+date_default_timezone_set('Asia/Manila');
+
 require_once __DIR__ . '/../../db_connection.php';
 
 // --------------------------------------------------------------------------

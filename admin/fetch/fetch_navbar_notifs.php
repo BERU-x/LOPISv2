@@ -1,5 +1,8 @@
 <?php
 // fetch/fetch_navbar_notifs.php
+
+date_default_timezone_set('Asia/Manila');
+
 session_start();
 
 // 1. ADJUST PATHS

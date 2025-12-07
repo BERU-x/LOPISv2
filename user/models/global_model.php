@@ -1,6 +1,8 @@
 <?php
 // models/global_model.php
 
+date_default_timezone_set('Asia/Manila');
+
 // Ensure database connection is available
 require_once __DIR__ . '/../../db_connection.php';
 
@@ -57,6 +59,19 @@ function send_email_alert($to_email, $subject, $body) {
 // --- 1. CREATE NOTIFICATION (Updated to use hardcoded Admin emails) ---
 function send_notification($pdo, $target_user_id, $target_role, $type, $message, $link = '#', $sender_name = null) {
     $db_insert_success = false;
+
+    // --- ADD FORMAL SUBJECT MAPPING HERE ---
+    $formal_types = [
+        'leave' => 'Leave Request',
+        'overtime' => 'Overtime Request',
+        'cash_advance' => 'Cash Advance Request',
+        'system' => 'System Alert',
+        // Add other notification types here
+    ];
+    
+    // Look up the formal type, default to capitalized type if not found
+    $formal_type = $formal_types[$type] ?? ucwords(str_replace('_', ' ', $type));
+    // ---------------------------------------
 
     try {
         // AUTOMATIC NAME FETCHING LOGIC: (Unchanged)
@@ -121,16 +136,17 @@ function send_notification($pdo, $target_user_id, $target_role, $type, $message,
                 // No DB query needed here for admin emails
             }
             
-            if ($recipient_email) {
-                $subject = "HRIS ALERT: {$type} Notification Received";
-                // Note: Recipient name is 'Administrator' for the hardcoded list
+        if ($recipient_email) {
+                // MODIFIED SUBJECT LINE
+                $subject = "HRIS ALERT: $formal_type Submitted"; 
+                
+                // Note: The message body uses $type for consistency
                 $email_body = "Hello {$recipient_name},<br><br>"
-                            . "You have a new **{$type}** notification from {$sender_name}:<br>"
+                            . "You have a new **{$type}** notification.<br>"
                             . "<strong>{$message}</strong><br><br>"
                             . "Please log in to the portal to view details:<br>"
                             . "<a href='http://lendell.ph/{$link}'>View Notification</a>";
                 
-                // Execute the email function (the logging function defined above)
                 send_email_alert($recipient_email, $subject, $email_body);
             }
         }

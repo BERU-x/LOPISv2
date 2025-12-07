@@ -3,7 +3,15 @@
     <div id="content" class="flex-grow-1">
 
         <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top">
-            
+                        
+        <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle me-3 mx-3">
+            <i class="fa fa-bars"></i>
+        </button>
+        
+        <button id="sidebarToggle" class="btn btn-link d-none d-md-inline-block me-3 mx-3">
+            <i class="fa fa-bars"></i>
+        </button>
+
             <ul class="navbar-nav ms-auto">
 
                 <li class="nav-item d-none d-sm-flex align-items-center me-3">

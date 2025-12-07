@@ -118,44 +118,84 @@ if ($action === 'batch_action' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
             foreach ($ids as $payroll_id) {
                 // Fetch Details
-                $stmt = $pdo->prepare("SELECT id, employee_id, status, net_pay, cut_off_start, cut_off_end FROM tbl_payroll WHERE id = ?");
+                $stmt = $pdo->prepare("SELECT id, ref_no, employee_id, status, net_pay, cut_off_start, cut_off_end FROM tbl_payroll WHERE id = ?");
                 $stmt->execute([$payroll_id]);
                 $payroll = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                if ($payroll && $payroll['status'] != 1) {
+                // Only process if currently PENDING (Status 0)
+                if ($payroll && $payroll['status'] == 0) {
                     $emp_id = $payroll['employee_id'];
                     $net_pay = floatval($payroll['net_pay']);
                     $start_date = $payroll['cut_off_start'];
                     $end_date = $payroll['cut_off_end'];
+                    $ref_no = $payroll['ref_no'];
 
-                    // A. Handle Deficit
+                    // A. Handle Deficit (Negative Net Pay)
                     if ($net_pay < 0) {
                         $deficit = abs($net_pay);
                         $pdo->prepare("UPDATE tbl_employee_financials SET outstanding_balance = outstanding_balance + ? WHERE employee_id = ?")->execute([$deficit, $emp_id]);
                     }
 
-                    // B. Process Deductions (Update Loan Balances)
+                    // B. Process Items (Loans, Cash Assistance, Savings)
                     $stmt_items = $pdo->prepare("SELECT item_name, amount FROM tbl_payroll_items WHERE payroll_id = ? AND item_type = 'deduction'");
                     $stmt_items->execute([$payroll_id]);
                     $deductions = $stmt_items->fetchAll(PDO::FETCH_ASSOC);
 
                     foreach ($deductions as $item) {
                         $amount = floatval($item['amount']);
-                        $col = null;
-                        if (stripos($item['item_name'], 'SSS Loan') !== false) $col = 'sss_loan_balance';
-                        elseif (stripos($item['item_name'], 'Pag-IBIG Loan') !== false) $col = 'pagibig_loan_balance';
-                        elseif (stripos($item['item_name'], 'Company Loan') !== false) $col = 'company_loan_balance';
-                        elseif (stripos($item['item_name'], 'Previous Period Deficit') !== false) $col = 'outstanding_balance';
+                        if ($amount <= 0) continue;
 
-                        if ($col && $amount > 0) {
-                            $pdo->prepare("UPDATE tbl_employee_financials SET $col = GREATEST(0, $col - ?) WHERE employee_id = ?")->execute([$amount, $emp_id]);
+                        $col_to_reduce = null;
+
+                        // --- 1. LOANS & CASH ASSISTANCE (Subtract from Balance) ---
+                        if (stripos($item['item_name'], 'SSS Loan') !== false) {
+                            $col_to_reduce = 'sss_loan_balance';
+                        } 
+                        elseif (stripos($item['item_name'], 'Pag-IBIG Loan') !== false) {
+                            $col_to_reduce = 'pagibig_loan_balance';
+                        } 
+                        elseif (stripos($item['item_name'], 'Company Loan') !== false) {
+                            $col_to_reduce = 'company_loan_balance';
+                        } 
+                        elseif (stripos($item['item_name'], 'Cash Assistance') !== false) {
+                            $col_to_reduce = 'cash_assist_total'; 
+                        }
+                        elseif (stripos($item['item_name'], 'Previous Period Deficit') !== false) {
+                            $col_to_reduce = 'outstanding_balance';
+                        }
+
+                        // Execute Reduction
+                        if ($col_to_reduce) {
+                            $pdo->prepare("UPDATE tbl_employee_financials SET $col_to_reduce = GREATEST(0, $col_to_reduce - ?) WHERE employee_id = ?")
+                                ->execute([$amount, $emp_id]);
+                        }
+
+                        // --- 2. COMPANY SAVINGS (Add to Total & Ledger) ---
+                        if (stripos($item['item_name'], 'Savings') !== false) {
+                            // 2.1 Add to total_savings column
+                            $pdo->prepare("UPDATE tbl_employee_financials SET total_savings = total_savings + ? WHERE employee_id = ?")
+                                ->execute([$amount, $emp_id]);
+
+                            // 2.2 Insert into Ledger
+                            // We calculate the new balance on the fly for the ledger
+                            $stmt_get_bal = $pdo->prepare("SELECT total_savings FROM tbl_employee_financials WHERE employee_id = ?");
+                            $stmt_get_bal->execute([$emp_id]);
+                            $curr_savings = $stmt_get_bal->fetchColumn() ?: 0;
+
+                            $stmt_ledger = $pdo->prepare("INSERT INTO tbl_savings_ledger 
+                                (employee_id, payroll_id, ref_no, transaction_type, amount, running_balance, remarks, transaction_date) 
+                                VALUES (?, ?, ?, 'Deposit', ?, ?, 'Payroll Deduction', CURDATE())");
+                            $stmt_ledger->execute([$emp_id, $payroll_id, $ref_no, $amount, $curr_savings]);
                         }
                     }
 
                     // C. Mark Cash Advances as Paid
-                    $pdo->prepare("UPDATE tbl_cash_advances SET status = 'Paid', date_updated = NOW() WHERE employee_id = ? AND status = 'Deducted' AND date_requested BETWEEN ? AND ?")->execute([$emp_id, $start_date, $end_date]);
+                    // We look for Pending advances within the date range
+                    $pdo->prepare("UPDATE tbl_cash_advances SET status = 'Paid', date_updated = NOW() 
+                                   WHERE employee_id = ? AND status = 'Pending' AND date_requested BETWEEN ? AND ?")
+                        ->execute([$emp_id, $start_date, $end_date]);
 
-                    // D. Update Payroll Status
+                    // D. Update Payroll Status to PAID (1)
                     $pdo->prepare("UPDATE tbl_payroll SET status = 1 WHERE id = ?")->execute([$payroll_id]);
 
                     // E. Send Notification
@@ -184,4 +224,3 @@ if ($action === 'batch_action' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     exit;
 }
-?>

@@ -16,3 +16,93 @@ Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=
 Body (Stripped HTML):
 Hello Administrator,You have a new **leave** notification from Aljhon Mark Alvior:Aljhon Mark Alvior has requested 1 day(s) of Vacation Leave.Please log in to the portal to view details:View Notification
 --------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 17:37:59 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: warning Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **warning** notification from Aljhon Mark Alvior:Aljhon Mark Alvior has requested a Cash Advance of ₱1,000.00.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 21:55:12 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification from Aljhon Mark Alvior:Aljhon Mark Alvior has requested 1 day(s) of Sick Leave.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 15:14:00 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification from Aljhon Mark Alvior:Aljhon Mark Alvior requested 2 hours of Overtime for 2025-12-05.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 22:16:24 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification from Aljhon Mark Alvior:Aljhon Mark Alvior requested 2 hours of Overtime for 2025-12-05.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 15:17:30 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification from Aljhon Mark Alvior:Aljhon Mark Alvior requested 2 hours of Overtime for 2025-12-05.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 22:21:41 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: cash_advance Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **cash_advance** notification from Aljhon Mark Alvior:Aljhon Mark Alvior requested a Cash Advance of ₱1,000.00 needed by 2025-12-09.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 22:22:35 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification from Aljhon Mark Alvior:Aljhon Mark Alvior has requested 1 day(s) of Sick Leave.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 22:31:07 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new leave notification from Aljhon Mark Alvior:Aljhon Mark Alvior has requested 1 day(s) of Emergency Leave.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 22:34:31 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Leave Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification from Aljhon Mark Alvior:Aljhon Mark Alvior has requested 1 day(s) of Vacation Leave.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-07 22:36:50 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Leave Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification.Aljhon Mark Alvior has requested 1 day(s) of Vacation Leave.Please log in to the portal to view details:View Notification
+--------------------------------------

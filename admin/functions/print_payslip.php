@@ -1,6 +1,8 @@
 <?php
 // functions/print_payslip.php
 
+date_default_timezone_set('Asia/Manila');
+
 require '../../db_connection.php'; 
 require '../../vendor/autoload.php'; 
 

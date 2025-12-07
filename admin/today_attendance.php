@@ -24,7 +24,7 @@ require 'template/topbar.php';
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-label text-uppercase mb-1">Present Today</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            <div class="h5 mb-0 font-weight-bold text-dark">
                                 <span id="val-present"><i class="fas fa-spinner fa-spin"></i></span> / <span id="val-total"></span>
                             </div>
                         </div>
@@ -39,7 +39,7 @@ require 'template/topbar.php';
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-label text-uppercase mb-1">Absent</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="val-absent"><i class="fas fa-spinner fa-spin"></i></div>
+                            <div class="h5 mb-0 font-weight-bold text-dark" id="val-absent"><i class="fas fa-spinner fa-spin"></i></div>
                         </div>
                         <div class="col-auto"><i class="fas fa-user-times fa-2x text-gray-300"></i></div>
                     </div>
@@ -52,7 +52,7 @@ require 'template/topbar.php';
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-label text-uppercase mb-1">Late Arrivals</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="val-late"><i class="fas fa-spinner fa-spin"></i></div>
+                            <div class="h5 mb-0 font-weight-bold text-dark" id="val-late"><i class="fas fa-spinner fa-spin"></i></div>
                         </div>
                         <div class="col-auto"><i class="fas fa-running fa-2x text-gray-300"></i></div>
                     </div>
@@ -65,7 +65,7 @@ require 'template/topbar.php';
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-label text-uppercase mb-1">On Time</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="val-ontime"><i class="fas fa-spinner fa-spin"></i></div>
+                            <div class="h5 mb-0 font-weight-bold text-dark" id="val-ontime"><i class="fas fa-spinner fa-spin"></i></div>
                         </div>
                         <div class="col-auto"><i class="fas fa-clock fa-2x text-gray-300"></i></div>
                     </div>

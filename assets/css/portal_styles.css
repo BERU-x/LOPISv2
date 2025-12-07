@@ -709,3 +709,12 @@ div.dataTables_wrapper div.dataTables_filter input:focus {
     #refresh-spinner {
         transition: transform 0.3s ease-in-out, color 0.3s;
     }
+
+.page-link {
+    color: #0CC0DF !important;
+}
+.page-item.active .page-link {
+    background-color: #0CC0DF !important;
+    border-color: #0CC0DF !important;
+    color: white !important;
+}

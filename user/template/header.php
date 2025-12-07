@@ -2,6 +2,8 @@
 // This is the Employee Header
 // It contains session auth, loader logic, and the HTML <head>
 
+date_default_timezone_set('Asia/Manila');
+
 // 1. INCLUDE AUTHENTICATION (This starts the session and checks cookies)
 require_once __DIR__ . '/../../checking.php';
 
