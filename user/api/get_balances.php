@@ -1,6 +1,5 @@
 <?php
-// user/api/get_balances.php
-require_once '../../db_connection.php'; 
+require_once '../../db_connection.php';
 
 session_start();
 header('Content-Type: application/json');
@@ -13,68 +12,115 @@ if (!isset($_SESSION['employee_id'])) {
 
 $employee_id = $_SESSION['employee_id'];
 
-// 2. Default Response Structure
+// 2. Initialize Response Structure
 $response = [
     'status' => 'error',
     'message' => 'No data found.',
     'data' => [
-        'sss_loan_orig' => 0, 'sss_loan_balance' => 0,
-        'pagibig_loan_orig' => 0, 'pagibig_loan_balance' => 0,
-        'company_loan_orig' => 0, 'company_loan_balance' => 0,
-        'cash_assist_total' => 0, 'cash_assist_deduction' => 0,
-        'savings_deduction' => 0, 'outstanding_balance' => 0,
-        'last_loan_update' => 'N/A'
-    ],
-    'ledger' => [] // New array for ledger history
+        'sss' => [
+            'total_loan' => 0,
+            'balance' => 0
+        ],
+        'pagibig' => [
+            'total_loan' => 0,
+            'balance' => 0
+        ],
+        'company_loan' => [
+            'total_loan' => 0,
+            'balance' => 0
+        ],
+        'cash_assistance' => [
+            'total_amount' => 0,
+            'balance' => 0, // Mapped from outstanding_balance
+            'amortization' => 0 // Mapped from cash_assist_deduction
+        ],
+        'savings' => [
+            'monthly_deduction' => 0, // The fixed amount deducted per payroll
+            'current_balance' => 0,   // Calculated from the latest ledger entry
+            'history' => []           // The ledger array
+        ],
+        'meta' => [
+            'last_update' => 'N/A'
+        ]
+    ]
 ];
 
 try {
-    // 3. Fetch Summary Data (Existing)
+    // 3. Fetch Summary Balances from tbl_employee_financials
     $stmt = $pdo->prepare("
         SELECT 
-            sss_loan AS sss_loan_orig,
-            pagibig_loan AS pagibig_loan_orig,
-            company_loan AS company_loan_orig,
+            sss_loan, sss_loan_balance,
+            pagibig_loan, pagibig_loan_balance,
+            company_loan, company_loan_balance,
+            cash_assist_total, outstanding_balance, cash_assist_deduction,
             savings_deduction,
-            cash_assist_total,
-            outstanding_balance,
-            cash_assist_deduction,
-            sss_loan_balance,
-            pagibig_loan_balance,
-            company_loan_balance,
             last_loan_update
         FROM tbl_employee_financials
         WHERE employee_id = ?
         LIMIT 1
     ");
     $stmt->execute([$employee_id]);
-    $data = $stmt->fetch(PDO::FETCH_ASSOC);
+    $fin = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($data) {
+    // 4. Fetch Savings Ledger History from tbl_savings_ledger
+    $stmtLedger = $pdo->prepare("
+        SELECT 
+            transaction_date, 
+            ref_no, 
+            transaction_type, 
+            amount, 
+            running_balance, 
+            remarks
+        FROM tbl_savings_ledger
+        WHERE employee_id = ?
+        ORDER BY transaction_date DESC, created_at DESC
+        LIMIT 50
+    ");
+    $stmtLedger->execute([$employee_id]);
+    $ledgerData = $stmtLedger->fetchAll(PDO::FETCH_ASSOC);
+
+    // 5. Populate Response
+    if ($fin) {
         $response['status'] = 'success';
         $response['message'] = 'Data loaded successfully.';
-        
-        if (!empty($data['last_loan_update'])) {
-            $data['last_loan_update'] = date('M d, Y', strtotime($data['last_loan_update']));
+
+        // --- SSS Loan ---
+        $response['data']['sss']['total_loan'] = (float)$fin['sss_loan'];
+        $response['data']['sss']['balance']    = (float)$fin['sss_loan_balance'];
+
+        // --- Pag-ibig Loan ---
+        $response['data']['pagibig']['total_loan'] = (float)$fin['pagibig_loan'];
+        $response['data']['pagibig']['balance']    = (float)$fin['pagibig_loan_balance'];
+
+        // --- Company Loan ---
+        $response['data']['company_loan']['total_loan'] = (float)$fin['company_loan'];
+        $response['data']['company_loan']['balance']    = (float)$fin['company_loan_balance'];
+
+        // --- Cash Assistance ---
+        // Note: Assuming 'outstanding_balance' refers to Cash Assist based on table structure
+        $response['data']['cash_assistance']['total_amount'] = (float)$fin['cash_assist_total'];
+        $response['data']['cash_assistance']['balance']      = (float)$fin['outstanding_balance'];
+        $response['data']['cash_assistance']['amortization'] = (float)$fin['cash_assist_deduction'];
+
+        // --- Savings ---
+        $response['data']['savings']['monthly_deduction'] = (float)$fin['savings_deduction'];
+        $response['data']['savings']['history']           = $ledgerData;
+
+        // Determine current total savings from the latest ledger entry
+        if (!empty($ledgerData)) {
+            $response['data']['savings']['current_balance'] = (float)$ledgerData[0]['running_balance'];
         } else {
-            $data['last_loan_update'] = 'N/A';
+            $response['data']['savings']['current_balance'] = 0.00;
         }
 
-        $response['data'] = $data;
-
-        // 4. Fetch Savings Ledger History (New)
-        $stmtLedger = $pdo->prepare("
-            SELECT transaction_date, ref_no, transaction_type, amount, running_balance, remarks
-            FROM tbl_savings_ledger
-            WHERE employee_id = ?
-            ORDER BY transaction_date DESC, created_at DESC
-            LIMIT 50
-        ");
-        $stmtLedger->execute([$employee_id]);
-        $response['ledger'] = $stmtLedger->fetchAll(PDO::FETCH_ASSOC);
-    } 
+        // --- Meta / Dates ---
+        if (!empty($fin['last_loan_update'])) {
+            $response['data']['meta']['last_update'] = date('M d, Y', strtotime($fin['last_loan_update']));
+        }
+    }
 
 } catch (PDOException $e) {
+    $response['status'] = 'error';
     $response['message'] = "Database Error: " . $e->getMessage();
 }
 

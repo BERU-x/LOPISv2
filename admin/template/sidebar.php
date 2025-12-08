@@ -44,7 +44,14 @@ function isActive($page_name, $current_page) {
             <span>Employee Management</span>
         </a>
     </li>   
-        
+       
+    <li class="nav-item <?php echo isActive('financial_management', $current_page); ?>">
+        <a class="nav-link" href="financial_management.php">
+            <i class="fas fa-fw fa-calculator"></i>
+            <span>Financial Management</span>
+        </a>
+    </li> 
+
     <li class="nav-item <?php echo isActive('attendance_logs', $current_page); ?>">
         <a class="nav-link" href="attendance_logs.php">
             <i class="fas fa-fw fa-clipboard-list"></i>
