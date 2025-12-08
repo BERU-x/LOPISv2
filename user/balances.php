@@ -10,10 +10,6 @@ require 'template/topbar.php';
 
 <div class="container-fluid">
     <h1 class="h3 mb-4 text-gray-800">Financial Overview</h1>
-    
-    <div id="status-message" class="alert alert-info py-2 small" style="display:none;">
-        <i class="fas fa-spinner fa-spin me-2"></i> Loading financial data...
-    </div>
 
     <div class="row mb-4">
         <div class="col-xl-6 col-md-6 mb-4">
@@ -67,6 +63,7 @@ require 'template/topbar.php';
                             <div class="h5 font-weight-bold text-gray-900" id="sss-balance">₱0.00</div>
                             <hr class="my-2">
                             <div class="text-xs text-muted">Original: <span id="sss-orig">₱0.00</span></div>
+                            <div class="text-xs text-danger mt-1">Amortization: <span id="sss-amort">₱0.00</span></div>
                         </div>
                         <div class="col-auto"><i class="fas fa-landmark fa-2x text-gray-300"></i></div>
                     </div>
@@ -84,6 +81,7 @@ require 'template/topbar.php';
                             <div class="h5 font-weight-bold text-gray-900" id="pagibig-balance">₱0.00</div>
                             <hr class="my-2">
                             <div class="text-xs text-muted">Original: <span id="pagibig-orig">₱0.00</span></div>
+                            <div class="text-xs text-danger mt-1">Amortization: <span id="pagibig-amort">₱0.00</span></div>
                         </div>
                         <div class="col-auto"><i class="fas fa-home fa-2x text-gray-300"></i></div>
                     </div>
@@ -101,6 +99,7 @@ require 'template/topbar.php';
                             <div class="h5 font-weight-bold text-gray-900" id="company-balance">₱0.00</div>
                             <hr class="my-2">
                             <div class="text-xs text-muted">Original: <span id="company-orig">₱0.00</span></div>
+                            <div class="text-xs text-danger mt-1">Amortization: <span id="company-amort">₱0.00</span></div>
                         </div>
                         <div class="col-auto"><i class="fas fa-building fa-2x text-gray-300"></i></div>
                     </div>
@@ -131,8 +130,8 @@ require 'template/topbar.php';
         <div class="col-lg-12 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header py-3 text-label d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold"><i class="fas fa-wallet me-2"></i>Savings Ledger History</h6>
-                    <span class="badge badge-light text-success">Last 50 Transactions</span>
+                    <h6 class="m-0 font-weight-bold"><i class="fas fa-history me-2"></i>General Ledger History</h6>
+                    <span class="badge badge-light text-success">Last 100 Transactions</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
@@ -140,6 +139,7 @@ require 'template/topbar.php';
                             <thead class="bg-light sticky-top">
                                 <tr>
                                     <th>Date</th>
+                                    <th>Category</th>
                                     <th>Ref No</th>
                                     <th>Type</th>
                                     <th>Remarks</th>
@@ -148,7 +148,7 @@ require 'template/topbar.php';
                                 </tr>
                             </thead>
                             <tbody id="ledger-body">
-                                <tr><td colspan="6" class="text-center text-muted py-3">Loading transactions...</td></tr>
+                                <tr><td colspan="7" class="text-center text-muted py-3">Loading transactions...</td></tr>
                             </tbody>
                         </table>
                     </div>

@@ -24,11 +24,16 @@ require 'template/topbar.php';
                 <div class="row g-3">
                     <div class="col-md-4">
                         <label class="form-label text-xs font-weight-bold text-uppercase text-gray-600">Date *</label>
-                        <input type="date" class="form-control" name="ot_date" required max="<?php echo date('Y-m-d'); ?>">
+                        <input type="date" class="form-control" id="ot_date" name="ot_date" required max="<?php echo date('Y-m-d'); ?>">
+                        
+                        <div id="rawOtDisplay" class="mt-2 small text-muted">
+                            Please select an overtime date.
+                        </div>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label text-xs font-weight-bold text-uppercase text-gray-600">Hours *</label>
-                        <input type="number" step="0.5" class="form-control" name="ot_hours" min="0.5" max="8" required>
+                        <input type="number" step="0.5" class="form-control" 
+                               id="hours_requested" name="hours_requested" min="0.5" max="8" required>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label text-xs font-weight-bold text-uppercase text-gray-600">Reason *</label>

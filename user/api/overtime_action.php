@@ -18,36 +18,78 @@ $action = $_GET['action'] ?? '';
 $employee_id = $_SESSION['employee_id'];
 
 // =================================================================================
-// ACTION: SUBMIT OT REQUEST
+// ACTION: VALIDATE OT REQUEST (NEW ENDPOINT for JavaScript)
 // =================================================================================
-if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    
+if ($action === 'validate_ot_request' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $ot_date = $_POST['ot_date'] ?? null;
-    $ot_hours = $_POST['ot_hours'] ?? null;
-    $reason = trim($_POST['reason'] ?? '');
-
-    // Validation
-    if (empty($ot_date) || empty($ot_hours) || empty($reason)) {
-        echo json_encode(['status' => 'error', 'message' => 'Please fill out all required fields.']);
-        exit;
-    }
-    if (!is_numeric($ot_hours) || $ot_hours <= 0 || $ot_hours > 8) {
-        echo json_encode(['status' => 'error', 'message' => 'Hours must be between 0.5 and 8.']);
+    
+    if (empty($ot_date)) {
+        echo json_encode(['status' => 'error', 'message' => 'Date is required for validation.']);
         exit;
     }
 
     try {
-        // Check Attendance (Raw OT must exist)
+        // Fetch raw overtime from attendance logs for the selected date
         $stmt = $pdo->prepare("SELECT overtime_hr FROM tbl_attendance WHERE employee_id = ? AND date = ?");
         $stmt->execute([$employee_id, $ot_date]);
         $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$attendance || $attendance['overtime_hr'] <= 0) {
-            echo json_encode(['status' => 'error', 'message' => 'No raw overtime recorded for this date.']);
+        $raw_ot_hr = $attendance['overtime_hr'] ?? 0;
+
+        echo json_encode([
+            'status' => 'success',
+            // Return raw hours to the frontend for display and setting the 'max' attribute
+            'raw_ot_hr' => (float)$raw_ot_hr 
+        ]);
+
+    } catch (Exception $e) {
+        // Log the error internally but provide a general message to the user
+        echo json_encode(['status' => 'error', 'message' => 'Failed to retrieve biometric log.']);
+    }
+    exit;
+}
+
+
+// =================================================================================
+// ACTION: SUBMIT OT REQUEST (UPDATED with Server-Side Cap Check)
+// =================================================================================
+if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    
+    // Note: Variable names fixed to match the frontend (hours_requested)
+    $ot_date = $_POST['ot_date'] ?? null;
+    $ot_hours = $_POST['hours_requested'] ?? null; // Assuming frontend uses name="hours_requested"
+    $reason = trim($_POST['reason'] ?? '');
+
+    // Validation 1: Basic Input Check
+    if (empty($ot_date) || empty($ot_hours) || empty($reason)) {
+        echo json_encode(['status' => 'error', 'message' => 'Please fill out all required fields.']);
+        exit;
+    }
+    if (!is_numeric($ot_hours) || $ot_hours <= 0) {
+        echo json_encode(['status' => 'error', 'message' => 'Hours must be a positive number.']);
+        exit;
+    }
+
+    try {
+        // Validation 2: Check Attendance (Raw OT must exist AND Requested OT must not exceed Raw OT)
+        $stmt = $pdo->prepare("SELECT overtime_hr FROM tbl_attendance WHERE employee_id = ? AND date = ?");
+        $stmt->execute([$employee_id, $ot_date]);
+        $attendance = $stmt->fetch(PDO::FETCH_ASSOC);
+        $raw_ot_hr = (float)($attendance['overtime_hr'] ?? 0);
+        $requested_ot = (float)$ot_hours;
+
+        // CRITICAL SERVER-SIDE CAP CHECK
+        if (!$attendance || $raw_ot_hr <= 0) {
+            echo json_encode(['status' => 'error', 'message' => 'No raw overtime recorded for this date. Cannot submit request.']);
             exit;
         }
+        
+        if ($requested_ot > $raw_ot_hr) {
+             echo json_encode(['status' => 'error', 'message' => "Requested hours ($requested_ot) exceed available raw OT ($raw_ot_hr). Please adjust."]);
+             exit;
+        }
 
-        // Check for Duplicates
+        // Validation 3: Check for Duplicates
         $stmt = $pdo->prepare("SELECT id FROM tbl_overtime WHERE employee_id = ? AND ot_date = ? AND status = 'Pending'");
         $stmt->execute([$employee_id, $ot_date]);
         if ($stmt->fetch()) {
@@ -58,20 +100,20 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         // Insert Request
         $stmt = $pdo->prepare("INSERT INTO tbl_overtime (employee_id, ot_date, hours_requested, reason, status, created_at) VALUES (?, ?, ?, ?, 'Pending', NOW())");
         
-        if ($stmt->execute([$employee_id, $ot_date, $ot_hours, $reason])) {
+        if ($stmt->execute([$employee_id, $ot_date, $requested_ot, $reason])) {
             
             // ---------------------------------------------------------
             // 2. TRIGGER NOTIFICATION
             // ---------------------------------------------------------
             if (function_exists('send_notification')) {
-                // Fetch sender name for clearer message (optional, as model does it too, but good for custom msg)
+                // Fetch sender name for clearer message
                 $sender_name = $employee_id;
                 $stmt_name = $pdo->prepare("SELECT firstname, lastname FROM tbl_employees WHERE employee_id = ?");
                 $stmt_name->execute([$employee_id]);
                 $user = $stmt_name->fetch();
                 if($user) $sender_name = $user['firstname'] . ' ' . $user['lastname'];
 
-                $notif_msg = "$sender_name requested $ot_hours hours of Overtime for $ot_date.";
+                $notif_msg = "$sender_name requested $requested_ot hours of Overtime for $ot_date.";
                 
                 // Send to Admin
                 send_notification($pdo, null, 'Admin', 'overtime', $notif_msg, 'overtime_management.php');
@@ -93,6 +135,7 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // ACTION: FETCH OT HISTORY
 // =================================================================================
 if ($action === 'fetch') {
+  
     // Simplified Columns for Ordering (Matches frontend index)
     $columns = [
         0 => 'ot_date',

@@ -139,7 +139,7 @@ $(document).ready(function() {
 
 });
 
-// --- VIEW DETAILS LOGIC (No change needed) ---
+// --- VIEW DETAILS LOGIC (MODIFIED for better numerical handling) ---
 function viewOT(id) {
     currentOTId = id;
     
@@ -161,8 +161,13 @@ function viewOT(id) {
             $('#modal_emp_dept').text(data.department);
             $('#modal_ot_date').text(data.ot_date);
             $('#modal_reason').text(data.reason || 'No reason provided.');
-            $('#modal_raw_ot').text(parseFloat(data.raw_biometric_ot || 0).toFixed(2));
-            $('#modal_req_hrs').text(parseFloat(data.hours_requested).toFixed(2));
+            
+            // Explicitly parse and display raw hours
+            const rawOtHours = parseFloat(data.raw_biometric_ot || 0);
+            const requestedHours = parseFloat(data.hours_requested || 0);
+            
+            $('#modal_raw_ot').text(rawOtHours.toFixed(2));
+            $('#modal_req_hrs').text(requestedHours.toFixed(2));
             
             // Set Status Badge
             var statusHtml = '<span class="badge bg-warning text-dark">Pending</span>';
@@ -172,14 +177,42 @@ function viewOT(id) {
 
             // Handle Logic based on status
             if(data.status === 'Pending') {
-                // Default approved input to requested hours
-                $('#modal_approved_input').val(data.hours_requested);
+                
+                // 1. Determine Initial Approved Value
+                let defaultApproved = requestedHours;
+                
+                // ⭐ CRITICAL CAP 1: Cap the default approved hours to the Raw OT
+                if (defaultApproved > rawOtHours) {
+                    defaultApproved = rawOtHours;
+                }
+                
+                // Set the initial capped value in the input field
+                $('#modal_approved_input').val(defaultApproved.toFixed(2));
+                
+                // 2. Attach Real-time Input Cap Listener
+                // We use .off().on() to ensure the listener is clean every time the modal opens
+                $('#modal_approved_input').off('input.ot_cap').on('input.ot_cap', function() {
+                    // Use 'input' event for immediate feedback
+                    let enteredValue = parseFloat($(this).val());
+                    
+                    // If entered value is greater than the raw OT, reset it to the cap
+                    if (!isNaN(enteredValue) && enteredValue > rawOtHours) {
+                        // Reset the input value to the maximum (Raw OT)
+                        $(this).val(rawOtHours.toFixed(2));
+                        
+                        // Optional: Show a temporary warning to the user
+                        // You could add an alert here if needed for better UX.
+                    }
+                });
+
                 $('#modal_actions').show(); // Show Approve/Reject buttons
             } else {
                 // Read-only mode
                 $('#modal_approved_input').addClass('d-none');
                 $('#modal_approved_display').text(data.hours_approved + ' hrs').removeClass('d-none');
                 $('#modal_actions').hide(); // Hide buttons
+                // Clean up the keyup listener when switching to read-only
+                $('#modal_approved_input').off('input.ot_cap');
             }
 
             $('#viewOTModal').modal('show');

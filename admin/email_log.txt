@@ -70,3 +70,57 @@ Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=
 Body:
 Hello Sample,You have a new **overtime** notification from Administrator:Your Overtime request for Nov 27 has been APPROVED.Please log in to the portal to view details:View Notification
 --------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-08 18:47:57 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **overtime** notification from Administrator:Your Overtime request for Dec 05 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-08 18:49:37 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Administrator,You have a new **leave** notification from Administrator:New Sick Leave request filed for Aljhon Mark Alvior.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-08 18:49:37 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:An administrator has filed a Sick Leave request on your behalf.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-08 18:50:49 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:Your Sick Leave request for Dec 21 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-08 18:51:51 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:Your Sick Leave request for Dec 28 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 00:47:30 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: payroll Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **payroll** notification from Administrator:Payslip for Nov 12 - Nov 26 is available.Please log in to the portal to view details:View Notification
+--------------------------------------

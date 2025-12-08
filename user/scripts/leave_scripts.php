@@ -84,22 +84,95 @@ $(document).ready(function() {
     // --- 4. EVENT LISTENERS ---
 
     // Client-Side Validation: Check Credits
-    $('#leave_type_select').on('change', function() {
-        let type = $(this).val();
-        let remaining = 0;
-        let checkCredit = false;
+// --- HELPER: Calculate Working Days (Excludes Sat/Sun) ---
+    function countWorkingDays(start, end) {
+        let count = 0;
+        let curDate = new Date(start);
+        let endDate = new Date(end);
 
-        if ($.isEmptyObject(leaveBalances)) return;
-
-        if (type === 'Vacation Leave') { remaining = leaveBalances.vl.remaining; checkCredit = true; }
-        else if (type === 'Sick Leave') { remaining = leaveBalances.sl.remaining; checkCredit = true; }
-        else if (type === 'Emergency Leave') { remaining = leaveBalances.el.remaining; checkCredit = true; }
-
-        if (checkCredit && remaining <= 0) {
-            $('#credit_warning').slideDown();
-        } else {
-            $('#credit_warning').slideUp();
+        // Loop through every day
+        while (curDate <= endDate) {
+            let dayOfWeek = curDate.getDay();
+            // 0 = Sunday, 6 = Saturday
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                count++;
+            }
+            // Move to next day
+            curDate.setDate(curDate.getDate() + 1);
         }
+        return count;
+    }
+
+    // --- FUNCTION: Validate Logic ---
+    function validateLeaveRequest() {
+        // 1. Get Inputs
+        let type = $('#leave_type_select').val();
+        let startVal = $('#start_date').val();
+        let endVal = $('#end_date').val();
+        let submitBtn = $('#submit_btn');
+        let warningBox = $('#credit_warning');
+
+        // 2. Initial Checks
+        if (!type || !startVal || !endVal) {
+            warningBox.slideUp();
+            submitBtn.prop('disabled', false);
+            return;
+        }
+
+        // 3. Get Remaining Balance
+        let remaining = 0;
+        if ($.isEmptyObject(leaveBalances)) return; // Wait for AJAX
+
+        if (type === 'Vacation Leave') remaining = parseFloat(leaveBalances.vl.remaining);
+        else if (type === 'Sick Leave') remaining = parseFloat(leaveBalances.sl.remaining);
+        else if (type === 'Emergency Leave') remaining = parseFloat(leaveBalances.el.remaining);
+
+        // 4. Calculate Days (Excluding Weekends)
+        let requestedDays = countWorkingDays(startVal, endVal);
+
+        // 5. Compare & Update UI
+        if (requestedDays > remaining) {
+            // BLOCK: Request exceeds balance
+            submitBtn.prop('disabled', true);
+            
+            warningBox.removeClass('alert-warning').addClass('alert-danger');
+            warningBox.html(`
+                <i class="fas fa-ban me-2"></i> 
+                <strong>Insufficient Credits.</strong><br>
+                This request is for <b>${requestedDays} working days</b> (excluding weekends), 
+                but you only have <b>${remaining}</b> remaining.
+            `);
+            warningBox.slideDown();
+        } else {
+            // ALLOW
+            submitBtn.prop('disabled', false);
+            
+            // Optional: Show a neutral info message about the count
+            // warningBox.removeClass('alert-danger').addClass('alert-info');
+            // warningBox.html(`<i class="fas fa-info-circle me-2"></i> Requesting <b>${requestedDays}</b> working days.`);
+            // warningBox.slideDown();
+            
+            // Or just hide it if valid
+            warningBox.slideUp();
+        }
+    }
+
+    // --- 4. EVENT LISTENERS ---
+
+    // Unified Listener: Runs when Type, Start Date, or End Date changes
+    $('#leave_type_select, #start_date, #end_date').on('change', function() {
+        let startElem = $('#start_date');
+        let endElem = $('#end_date');
+
+        // Auto-fix End Date if it's before Start Date
+        if (this.id === 'start_date') {
+            if (endElem.val() === '' || endElem.val() < startElem.val()) {
+                endElem.val(startElem.val());
+            }
+            endElem.attr('min', startElem.val());
+        }
+
+        validateLeaveRequest();
     });
 
     // Auto-update End Date

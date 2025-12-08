@@ -15,30 +15,33 @@ $employee_id = $_SESSION['employee_id'];
 // 2. Initialize Response Structure
 $response = [
     'status' => 'error',
-    'message' => 'No data found.',
+    'message' => 'Data derived successfully.',
     'data' => [
         'sss' => [
             'total_loan' => 0,
-            'balance' => 0
+            'balance' => 0,
+            'amortization' => 0 
         ],
         'pagibig' => [
             'total_loan' => 0,
-            'balance' => 0
+            'balance' => 0,
+            'amortization' => 0 
         ],
         'company_loan' => [
             'total_loan' => 0,
-            'balance' => 0
+            'balance' => 0,
+            'amortization' => 0 
         ],
         'cash_assistance' => [
-            'total_amount' => 0,
-            'balance' => 0, // Mapped from outstanding_balance
-            'amortization' => 0 // Mapped from cash_assist_deduction
+            'total_amount' => 0, 
+            'balance' => 0,
+            'amortization' => 0 
         ],
         'savings' => [
-            'monthly_deduction' => 0, // The fixed amount deducted per payroll
-            'current_balance' => 0,   // Calculated from the latest ledger entry
-            'history' => []           // The ledger array
+            'monthly_deduction' => 0,
+            'current_balance' => 0,
         ],
+        'general_ledger' => [],
         'meta' => [
             'last_update' => 'N/A'
         ]
@@ -46,76 +49,107 @@ $response = [
 ];
 
 try {
-    // 3. Fetch Summary Balances from tbl_employee_financials
-    $stmt = $pdo->prepare("
+    // --- STEP 3: Fetch Total Granted Amounts from tbl_employee_ledger ---
+    $stmtTotals = $pdo->prepare("
         SELECT 
-            sss_loan, sss_loan_balance,
-            pagibig_loan, pagibig_loan_balance,
-            company_loan, company_loan_balance,
-            cash_assist_total, outstanding_balance, cash_assist_deduction,
-            savings_deduction,
-            last_loan_update
-        FROM tbl_employee_financials
+            category, 
+            SUM(amount) AS total_granted 
+        FROM tbl_employee_ledger
         WHERE employee_id = ?
-        LIMIT 1
+          AND (transaction_type = 'Loan_Grant' OR (category = 'Cash_Assist' AND transaction_type = 'Deposit'))
+        GROUP BY category
     ");
-    $stmt->execute([$employee_id]);
-    $fin = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmtTotals->execute([$employee_id]);
+    $totalsData = $stmtTotals->fetchAll(PDO::FETCH_KEY_PAIR); // [category => total_granted]
 
-    // 4. Fetch Savings Ledger History from tbl_savings_ledger
+    // --- STEP 4: Fetch ALL Ledger History (For the table display) ---
     $stmtLedger = $pdo->prepare("
         SELECT 
+            category, 
             transaction_date, 
             ref_no, 
             transaction_type, 
             amount, 
+            amortization,
             running_balance, 
             remarks
-        FROM tbl_savings_ledger
+        FROM tbl_employee_ledger
         WHERE employee_id = ?
         ORDER BY transaction_date DESC, created_at DESC
-        LIMIT 50
+        LIMIT 100 
     ");
     $stmtLedger->execute([$employee_id]);
     $ledgerData = $stmtLedger->fetchAll(PDO::FETCH_ASSOC);
 
-    // 5. Populate Response
-    if ($fin) {
+    // --- STEP 5: OPTIMIZED Fetch for Current Balances and Amortization Rates ---
+    // Using a subquery to find the MAX created_at for each category for reliability.
+    $stmtLatestData = $pdo->prepare("
+        SELECT 
+            t1.category,
+            t1.running_balance,
+            (SELECT t2.amortization FROM tbl_employee_ledger t2
+             WHERE t2.employee_id = t1.employee_id AND t2.category = t1.category 
+               AND t2.amortization > 0
+             ORDER BY t2.created_at DESC, t2.transaction_date DESC 
+             LIMIT 1
+            ) AS latest_amortization_rate
+        FROM tbl_employee_ledger t1
+        WHERE t1.employee_id = :eid
+        AND t1.created_at = (
+            SELECT MAX(created_at)
+            FROM tbl_employee_ledger
+            WHERE employee_id = t1.employee_id AND category = t1.category
+        )
+    ");
+    $stmtLatestData->execute([':eid' => $employee_id]);
+    $latestData = $stmtLatestData->fetchAll(PDO::FETCH_ASSOC);
+
+    // --- STEP 6: Populate Response (using derived values) ---
+    
+    // Convert optimized results into lookup arrays
+    $latestBalances = [];
+    $amortizationRates = [];
+    foreach ($latestData as $row) {
+        $latestBalances[$row['category']] = (float)$row['running_balance'];
+        $amortizationRates[$row['category']] = (float)$row['latest_amortization_rate'];
+    }
+
+    $hasData = !empty($latestData);
+    $latestTransactionDate = !empty($ledgerData) ? $ledgerData[0]['transaction_date'] : null;
+
+
+    if ($hasData) {
         $response['status'] = 'success';
-        $response['message'] = 'Data loaded successfully.';
+        $response['message'] = 'Financial data derived successfully.';
 
-        // --- SSS Loan ---
-        $response['data']['sss']['total_loan'] = (float)$fin['sss_loan'];
-        $response['data']['sss']['balance']    = (float)$fin['sss_loan_balance'];
+        // --- Loans ---
+        $response['data']['sss']['balance']        = $latestBalances['SSS_Loan'] ?? 0.00;
+        $response['data']['sss']['amortization']   = $amortizationRates['SSS_Loan'] ?? 0.00;
+        $response['data']['sss']['total_loan']     = $totalsData['SSS_Loan'] ?? 0.00;
 
-        // --- Pag-ibig Loan ---
-        $response['data']['pagibig']['total_loan'] = (float)$fin['pagibig_loan'];
-        $response['data']['pagibig']['balance']    = (float)$fin['pagibig_loan_balance'];
+        $response['data']['pagibig']['balance']    = $latestBalances['Pagibig_Loan'] ?? 0.00;
+        $response['data']['pagibig']['amortization'] = $amortizationRates['Pagibig_Loan'] ?? 0.00; 
+        $response['data']['pagibig']['total_loan'] = $totalsData['Pagibig_Loan'] ?? 0.00;
 
-        // --- Company Loan ---
-        $response['data']['company_loan']['total_loan'] = (float)$fin['company_loan'];
-        $response['data']['company_loan']['balance']    = (float)$fin['company_loan_balance'];
-
+        $response['data']['company_loan']['balance'] = $latestBalances['Company_Loan'] ?? 0.00;
+        $response['data']['company_loan']['amortization'] = $amortizationRates['Company_Loan'] ?? 0.00;
+        $response['data']['company_loan']['total_loan'] = $totalsData['Company_Loan'] ?? 0.00;
+        
         // --- Cash Assistance ---
-        // Note: Assuming 'outstanding_balance' refers to Cash Assist based on table structure
-        $response['data']['cash_assistance']['total_amount'] = (float)$fin['cash_assist_total'];
-        $response['data']['cash_assistance']['balance']      = (float)$fin['outstanding_balance'];
-        $response['data']['cash_assistance']['amortization'] = (float)$fin['cash_assist_deduction'];
+        $response['data']['cash_assistance']['balance']      = $latestBalances['Cash_Assist'] ?? 0.00;
+        $response['data']['cash_assistance']['amortization'] = $amortizationRates['Cash_Assist'] ?? 0.00;
+        $response['data']['cash_assistance']['total_amount'] = $totalsData['Cash_Assist'] ?? 0.00;
 
         // --- Savings ---
-        $response['data']['savings']['monthly_deduction'] = (float)$fin['savings_deduction'];
-        $response['data']['savings']['history']           = $ledgerData;
+        $response['data']['savings']['current_balance'] = $latestBalances['Savings'] ?? 0.00;
+        $response['data']['savings']['monthly_deduction'] = $amortizationRates['Savings'] ?? 0.00; 
 
-        // Determine current total savings from the latest ledger entry
-        if (!empty($ledgerData)) {
-            $response['data']['savings']['current_balance'] = (float)$ledgerData[0]['running_balance'];
-        } else {
-            $response['data']['savings']['current_balance'] = 0.00;
-        }
+        // --- Ledger History ---
+        $response['data']['general_ledger'] = $ledgerData;
 
         // --- Meta / Dates ---
-        if (!empty($fin['last_loan_update'])) {
-            $response['data']['meta']['last_update'] = date('M d, Y', strtotime($fin['last_loan_update']));
+        if ($latestTransactionDate) {
+            $response['data']['meta']['last_update'] = date('M d, Y', strtotime($latestTransactionDate));
         }
     }
 

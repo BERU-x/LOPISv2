@@ -43,21 +43,14 @@ try {
     $stmt_holidays->execute([':start' => $start_date, ':end' => $end_date]);
     $holidays = $stmt_holidays->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch Employee Data (Added Balance Columns)
+    // Fetch Employee Data (CLEANED UP - Only getting base and compensation data)
     $sql_emp = "SELECT 
                     e.employee_id, e.firstname, e.lastname,
-                    c.monthly_rate, c.daily_rate, c.hourly_rate, c.food_allowance, c.transpo_allowance,
-                    
-                    f.sss_loan, f.pagibig_loan, f.company_loan, 
-                    f.sss_loan_balance, f.pagibig_loan_balance, f.company_loan_balance, 
-
-                    f.savings_deduction, f.cash_assist_deduction, f.cash_assist_total,
-                    f.outstanding_balance 
+                    c.monthly_rate, c.daily_rate, c.hourly_rate, c.food_allowance, c.transpo_allowance
                 FROM tbl_employees e
                 JOIN tbl_compensation c ON e.employee_id = c.employee_id
-                LEFT JOIN tbl_employee_financials f ON e.employee_id = f.employee_id
                 WHERE e.employment_status = 1"; 
-
+    
     if ($target_employee !== 'all') {
         $sql_emp .= " AND e.employee_id = :target_id";
         $stmt_emp = $pdo->prepare($sql_emp);
@@ -72,7 +65,7 @@ try {
 
     // --- TRANSACTION ---
     if ($pdo->inTransaction()) {
-         $pdo->rollBack(); 
+        $pdo->rollBack(); 
     }
     
     $pdo->beginTransaction();
@@ -103,7 +96,44 @@ try {
         AND status = 'Approved'
     ");
 
-    // 4. Other Calculations
+    // 4. Ledger Balances (Fetch latest running balance for all categories)
+    $stmt_ledger_balances = $pdo->prepare("
+        SELECT 
+            category, 
+            running_balance 
+        FROM tbl_employee_ledger 
+        WHERE employee_id = :eid 
+        AND (category, transaction_date, created_at) IN (
+            SELECT 
+                category, 
+                MAX(transaction_date), 
+                MAX(created_at) 
+            FROM tbl_employee_ledger 
+            WHERE employee_id = :eid
+            GROUP BY category
+        )
+    ");
+    
+    // 5. FIXED DEDUCTION RATES (NEW: Fetch amortization rate from ledger)
+    $stmt_fixed_rates = $pdo->prepare("
+        SELECT 
+            category, 
+            amortization 
+        FROM tbl_employee_ledger 
+        WHERE employee_id = :eid 
+          AND amortization > 0
+        AND (category, created_at) IN (
+            SELECT 
+                category, 
+                MAX(created_at) 
+            FROM tbl_employee_ledger 
+            WHERE employee_id = :eid 
+              AND amortization > 0
+            GROUP BY category
+        )
+    ");
+    
+    // 6. Other Calculations
     $stmt_sss = $pdo->prepare("SELECT total_contribution FROM tbl_sss_standard WHERE :rate >= min_salary AND :rate <= max_salary ORDER BY id DESC LIMIT 1");
     $stmt_leave_days = $pdo->prepare("SELECT SUM(days_count) FROM tbl_leave WHERE employee_id = :eid AND status = 1 AND leave_type NOT LIKE '%Unpaid%' AND start_date BETWEEN :start AND :end");
     $stmt_ca_check = $pdo->prepare("SELECT SUM(amount) FROM tbl_cash_advances WHERE employee_id = :eid AND status = 'Pending' AND date_requested BETWEEN :start AND :end");
@@ -143,10 +173,34 @@ try {
         $hourly_rate  = floatval($emp['hourly_rate'] ?? 0);
         
         if ($hourly_rate <= 0 && $daily_rate > 0) {
-             $hourly_rate = $daily_rate / 8; 
+            $hourly_rate = $daily_rate / 8; 
         }
         if ($hourly_rate <= 0) $hourly_rate = 0.01;
 
+        // --- 1. FETCH DYNAMIC LEDGER BALANCES ---
+        $stmt_ledger_balances->execute([':eid' => $emp_id]);
+        $balances = $stmt_ledger_balances->fetchAll(PDO::FETCH_KEY_PAIR); // [Category => Running_Balance]
+        
+        // Map fetched CURRENT balances
+        $sss_loan_balance = $balances['SSS_Loan'] ?? 0.00;
+        $pagibig_loan_balance = $balances['Pagibig_Loan'] ?? 0.00;
+        $company_loan_balance = $balances['Company_Loan'] ?? 0.00;
+        $cash_assist_balance = $balances['Cash_Assist'] ?? 0.00;
+        
+        // --- 2. FETCH FIXED DEDUCTION RATES ---
+        $stmt_fixed_rates->execute([':eid' => $emp_id]);
+        $rates_data = $stmt_fixed_rates->fetchAll(PDO::FETCH_KEY_PAIR); // [Category => Amortization Rate]
+        
+        $divider = ($payroll_type == 'semi-monthly') ? 2 : 1;
+        
+        // Map fetched scheduled rates, adjusting for semi-monthly payroll
+        // ⭐ FIX: Divide the fetched monthly rate by the divider for semi-monthly payroll
+        $sss_loan_rate = floatval($rates_data['SSS_Loan'] ?? 0) / $divider;
+        $pagibig_loan_rate = floatval($rates_data['Pagibig_Loan'] ?? 0) / $divider;
+        $company_loan_rate = floatval($rates_data['Company_Loan'] ?? 0) / $divider;
+        $cash_assist_rate = floatval($rates_data['Cash_Assist'] ?? 0) / $divider; 
+        $savings_rate = floatval($rates_data['Savings'] ?? 0) / $divider; 
+        
         // --- Premium Pay Accumulators ---
         $regular_ot_premium = 0; 
         $sunday_ot_premium = 0;
@@ -157,7 +211,7 @@ try {
         $regular_holiday_non_work_pay = 0; 
         $sunday_work_premium = 0; 
 
-        // --- 1. PRE-CALCULATIONS ---
+        // --- 3. PRE-CALCULATIONS (Attendance, Late, Leave) ---
         $stmt_late->execute([':eid' => $emp_id, ':start' => $start_date, ':end' => $end_date]);
         $total_late_hours = floatval($stmt_late->fetchColumn() ?: 0);
         $late_deduction_amount = $total_late_hours * $hourly_rate;
@@ -179,7 +233,7 @@ try {
 
         $premium_day_ot_hours = 0; 
         
-        // --- 2. ATTENDANCE LOOP (Approved OT only) ---
+        // --- 4. ATTENDANCE LOOP (Premium/OT Calculation) ---
         $stmt_all_daily_records = $pdo->prepare("
             SELECT date, num_hr
             FROM tbl_attendance 
@@ -197,7 +251,6 @@ try {
             $day_date = $record['date'];
             $base_hours = min(8, floatval($record['num_hr'])); 
             
-            // Look up approved OT instead of raw attendance OT
             $ot_hours = isset($approved_ot_records[$day_date]) ? floatval($approved_ot_records[$day_date]) : 0;
             
             $day_of_week = date('N', strtotime($day_date)); 
@@ -263,16 +316,16 @@ try {
         $total_worked_base_pay_GROSS = $daily_rate * $days_present;
         $total_base_pay = $total_worked_base_pay_GROSS + $regular_holiday_non_work_pay + $paid_leave_amount; 
 
-        // --- FINAL EARNINGS ---
+        // --- 5. FINAL EARNINGS ---
         $food_allow = ($payroll_type == 'semi-monthly') ? floatval($emp['food_allowance']) / 2 : floatval($emp['food_allowance']);
         $transpo_allow = ($payroll_type == 'semi-monthly') ? floatval($emp['transpo_allowance']) / 2 : floatval($emp['transpo_allowance']);
         $total_allowances = $food_allow + $transpo_allow;
 
         $gross_pay = $total_base_pay + $total_allowances + $total_ot_premium_pay + $sunday_work_premium + $rh_worked_pay_premium + $snwh_worked_pay_premium;
 
-        // --- 3. DEDUCTIONS ---
-        $divider = ($payroll_type == 'semi-monthly') ? 2 : 1;
+        // --- 6. DEDUCTIONS ---
         
+        // Government Contributions
         $stmt_sss->execute([':rate' => $monthly_rate]);
         $sss_row = $stmt_sss->fetch(PDO::FETCH_ASSOC);
         $sss_contrib = ($sss_row ? floatval($sss_row['total_contribution']) : 0) / $divider;
@@ -296,35 +349,30 @@ try {
             $tax_deduction = $excess * 0.15;
         }
 
-        // Fixed Deductions (WITH BALANCE CHECK)
-        $sss_loan     = $get_deduction($emp['sss_loan'] ?? 0, $emp['sss_loan_balance'] ?? 0);
-        $pagibig_loan = $get_deduction($emp['pagibig_loan'] ?? 0, $emp['pagibig_loan_balance'] ?? 0);
-        $company_loan = $get_deduction($emp['company_loan'] ?? 0, $emp['company_loan_balance'] ?? 0);
-        $cash_assist  = $get_deduction($emp['cash_assist_deduction'] ?? 0, $emp['cash_assist_total'] ?? 0);
-        $savings      = floatval($emp['savings_deduction'] ?? 0);
+        // Fixed Deductions (Capped by Dynamic Ledger Balance)
+        $sss_loan     = $get_deduction($sss_loan_rate, $sss_loan_balance);
+        $pagibig_loan = $get_deduction($pagibig_loan_rate, $pagibig_loan_balance);
+        $company_loan = $get_deduction($company_loan_rate, $company_loan_balance);
+        $cash_assist  = $get_deduction($cash_assist_rate, $cash_assist_balance);
+        $savings      = $savings_rate; 
 
-        // RETAINED LOGIC: Previous Period Deficit
-        $previous_deficit_deduction = 0;
-        $outstanding_bal = floatval($emp['outstanding_balance'] ?? 0);
-        if ($outstanding_bal > 0) {
-            $previous_deficit_deduction = $outstanding_bal; 
-        }
+        $previous_deficit_deduction = 0; // Remains 0
 
         // TOTAL DEDUCTIONS
         $total_deductions = $total_govt_deductions + 
-                            $sss_loan + $pagibig_loan + $company_loan + 
-                            $savings + $cash_advance + $cash_assist + $tax_deduction + 
-                            $previous_deficit_deduction;
+                             $sss_loan + $pagibig_loan + $company_loan + 
+                             $savings + $cash_advance + $cash_assist + $tax_deduction + 
+                             $previous_deficit_deduction; 
 
-        // --- 4. NET PAY ---
+        // --- 7. NET PAY ---
         $net_pay = $gross_pay - $total_deductions;
 
-        // --- 5. INSERT HEADER ---
+        // --- 8. INSERT HEADER ---
         $ref_no = 'LOSI-' . date('YmdHis') . '-' . $emp_id; 
         $stmt_header->execute([':ref'=>$ref_no, ':empid'=>$emp_id, ':start'=>$start_date, ':end'=>$end_date, ':gross'=>$gross_pay, ':deduct'=>$total_deductions, ':net'=>$net_pay]);
         $payroll_id = $pdo->lastInsertId();
         
-        // --- 6. INSERT ITEMS ---
+        // --- 9. INSERT ITEMS ---
         $total_worked_base_pay = $total_worked_base_pay_GROSS; 
 
         // Display rates
@@ -352,8 +400,6 @@ try {
 
             // Deductions
             ['name' => 'Late / Undertime (' . number_format($total_late_hours, 2) . ' hrs)', 'type' => 'deduction', 'amount' => $late_deduction_amount],
-            // RETAINED ITEM: Previous Period Deficit Item
-            ['name' => 'Previous Period Deficit', 'type' => 'deduction', 'amount' => $previous_deficit_deduction],                
             ['name' => 'SSS Contribution', 'type' => 'deduction', 'amount' => $sss_contrib],
             ['name' => 'PhilHealth', 'type' => 'deduction', 'amount' => $philhealth_deduct],
             ['name' => 'Pag-IBIG', 'type' => 'deduction', 'amount' => $pagibig_contrib],
@@ -382,7 +428,7 @@ try {
 
 } catch (Exception $e) {
     if ($pdo->inTransaction()) {
-         $pdo->rollBack();
+        $pdo->rollBack();
     }
     // --- ERROR JSON ---
     $response['status'] = 'error';
