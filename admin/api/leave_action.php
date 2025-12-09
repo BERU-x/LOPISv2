@@ -47,7 +47,8 @@ if ($action === 'fetch') {
 // --- 2. FETCH EMPLOYEE DROPDOWN ---
 if ($action === 'fetch_employees') {
     try {
-        $stmt = $pdo->query("SELECT employee_id, firstname, lastname FROM tbl_employees WHERE employment_status != 5 ORDER BY lastname ASC");
+        // Changed WHERE clause from != 5 to < 5
+        $stmt = $pdo->query("SELECT employee_id, firstname, lastname FROM tbl_employees WHERE employment_status < 5 ORDER BY lastname ASC");
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     } catch (Exception $e) {
         echo json_encode([]);

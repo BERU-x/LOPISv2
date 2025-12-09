@@ -100,7 +100,7 @@ if ($action === 'fetch') {
 }
 
 // =====================================================================
-// 3. BATCH ACTIONS (Approve / Email) - UPDATED FOR LEDGER
+// 3. BATCH ACTIONS (Approve / Email)
 // =====================================================================
 if ($action === 'batch_action' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $ids = $_POST['ids'] ?? [];
@@ -112,25 +112,34 @@ if ($action === 'batch_action' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
-        // --- PREPARE LEDGER STATEMENTS ---
-        // Get the last known running balance for a category
+        // --- PREPARE STATEMENTS (Prepare ONCE, Execute MANY times) ---
+        
+        // 1. Get Last Balance
         $stmt_get_last_bal = $pdo->prepare("
             SELECT running_balance 
             FROM tbl_employee_ledger 
             WHERE employee_id = ? AND category = ? 
-            ORDER BY transaction_date DESC, created_at DESC 
+            ORDER BY id DESC 
             LIMIT 1
         ");
         
-        // Insert a new transaction into the unified ledger
-        // ⭐️ FIX: Added 'amortization' column and placeholder (?)
+        // 2. Insert Ledger
         $stmt_ledger_insert = $pdo->prepare("
             INSERT INTO tbl_employee_ledger 
                 (employee_id, category, payroll_id, ref_no, transaction_type, amount, amortization, running_balance, remarks, transaction_date) 
             VALUES 
                 (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        // -----------------------------------
+
+        // 3. Get Payroll Items (Deductions only)
+        $stmt_get_items = $pdo->prepare("SELECT item_name, amount FROM tbl_payroll_items WHERE payroll_id = ? AND item_type = 'deduction'");
+
+        // 4. Update Payroll Status
+        $stmt_update_status = $pdo->prepare("UPDATE tbl_payroll SET status = 1 WHERE id = ?");
+
+        // 5. Mark Cash Advances Paid (Range based)
+        $stmt_update_ca = $pdo->prepare("UPDATE tbl_cash_advances SET status = 'Paid', date_updated = NOW() 
+                                         WHERE employee_id = ? AND status = 'Pending' AND date_requested BETWEEN ? AND ?");
 
         if ($sub_action === 'approve') {
             $pdo->beginTransaction();
@@ -142,7 +151,7 @@ if ($action === 'batch_action' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$payroll_id]);
                 $payroll = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                // Only process if currently PENDING (Status 0)
+                // Only process if PENDING
                 if ($payroll && $payroll['status'] == 0) {
                     $emp_id = $payroll['employee_id'];
                     $net_pay = floatval($payroll['net_pay']);
@@ -150,89 +159,87 @@ if ($action === 'batch_action' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $end_date = $payroll['cut_off_end'];
                     $ref_no = $payroll['ref_no'];
 
-                    // A. Handle Deficit (Negative Net Pay) - NEW LEDGER ENTRY
+                    // ---------------------------------------------------------
+                    // A. HANDLE NEGATIVE NET PAY (Create Deficit Debt)
+                    // ---------------------------------------------------------
                     if ($net_pay < 0) {
                         $deficit = abs($net_pay);
                         
-                        // NOTE: Assuming 'Previous_Deficit' is an allowed category in tbl_employee_ledger
+                        // Get current deficit balance
                         $stmt_get_last_bal->execute([$emp_id, 'Previous_Deficit']);
                         $last_deficit_bal = floatval($stmt_get_last_bal->fetchColumn() ?: 0);
                         
-                        $new_deficit_bal = $last_deficit_bal + $deficit; // Deficits increase the balance (less net)
+                        // Balance INCREASES (Debt grows)
+                        $new_deficit_bal = round($last_deficit_bal + $deficit, 2);
                         
                         $stmt_ledger_insert->execute([
                             $emp_id, 
                             'Previous_Deficit', 
                             $payroll_id, 
                             $ref_no, 
-                            'Adjustment', 
+                            'Adjustment', // Type
                             $deficit, 
-                            0.00, // Amortization is 0 for deficit carry over
+                            0.00, 
                             $new_deficit_bal, 
                             'Payroll Deficit Carry Over', 
                             $end_date
                         ]);
                     }
 
-                    // B. Process Items (Loans, Cash Assistance, Savings) - UNIFIED LEDGER INSERT
-                    $stmt_items = $pdo->prepare("SELECT item_name, amount FROM tbl_payroll_items WHERE payroll_id = ? AND item_type = 'deduction'");
-                    $stmt_items->execute([$payroll_id]);
-                    $deductions = $stmt_items->fetchAll(PDO::FETCH_ASSOC);
+                    // ---------------------------------------------------------
+                    // B. PROCESS DEDUCTIONS (Loans vs Savings)
+                    // ---------------------------------------------------------
+                    $stmt_get_items->execute([$payroll_id]);
+                    $deductions = $stmt_get_items->fetchAll(PDO::FETCH_ASSOC);
 
                     foreach ($deductions as $item) {
                         $amount = floatval($item['amount']);
                         if ($amount <= 0) continue;
 
                         $category = null;
-                        $trans_type = null;
+                        $trans_type = 'Loan_Payment'; // Default
                         $remarks = 'Payroll Deduction';
                         $is_savings = false;
 
-                        // --- Map Item Name to Ledger Category ---
+                        // Map Item Names to Database Categories
                         if (stripos($item['item_name'], 'SSS Loan') !== false) {
                             $category = 'SSS_Loan';
-                            $trans_type = 'Loan_Payment';
                         } elseif (stripos($item['item_name'], 'Pag-IBIG Loan') !== false) {
                             $category = 'Pagibig_Loan';
-                            $trans_type = 'Loan_Payment';
                         } elseif (stripos($item['item_name'], 'Company Loan') !== false) {
                             $category = 'Company_Loan';
-                            $trans_type = 'Loan_Payment';
                         } elseif (stripos($item['item_name'], 'Cash Assistance') !== false) {
                             $category = 'Cash_Assist';
-                            $trans_type = 'Loan_Payment';
                         } elseif (stripos($item['item_name'], 'Company Savings') !== false) {
                             $category = 'Savings';
-                            $trans_type = 'Deposit'; // Savings is a deposit into the savings account
+                            $trans_type = 'Deposit'; 
                             $is_savings = true;
                         } elseif (stripos($item['item_name'], 'Previous Period Deficit') !== false) {
-                            // This deduction pays off the carried deficit
                             $category = 'Previous_Deficit'; 
-                            $trans_type = 'Loan_Payment';
-                        } 
-                        // Note: Other deductions (Tax, PhilHealth, etc.) are NOT tracked in tbl_employee_ledger.
+                        }
 
                         if ($category) {
-                            // 1. Get the latest running balance for this category
+                            // 1. Get Last Balance
                             $stmt_get_last_bal->execute([$emp_id, $category]);
                             $last_running_bal = floatval($stmt_get_last_bal->fetchColumn() ?: 0);
 
-                            // 2. Calculate the new running balance and check for overpayment cap
+                            // 2. Calculate New Balance (with Rounding)
                             if ($is_savings) {
-                                $new_running_bal = $last_running_bal + $amount;
+                                // Savings: Balance INCREASES
+                                $new_running_bal = round($last_running_bal + $amount, 2);
                             } else {
-                                $new_running_bal = $last_running_bal - $amount;
+                                // Loans: Balance DECREASES
+                                $new_running_bal = round($last_running_bal - $amount, 2);
                                 
+                                // Cap check: Don't let loan go below zero (Floating point safety)
                                 if ($new_running_bal < 0) {
-                                    // Recalculate actual amount paid if capping is required
-                                    $amount = $last_running_bal; 
+                                    $amount = $last_running_bal; // Adjust payment to match remaining debt
                                     $new_running_bal = 0.00;
                                     $remarks = 'Loan Fully Paid (Cap Applied)';
                                 }
                             }
                             
-                            // 3. Insert the new transaction into tbl_employee_ledger
-                            // ⭐️ FIX: Use the actual $end_date variable for the transaction date.
+                            // 3. Insert Ledger Record
                             $stmt_ledger_insert->execute([
                                 $emp_id, 
                                 $category, 
@@ -240,24 +247,27 @@ if ($action === 'batch_action' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $ref_no, 
                                 $trans_type, 
                                 $amount, 
-                                0.00, // Amortization 
+                                0.00, // Amortization (Rate) doesn't change on payment
                                 $new_running_bal, 
                                 $remarks, 
-                                $end_date // Transaction Date 
+                                $end_date 
                             ]);
                         }
                     }
 
-                    // C. Mark Cash Advances as Paid
-                    // We look for Pending advances within the date range
-                    $pdo->prepare("UPDATE tbl_cash_advances SET status = 'Paid', date_updated = NOW() 
-                                     WHERE employee_id = ? AND status = 'Pending' AND date_requested BETWEEN ? AND ?")
-                        ->execute([$emp_id, $start_date, $end_date]);
+                    // ---------------------------------------------------------
+                    // C. MARK CASH ADVANCES AS PAID
+                    // ---------------------------------------------------------
+                    $stmt_update_ca->execute([$emp_id, $start_date, $end_date]);
 
-                    // D. Update Payroll Status to PAID (1)
-                    $pdo->prepare("UPDATE tbl_payroll SET status = 1 WHERE id = ?")->execute([$payroll_id]);
+                    // ---------------------------------------------------------
+                    // D. UPDATE PAYROLL STATUS
+                    // ---------------------------------------------------------
+                    $stmt_update_status->execute([$payroll_id]);
 
-                    // E. Send Notification
+                    // ---------------------------------------------------------
+                    // E. SEND NOTIFICATION
+                    // ---------------------------------------------------------
                     $period_str = date("M d", strtotime($start_date)) . " - " . date("M d", strtotime($end_date));
                     send_notification($pdo, $emp_id, 'Employee', 'payroll', "Payslip for {$period_str} is available.", 'payslips.php', null);
                     
@@ -268,7 +278,7 @@ if ($action === 'batch_action' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = "$approved_count records approved successfully.";
         } 
         elseif ($sub_action === 'send_email') {
-            // Email logic here...
+            // Email logic placeholder
             $msg = "Payslips queued for sending.";
         } 
         else {

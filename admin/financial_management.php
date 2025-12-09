@@ -117,12 +117,13 @@ require 'template/topbar.php';
                         </div>
 
                         <div class="col-md-6">
-                            <label class="text-label mb-1">Monthly Amortization</label>
+                            <label class="text-label mb-1" id="amortization_label">Monthly Amortization</label>
+                            
                             <div class="input-group">
                                 <span class="input-group-text">₱</span>
                                 <input type="number" step="0.01" name="amortization" id="amortization" class="form-control" placeholder="0.00">
                             </div>
-                            <small class="text-muted text-xs">For Loan Grants only</small>
+                            <small class="text-muted text-xs" id="amortization_help">For Loan Grants only</small>
                         </div>
 
                         <div class="col-md-6">

@@ -231,4 +231,14 @@ function renderHolidaysList(holidays) {
     html += '</ul>';
     container.html(html);
 }
+
+    // Welcome Msg
+    function setWelcomeMessage() {
+        const now = new Date();
+        const hrs = now.getHours();
+        let greet = (hrs < 12) ? "Good Morning! ☀️" : ((hrs >= 12 && hrs <= 17) ? "Good Afternoon! 🌤️" : "Good Evening! 🌙");
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        $('#status-message').html(`${greet} &nbsp;|&nbsp; Today is ${now.toLocaleDateString('en-US', options)}`);
+    }
+    setWelcomeMessage();
 </script>

@@ -25,26 +25,33 @@ if ($action === 'fetch') {
     // DataTables columns mapping for sorting
     $columns = [
         0 => 'e.employee_id', 
-        1 => 'e.lastname', // Maps to the Name column
+        1 => 'e.lastname', 
         2 => 'c.daily_rate', 
         3 => 'e.employment_status',
     ];
 
     $base_sql = " FROM tbl_employees e LEFT JOIN tbl_compensation c ON e.employee_id = c.employee_id";
-    $where_params = [];
+    
+    // 1. Initialize params with your hardcoded filter (Status < 7)
+    $where_params = ["e.employment_status < 7"];
     $where_bindings = [];
 
-    // Global Search
+    // Global Search (Appends to the existing status filter)
     if (!empty($search_value)) {
         $term = '%' . $search_value . '%';
         $where_params[] = "(e.employee_id LIKE ? OR e.firstname LIKE ? OR e.lastname LIKE ? OR e.position LIKE ?)";
         $where_bindings[] = $term; $where_bindings[] = $term; $where_bindings[] = $term; $where_bindings[] = $term;
     }
 
-    $where_sql = !empty($where_params) ? " WHERE " . implode(' AND ', $where_params) : "";
+    // Combine constraints
+    $where_sql = " WHERE " . implode(' AND ', $where_params);
 
-    // Counting records
-    $recordsTotal = $pdo->query("SELECT COUNT(e.employee_id) $base_sql")->fetchColumn();
+    // 2. Counting records (Total available vs Filtered by search)
+    
+    // recordsTotal: Counts all employees with status < 7 (ignoring search bar)
+    $recordsTotal = $pdo->query("SELECT COUNT(e.employee_id) $base_sql WHERE e.employment_status < 7")->fetchColumn();
+    
+    // recordsFiltered: Counts employees with status < 7 AND matching search bar
     $stmt = $pdo->prepare("SELECT COUNT(e.employee_id) $base_sql $where_sql");
     $stmt->execute($where_bindings);
     $recordsFiltered = $stmt->fetchColumn();

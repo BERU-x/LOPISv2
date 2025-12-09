@@ -124,3 +124,66 @@ Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=
 Body:
 Hello Aljhon Mark,You have a new **payroll** notification from Administrator:Payslip for Nov 12 - Nov 26 is available.Please log in to the portal to view details:View Notification
 --------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 13:55:11 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **overtime** notification from Administrator:Your Overtime request for Oct 25 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 14:14:55 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: payroll Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **payroll** notification from Administrator:Payslip for Oct 13 - Oct 27 is available.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 15:51:41 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **overtime** notification from Administrator:Your Overtime request for Oct 29 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 15:51:45 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **overtime** notification from Administrator:Your Overtime request for Oct 30 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 16:02:13 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from Administrator:Your Vacation Leave request for Dec 09 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 16:04:07 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: payroll Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **payroll** notification from Administrator:Payslip for Oct 28 - Nov 11 is available.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 16:08:16 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: payroll Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **payroll** notification from Administrator:Payslip for Oct 28 - Nov 11 is available.Please log in to the portal to view details:View Notification
+--------------------------------------

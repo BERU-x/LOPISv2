@@ -133,3 +133,39 @@ Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=
 Body (Stripped HTML):
 Hello Administrator,You have a new **overtime** notification.Aljhon Mark Alvior requested 2 hours of Overtime for 2025-12-05.Please log in to the portal to view details:View Notification
 --------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 13:54:58 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Overtime Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification.Aljhon Mark Alvior requested 4 hours of Overtime for 2025-10-25.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 15:51:23 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Overtime Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification.Aljhon Mark Alvior requested 4 hours of Overtime for 2025-10-29.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 15:51:31 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Overtime Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification.Aljhon Mark Alvior requested 4 hours of Overtime for 2025-10-30.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-09 16:02:02 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Leave Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification.Aljhon Mark Alvior has requested 1 day(s) of Vacation Leave.Please log in to the portal to view details:View Notification
+--------------------------------------

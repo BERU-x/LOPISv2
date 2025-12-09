@@ -13,10 +13,12 @@ $action = $_GET['action'] ?? '';
 $draw = (int)($_GET['draw'] ?? 1);
 
 // --- 1. FETCH OVERVIEW (For Main DataTables) ---
+// --- 1. FETCH OVERVIEW (For Main DataTables) ---
 if ($action === 'fetch_overview') {
     try {
         // --- 1a. Count Total Employees ---
-        $totalStmt = $pdo->query("SELECT COUNT(id) FROM tbl_employees WHERE employment_status != 5 AND employment_status != 6");
+        // CHANGED: Status < 5
+        $totalStmt = $pdo->query("SELECT COUNT(id) FROM tbl_employees WHERE employment_status < 5");
         $recordsTotal = $totalStmt->fetchColumn();
 
         // --- 1b. Build Query ---
@@ -34,7 +36,7 @@ if ($action === 'fetch_overview') {
                     COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Company_Loan' ORDER BY id DESC LIMIT 1), 0) as company_bal,
                     COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Cash_Assist' ORDER BY id DESC LIMIT 1), 0) as cash_bal
                 FROM tbl_employees e
-                WHERE e.employment_status != 5 AND e.employment_status != 6 ";
+                WHERE e.employment_status < 5 "; // CHANGED: Status < 5
 
         $params = [];
 
@@ -47,7 +49,9 @@ if ($action === 'fetch_overview') {
         }
 
         // Count Filtered Records
-        $countSql = "SELECT COUNT(id) FROM tbl_employees e WHERE e.employment_status != 5 AND e.employment_status != 6";
+        // CHANGED: Status < 5
+        $countSql = "SELECT COUNT(id) FROM tbl_employees e WHERE e.employment_status < 5";
+        
         if (!empty($search)) {
             $countSql .= " AND (e.lastname LIKE ? OR e.firstname LIKE ? OR e.employee_id LIKE ?)";
         }
@@ -85,7 +89,6 @@ if ($action === 'fetch_overview') {
     }
     exit;
 }
-
 // --- 2. FETCH LEDGER HISTORY (For History Modal) ---
 if ($action === 'fetch_ledger') {
     $emp_id = $_GET['employee_id'] ?? '';

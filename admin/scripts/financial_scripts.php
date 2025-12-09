@@ -275,21 +275,42 @@ $(document).ready(function() {
         $('#amortization').prop('disabled', true).val(''); // Reset Amortization
     });
 
-    // --- 6. UX: Toggle Amortization Field Logic ---
-    // Only enable Amortization input if it is a Loan Grant
+    // --- 6. UX: Toggle Amortization/Contribution Field Logic ---
     function toggleAmortizationField() {
         const type = $('#transaction_type').val();
         const category = $('#category').val();
         const amortInput = $('#amortization');
+        const amortLabel = $('#amortization_label');
+        const amortHelp = $('#amortization_help');
 
-        // Logic: Category must NOT be Savings, and Type MUST be Loan_Grant
-        if (category !== 'Savings' && type === 'Loan_Grant') {
-            amortInput.prop('disabled', false);
-            amortInput.prop('required', true); // Optional: make it required?
-        } else {
-            amortInput.prop('disabled', true);
-            amortInput.val(''); // Clear value if disabled
-            amortInput.prop('required', false);
+        // CASE A: SAVINGS (Setting the Pledge)
+        if (category === 'Savings') {
+            amortLabel.text('Monthly Contribution'); // Change Label
+            amortHelp.text('Set the amount to deduct per payroll');
+            
+            // Allow setting contribution on Deposit or Adjustment
+            // (e.g. Initial Deposit sets the rate, or Adjustment changes the rate)
+            if (type === 'Deposit' || type === 'Adjustment') {
+                amortInput.prop('disabled', false);
+            } else {
+                amortInput.prop('disabled', true);
+                amortInput.val('');
+            }
+        } 
+        // CASE B: LOANS (Setting the Amortization)
+        else {
+            amortLabel.text('Monthly Amortization'); // Reset Label
+            amortHelp.text('For Loan Grants only');
+
+            // Only enable for Loan Grants
+            if (type === 'Loan_Grant') {
+                amortInput.prop('disabled', false);
+                amortInput.prop('required', true); 
+            } else {
+                amortInput.prop('disabled', true);
+                amortInput.val('');
+                amortInput.prop('required', false);
+            }
         }
     }
 

@@ -60,7 +60,7 @@ require 'template/topbar.php';
 </div>
 
 <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"> 
+    <div class="modal-dialog modal-lg modal-dialog-centered"> 
         <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
             <div class="modal-header border-bottom-0 p-4"> 
                 <h5 class="modal-title fw-bold text-label" id="addModalLabel">
@@ -192,7 +192,7 @@ require 'template/topbar.php';
 </div>
 
 <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable"> 
+    <div class="modal-dialog modal-lg modal-dialog-centered"> 
         <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
             <div class="modal-header border-bottom-0 p-4"> 
                 <h5 class="modal-title fw-bold text-label" id="editModalLabel">

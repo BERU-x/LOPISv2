@@ -46,10 +46,14 @@ try {
     $earnings = [];
     $deductions = [];
     $deduction_lookup = []; // Lookup for current deduction amounts by item name
+
     foreach ($all_items as $item) {
-        if ($item['item_type'] == 'earning') $earnings[] = $item;
-        elseif ($item['item_type'] == 'deduction') {
+        if ($item['item_type'] == 'earning') {
+            $earnings[] = $item;
+        } elseif ($item['item_type'] == 'deduction') {
             $deductions[] = $item;
+            // Store simple float amount for matching logic later
+            // We use the item name (e.g., "SSS Loan", "Company Savings") as key
             $deduction_lookup[$item['item_name']] = floatval($item['amount']);
         }
     }
@@ -71,7 +75,7 @@ try {
     $leaves_taken_lookup = array_column($leaves_taken, 'total_days', 'leave_type');
 
 
-    // D. Fetch Leave Balances (Uses external model/API)
+    // D. Fetch Leave Balances (External Model)
     $remaining_balances = [];
     if (file_exists('models/leave_model.php')) {
         require_once 'models/leave_model.php';
@@ -85,19 +89,16 @@ try {
         }
     }
 
-    // --- E. FETCH LOAN/SAVINGS BALANCES FROM TBL_EMPLOYEE_LEDGER (NEW LOGIC) ---
-    // Fetch latest running balance for all loan/savings categories
+    // --- E. FETCH LEDGER BALANCES (Loans & Savings) ---
+    // This fetches the "Account Standing" before this payroll is finalized (usually)
     $sql_loan_balances = "
         SELECT 
             category, 
             running_balance 
         FROM tbl_employee_ledger 
         WHERE employee_id = :eid 
-        AND (category, transaction_date, created_at) IN (
-            SELECT 
-                category, 
-                MAX(transaction_date), 
-                MAX(created_at) 
+        AND (category, id) IN (
+            SELECT category, MAX(id) 
             FROM tbl_employee_ledger 
             WHERE employee_id = :eid
             GROUP BY category
@@ -128,13 +129,11 @@ try {
     }
 
 } catch (PDOException $e) {
-    // In a real application, log this error instead of exposing it
     die("Error: " . $e->getMessage()); 
 }
 ?>
 
 <style>
-    /* ... (Styles remain the same) ... */
     .payslip-paper {
         background: #fff;
         max-width: 850px;
@@ -144,7 +143,6 @@ try {
         box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
         position: relative;
     }
-    /* Editable inputs */
     input.editable-input {
         border: 1px dashed #d1d3e2;
         background-color: #f8f9fc;
@@ -167,6 +165,7 @@ try {
         background: transparent;
         color: #5a5c69;
     }
+    .table-sm td, .table-sm th { padding: 0.3rem; }
 
     @media print {
         @page { size: portrait; margin: 10mm; }
@@ -192,7 +191,7 @@ try {
         </div>
         
         <div class="d-flex gap-2">
-            <?php if($payslip['status'] == 0): // Only show save if Pending ?>
+            <?php if($payslip['status'] == 0): ?>
             <button type="button" id="btnSavePayslip" class="btn btn-primary shadow-sm fw-bold me-2">
                 <i class="fas fa-save me-2"></i>Save Changes
             </button>
@@ -263,10 +262,10 @@ try {
                             <td class="text-gray-800 fw-bold"><?php echo htmlspecialchars($earn['item_name']); ?></td>
                             <td class="text-end">
                                 <input type="number" step="0.01" 
-                                        name="items[<?php echo $earn['id']; ?>]" 
-                                        class="editable-input earning-field" 
-                                        value="<?php echo $earn['amount']; ?>"
-                                        <?php echo ($status == 1) ? 'readonly' : ''; ?>>
+                                       name="items[<?php echo $earn['id']; ?>]" 
+                                       class="editable-input earning-field" 
+                                       value="<?php echo $earn['amount']; ?>"
+                                       <?php echo ($status == 1) ? 'readonly' : ''; ?>>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -283,17 +282,16 @@ try {
                 <div class="col-6 ps-4">
                     <h6 class="text-secondary fw-bold text-uppercase border-bottom pb-2 mb-3">Deductions</h6>
                     <table class="table table-borderless table-sm small align-middle">
-                        
                         <?php if(count($deductions) > 0): ?>
                             <?php foreach($deductions as $deduct): ?>
                             <tr>
                                 <td class="text-gray-600"><?php echo htmlspecialchars($deduct['item_name']); ?></td>
                                 <td class="text-end">
                                     <input type="number" step="0.01" 
-                                            name="items[<?php echo $deduct['id']; ?>]" 
-                                            class="editable-input deduction-field" 
-                                            value="<?php echo $deduct['amount']; ?>"
-                                            <?php echo ($status == 1) ? 'readonly' : ''; ?>>
+                                           name="items[<?php echo $deduct['id']; ?>]" 
+                                           class="editable-input deduction-field" 
+                                           value="<?php echo $deduct['amount']; ?>"
+                                           <?php echo ($status == 1) ? 'readonly' : ''; ?>>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -312,6 +310,7 @@ try {
             </div>
 
             <div class="row mt-4 pt-3 border-top border-light">
+                
                 <div class="col-6">
                     <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Leave Summary (Total)</h6>
                     <table class="table table-bordered table-sm small align-middle">
@@ -324,7 +323,6 @@ try {
                         </thead>
                         <tbody>
                             <?php 
-                            // Define types to ensure we show even those with 0 usage if they have balance
                             $leave_types = ['Vacation Leave', 'Sick Leave', 'Emergency Leave', 'Maternity/Paternity', 'Unpaid Leave'];
                             $has_leave_data = false;
                             
@@ -332,56 +330,53 @@ try {
                                 $used = $leaves_taken_lookup[$type] ?? 0;
                                 $remaining = $remaining_balances[$type] ?? 'N/A';
                                 
-                                // Show row if Used > 0 OR if there is a Balance (not N/A)
                                 if ($used > 0 || $remaining !== 'N/A'): 
                                     $has_leave_data = true;
                                     $rem_class = ($remaining !== 'N/A' && $remaining <= 0) ? 'text-danger' : 'text-success';
-                                ?>
+                            ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($type); ?></td>
                                     <td class="text-center"><?php echo $used; ?></td>
                                     <td class="text-center fw-bold <?php echo $rem_class; ?>"><?php echo $remaining; ?></td>
                                 </tr>
-                                <?php 
+                            <?php 
                                     endif;
                                 endforeach;
-                                
                                 if(!$has_leave_data):
-                                ?>
-                                    <tr><td colspan="3" class="text-center text-muted fst-italic">No relevant leave data.</td></tr>
-                                <?php endif; ?>
+                            ?>
+                                <tr><td colspan="3" class="text-center text-muted fst-italic">No relevant leave data.</td></tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="col-6">
-                    <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Active Loan Balances</h6>
+                    <h6 class="text-gray-600 fw-bold text-uppercase text-xs mb-2">Financial Accounts Summary</h6>
                     <table class="table table-bordered table-sm small align-middle">
                         <thead class="bg-light">
                             <tr>
-                                <th>Loan Type</th>
-                                <th class="text-end">Remaining Balance</th> 
+                                <th>Account</th>
+                                <th class="text-end">Projected Balance</th> 
                             </tr>
                         </thead>
                         <tbody>
                             <?php 
-                            // Define the loan categories we care about
-                            $loan_categories = [
+                            // Map Database Category -> Readable Label
+                            $financial_categories = [
                                 'SSS_Loan' => 'SSS Loan', 
                                 'Pagibig_Loan' => 'Pag-IBIG Loan', 
                                 'Company_Loan' => 'Company Loan', 
-                                'Cash_Assist' => 'Cash Assistance'
+                                'Cash_Assist' => 'Cash Assistance',
+                                'Savings' => 'Company Savings' // Added Savings
                             ];
-                            $has_loans = false;
+                            $has_accounts = false;
                             
-                            foreach($loan_categories as $category => $label):
-                                // 1. Get the current remaining balance from the ledger query (E)
+                            foreach($financial_categories as $category => $label):
+                                // 1. Ledger Balance (Before this payroll usually)
                                 $db_balance = floatval($ledger_balances[$category] ?? 0);
                                 
-                                // 2. Find the current deduction amount from the payslip line items (B)
-                                // We use a search/match logic because item names are descriptive
+                                // 2. Find Deduction in Current Payslip
                                 $current_deduction = 0;
-                                // Simple string matching to find the deduction item
                                 foreach($deductions as $d_item) {
                                     if (strpos($d_item['item_name'], $label) !== false) {
                                         $current_deduction = floatval($d_item['amount']);
@@ -389,30 +384,38 @@ try {
                                     }
                                 }
                                 
-                                // 3. Calculate the projected new balance (Balance - Deduction)
-                                $calculated_remaining = $db_balance - $current_deduction;
+                                // 3. Calculate Projected Balance
+                                // Logic: Loans decrease with payment. Savings increase with payment (deposit).
+                                if ($category === 'Savings') {
+                                    $calculated_remaining = $db_balance + $current_deduction;
+                                    $math_operator = '+';
+                                } else {
+                                    $calculated_remaining = $db_balance - $current_deduction;
+                                    $math_operator = '-';
+                                }
                                 
-                                // Only display if there is a positive balance or deduction applied
+                                // Show if active balance OR current transaction exists
                                 if ($db_balance > 0 || $current_deduction > 0):
-                                    $has_loans = true;
-                                    $rem_class = ($calculated_remaining <= 0) ? 'text-danger' : 'text-dark';
-                                ?>
+                                    $has_accounts = true;
+                                    $rem_class = 'text-dark';
+                                    if ($category !== 'Savings' && $calculated_remaining <= 0) $rem_class = 'text-success'; // Loan Paid off
+                            ?>
                                 <tr>
                                     <td><?php echo $label; ?></td>
                                     <td class="text-end fw-bold <?php echo $rem_class; ?>">
                                         <span>₱ <?php echo number_format($calculated_remaining, 2); ?></span>
                                         <div class="text-gray-400 text-xs font-weight-normal">
-                                            (₱ <?php echo number_format($db_balance, 2); ?> - ₱ <?php echo number_format($current_deduction, 2); ?>)
+                                            (₱ <?php echo number_format($db_balance, 2); ?> <?php echo $math_operator; ?> ₱ <?php echo number_format($current_deduction, 2); ?>)
                                         </div>
                                     </td>
                                 </tr>
-                                <?php 
+                            <?php 
                                 endif;
                             endforeach;
                             
-                            if(!$has_loans): 
+                            if(!$has_accounts): 
                             ?>
-                                <tr><td colspan="2" class="text-center text-muted fst-italic">No active loans.</td></tr>
+                                <tr><td colspan="2" class="text-center text-muted fst-italic">No active financial accounts.</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -444,7 +447,6 @@ try {
 <?php require 'template/footer.php'; ?>
 
 <script>
-// ... (JavaScript remains the same) ...
 $(document).ready(function() {
 
     // --- 1. Real-time Calculation ---

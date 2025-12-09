@@ -1,6 +1,6 @@
 <?php
 // dashboard.php
-$page_title = 'LOPISv2 - Dashboard';
+$page_title = 'Dashboard - LOPISv2';
 $current_page = 'dashboard';
 require 'template/header.php';
 require 'template/sidebar.php';
@@ -12,7 +12,7 @@ require 'template/topbar.php';
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h1 class="h3 font-weight-bold mb-1">Dashboard Overview</h1>
-                <p class="mb-0 opacity-75">Welcome back! Here's what's happening today.</p>
+                <p class="text-white mb-0 opacity-75" id="status-message"></p> 
             </div>
         </div>
     </div>

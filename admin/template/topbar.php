@@ -24,7 +24,7 @@
 
                         <div class="small font-weight-bold text-gray-800 d-flex align-items-center justify-content-end">
                             <i class="fas fa-circle text-success live-dot me-2" style="font-size: 8px;"></i>
-                            <span id="last-updated-time">--:--</span>
+                            <span id="last-updated-time">Live Data</span>
                         </div>
 
                     </div>
