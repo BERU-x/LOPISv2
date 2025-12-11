@@ -6,9 +6,18 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../db_connection.php'; 
 require_once __DIR__ . '/../models/global_model.php'; // REQUIRED for notifications
 
+if (!isset($pdo)) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Database connection failed.']);
+    exit;
+}
+
 $action = $_GET['action'] ?? '';
 
-// --- 1. FETCH ALL DATA (Table + Stats) ---
+// =================================================================================
+// ACTION 1: FETCH ALL DATA (Table + Stats)
+// NOTE: This uses client-side pagination, NOT true DataTables SSP.
+// =================================================================================
 if ($action === 'fetch') {
     try {
         // A. Get Stats
@@ -19,8 +28,8 @@ if ($action === 'fetch') {
             FROM tbl_leave");
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if($row) {
-            $stats['pending'] = $row['pending'] ?? 0;
-            $stats['approved'] = $row['approved'] ?? 0;
+            $stats['pending'] = (int)($row['pending'] ?? 0);
+            $stats['approved'] = (int)($row['approved'] ?? 0);
         }
 
         // B. Get Table Data
@@ -35,48 +44,58 @@ if ($action === 'fetch') {
         $stmt = $pdo->query($sql);
         $leaves = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        echo json_encode(['stats' => $stats, 'data' => $leaves]);
+        // Standardized response wrapping custom data
+        echo json_encode(['status' => 'success', 'stats' => $stats, 'data' => $leaves]);
 
     } catch (Exception $e) {
         http_response_code(500);
-        echo json_encode(['error' => $e->getMessage()]);
+        echo json_encode(['status' => 'error', 'message' => 'Failed to fetch leave data.', 'details' => $e->getMessage()]);
     }
     exit;
 }
 
-// --- 2. FETCH EMPLOYEE DROPDOWN ---
+// =================================================================================
+// ACTION 2: FETCH EMPLOYEE DROPDOWN
+// =================================================================================
 if ($action === 'fetch_employees') {
     try {
-        // Changed WHERE clause from != 5 to < 5
+        // Fetch only active employees
         $stmt = $pdo->query("SELECT employee_id, firstname, lastname FROM tbl_employees WHERE employment_status < 5 ORDER BY lastname ASC");
-        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($employees); // Returns raw array for simple JS population
     } catch (Exception $e) {
-        echo json_encode([]);
+        echo json_encode([]); // Return empty array on failure
     }
     exit;
 }
 
-// --- 3. CREATE NEW LEAVE ---
+// =================================================================================
+// ACTION 3: CREATE NEW LEAVE
+// =================================================================================
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $emp_id = trim($_POST['employee_id'] ?? '');
+    $type = trim($_POST['leave_type'] ?? '');
+    $start_date = trim($_POST['start_date'] ?? '');
+    $end_date = trim($_POST['end_date'] ?? '');
+    $reason = trim($_POST['reason'] ?? '');
+    
+    // Simple Validation
+    if (empty($emp_id) || empty($type) || empty($start_date) || empty($end_date)) {
+        echo json_encode(['status' => 'error', 'message' => 'Missing required fields.']);
+        exit;
+    }
+    
     try {
-        $emp_id = $_POST['employee_id'];
-        $type = $_POST['leave_type'];
-        
-        // A. Fetch Employee Name FIRST (for notifications)
-        $stmt_name = $pdo->prepare("SELECT firstname, lastname FROM tbl_employees WHERE employee_id = ?");
-        $stmt_name->execute([$emp_id]);
-        $emp_data = $stmt_name->fetch(PDO::FETCH_ASSOC);
-        
-        // Fallback to ID if name not found, otherwise construct Full Name
-        $emp_name = $emp_data ? ($emp_data['firstname'] . ' ' . $emp_data['lastname']) : $emp_id;
-
-        // B. Calculate Dates
-        $start = new DateTime($_POST['start_date']);
-        $end = new DateTime($_POST['end_date']);
+        // A. Calculate Days Count
+        // NOTE: This simple calculation does not account for weekends or holidays.
+        $start = new DateTime($start_date);
+        $end = new DateTime($end_date);
         $diff = $start->diff($end);
         $days = $diff->days + 1;
 
-        // C. Insert Record
+        $pdo->beginTransaction();
+
+        // B. Insert Record
         $sql = "INSERT INTO tbl_leave (employee_id, leave_type, start_date, end_date, days_count, reason, status, created_on) 
                 VALUES (:employee_id, :leave_type, :start_date, :end_date, :days_count, :reason, 0, NOW())";
         
@@ -84,47 +103,67 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = $stmt->execute([
             ':employee_id' => $emp_id,
             ':leave_type'  => $type,
-            ':start_date'  => $_POST['start_date'],
-            ':end_date'    => $_POST['end_date'],
+            ':start_date'  => $start_date,
+            ':end_date'    => $end_date,
             ':days_count'  => $days,
-            ':reason'      => $_POST['reason']
+            ':reason'      => $reason
         ]);
+        
+        $last_id = $pdo->lastInsertId();
+
+        // C. Fetch Employee Name (for notifications)
+        $stmt_name = $pdo->prepare("SELECT firstname, lastname FROM tbl_employees WHERE employee_id = ?");
+        $stmt_name->execute([$emp_id]);
+        $emp_data = $stmt_name->fetch(PDO::FETCH_ASSOC);
+        $emp_name = $emp_data ? ($emp_data['firstname'] . ' ' . $emp_data['lastname']) : $emp_id;
 
         if($result) {
             // --- NOTIFICATION 1: ALERT ADMINS ---
-            // Updated to use Name instead of ID
-            $admin_msg = "New {$type} request filed for {$emp_name}.";
-            send_notification($pdo, null, 'Admin', 'leave', $admin_msg, 'leave_management.php', null);
+            $admin_msg = "New {$type} request filed for {$emp_name} ({$days} days).";
+            // Pass the leave ID as reference ID
+            send_notification($pdo, null, 'Admin', 'leave', $admin_msg, 'leave_management.php', $last_id);
 
             // --- NOTIFICATION 2: ALERT THE EMPLOYEE ---
-            // Notify the employee that an admin filed this for them
-            $emp_msg = "An administrator has filed a {$type} request on your behalf.";
-            send_notification($pdo, $emp_id, 'Employee', 'leave', $emp_msg, 'my_leaves.php', null);
+            $emp_msg = "A {$type} request ({$days} days) has been successfully filed.";
+            send_notification($pdo, $emp_id, 'Employee', 'leave', $emp_msg, 'my_leaves.php', $last_id);
 
+            $pdo->commit();
             echo json_encode(['status' => 'success', 'message' => 'Leave filed successfully!']);
         } else {
+            $pdo->rollBack();
             echo json_encode(['status' => 'error', 'message' => 'Failed to save record.']);
         }
 
     } catch (Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        echo json_encode(['status' => 'error', 'message' => 'Database Error: ' . $e->getMessage()]);
     }
     exit;
 }
 
-// --- 4. UPDATE STATUS (Approve/Reject) ---
+// =================================================================================
+// ACTION 4: UPDATE STATUS (Approve/Reject)
+// =================================================================================
 if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = $_POST['id'];
-    $status_str = $_POST['status_action']; // 'approve' or 'reject'
+    $id = (int)($_POST['id'] ?? 0);
+    $status_str = trim($_POST['status_action'] ?? ''); // 'approve' or 'reject'
     $status_int = ($status_str === 'approve') ? 1 : 2;
 
+    if ($id <= 0 || !in_array($status_str, ['approve', 'reject'])) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid ID or status action.']);
+        exit;
+    }
+
     try {
-        // 1. Fetch Employee ID First (Need this to send notification)
-        $stmt_get = $pdo->prepare("SELECT employee_id, leave_type, start_date FROM tbl_leave WHERE id = :id");
+        $pdo->beginTransaction();
+        
+        // 1. Fetch data before update (Needed for notification)
+        $stmt_get = $pdo->prepare("SELECT employee_id, leave_type, start_date FROM tbl_leave WHERE id = :id FOR UPDATE");
         $stmt_get->execute([':id' => $id]);
         $leave_data = $stmt_get->fetch(PDO::FETCH_ASSOC);
 
         if (!$leave_data) {
+            $pdo->rollBack();
             echo json_encode(['status' => 'error', 'message' => 'Leave record not found.']);
             exit;
         }
@@ -133,27 +172,31 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE tbl_leave SET status = :status, updated_on = NOW() WHERE id = :id");
         $stmt->execute([':status' => $status_int, ':id' => $id]);
         
+        $pdo->commit();
+        
         // --- NOTIFICATION: ALERT EMPLOYEE ---
         $action_past = ($status_str === 'approve') ? 'APPROVED' : 'REJECTED';
         $type = $leave_data['leave_type'];
-        $date = date('M d', strtotime($leave_data['start_date']));
+        $date = date('M d, Y', strtotime($leave_data['start_date']));
         
-        $notif_msg = "Your {$type} request for {$date} has been {$action_past}.";
+        $notif_msg = "Your {$type} request starting {$date} has been {$action_past}.";
         
-        // Target: Employee ID from the fetched record
-        send_notification($pdo, $leave_data['employee_id'], 'Employee', 'leave', $notif_msg, 'my_leaves.php', null);
+        send_notification($pdo, $leave_data['employee_id'], 'Employee', 'leave', $notif_msg, 'my_leaves.php', $id);
 
         echo json_encode(['status' => 'success', 'message' => 'Leave request updated!']);
 
     } catch (Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        echo json_encode(['status' => 'error', 'message' => 'Database Error: ' . $e->getMessage()]);
     }
     exit;
 }
 
-// --- 5. GET SINGLE DETAILS (For Modal) ---
+// =================================================================================
+// ACTION 5: GET SINGLE DETAILS (For Modal)
+// =================================================================================
 if ($action === 'get_details' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = $_POST['leave_id'];
+    $id = (int)($_POST['leave_id'] ?? 0);
     try {
         $sql = "SELECT l.*, e.firstname, e.lastname, e.photo, e.department 
                 FROM tbl_leave l 
@@ -164,13 +207,13 @@ if ($action === 'get_details' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if($data) {
-            echo json_encode(['success' => true, 'details' => $data]);
+            // Standardized response keys
+            echo json_encode(['status' => 'success', 'details' => $data]);
         } else {
-            echo json_encode(['success' => false]);
+            echo json_encode(['status' => 'error', 'message' => 'Details not found.']);
         }
     } catch (Exception $e) {
-        echo json_encode(['success' => false]);
+        echo json_encode(['status' => 'error', 'message' => 'Database error retrieving details.']);
     }
     exit;
 }
-?>

@@ -1,86 +1,56 @@
 <script>
-// NEW: Global variable to track when the spin started
-let spinnerStartTime = 0; 
+// ==============================================================================
+// 1. GLOBAL STATE VARIABLES
+// ==============================================================================
+let spinnerStartTime = 0; // Global variable to track when the spin started
+let payrollChart = null;  // Chart.js instance for Payroll
+let deptChart = null;     // Chart.js instance for Department Distribution
 
-// Global Chart Instances (so we can destroy/update them)
-let payrollChart = null;
-let deptChart = null;
+// ==============================================================================
+// 2. HELPER FUNCTIONS (Sync, Time, & UI)
+// ==============================================================================
 
-// ⭐ MODIFIED: This function now updates the time after the spinner stops
+// 2.1 Updates the final timestamp text (e.g., "10:30:05 AM")
+function updateLastSyncTime() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    $('#last-updated-time').text(timeString);
+}
+
+// 2.2 Stops the spinner safely (runs for at least 1000ms)
 function stopSpinnerSafely() {
     const icon = $('#refresh-spinner');
     const minDisplayTime = 1000; 
     const timeElapsed = new Date().getTime() - spinnerStartTime;
 
-    // Function to handle the final time update
-    const updateTime = () => {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            second: '2-digit'
-        });
-        $('#last-updated-time').text(timeString);
-    };
-
-    // Remove the spin class and update the time
     const finalizeStop = () => {
         icon.removeClass('fa-spin text-teal');
-        updateTime();
+        updateLastSyncTime();
     };
 
-    // Check if enough time has passed
     if (timeElapsed < minDisplayTime) {
-        // Wait the remainder before stopping
         setTimeout(finalizeStop, minDisplayTime - timeElapsed);
     } else {
-        // Stop immediately
         finalizeStop();
     }
 }
 
-function loadDashboardData() {
-    // 1. Start Timer & Visual Feedback
-    spinnerStartTime = new Date().getTime(); 
-    const icon = $('#refresh-spinner');
-    icon.addClass('fa-spin text-teal'); 
-
-    // ⭐ NEW: Change text to 'Syncing...' immediately
-    $('#last-updated-time').text('Syncing...'); 
-
-    $.ajax({
-        url: 'api/get_dashboard_data.php',
-        type: 'GET',
-        dataType: 'json',
-        success: function(response) {
-            updateMetrics(response.metrics);
-            renderPayrollChart(response.payroll_history);
-            renderDeptChart(response.dept_data);
-            renderLeavesList(response.upcoming_leaves);
-            renderHolidaysList(response.upcoming_holidays);
-
-            // 2. Success: Stop spin & Update Time using the safe function
-            stopSpinnerSafely();
-        },
-        error: function(err) {
-            console.error("Error loading dashboard data", err);
-            // On error, stop spin immediately and show error time
-            $('#refresh-spinner').removeClass('fa-spin text-teal');
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'});
-            $('#last-updated-time').text(`Error @ ${timeString}`);
-        }
-    });
+// 2.3 Sets the Greeting and Current Date in the header
+function setWelcomeMessage() {
+    const now = new Date();
+    const hrs = now.getHours();
+    let greet = (hrs < 12) ? "Good Morning! ☀️" : ((hrs >= 12 && hrs <= 17) ? "Good Afternoon! 🌤️" : "Good Evening! 🌙");
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    $('#status-message').html(`${greet} &nbsp;|&nbsp; Today is ${now.toLocaleDateString('en-US', options)}`);
 }
 
-// --- INITIALIZATION ---
-$(document).ready(function() {
-    // 1. Load data immediately when page opens
-    loadDashboardData();
-
-    // 2. CONNECT THE MASTER REFRESHER
-    window.refreshPageContent = loadDashboardData;
-});
+// ==============================================================================
+// 3. RENDER FUNCTIONS (Updating specific UI blocks)
+// ==============================================================================
 
 function updateMetrics(metrics) {
     $('#val-active-employees').text(Number(metrics.active_employees).toLocaleString());
@@ -104,7 +74,7 @@ function updateMetrics(metrics) {
 function renderPayrollChart(history) {
     const ctx = document.getElementById("payrollHistoryChart").getContext('2d');
     
-    if(payrollChart) payrollChart.destroy(); // Destroy existing if refreshing
+    if(payrollChart) payrollChart.destroy();
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
     gradient.addColorStop(0, 'rgba(12, 192, 223, 0.5)'); 
@@ -152,6 +122,7 @@ function renderDeptChart(dataObj) {
             labels: labels,
             datasets: [{
                 data: values,
+                // Using consistent, hardcoded colors for stability
                 backgroundColor: ['#0CC0DF', '#4e73df', '#6b36ccff', '#f6c23e', '#e74a3b', '#1cc88a', '#858796'], 
                 borderWidth: 5,
                 hoverBorderColor: "#ffffff"
@@ -172,8 +143,7 @@ function renderLeavesList(leaves) {
     if (leaves.length === 0) {
         container.html(`
             <div class="text-center py-5 text-muted">
-                <i class="fas fa-check-circle fa-2x mb-3"></i>
-                <p class="mb-0">No approved leaves scheduled soon.</p>
+                <i class="fa-solid fa-circle-check fa-2x mb-3"></i> <p class="mb-0">No approved leaves scheduled soon.</p>
             </div>
         `);
         return;
@@ -181,7 +151,6 @@ function renderLeavesList(leaves) {
 
     let html = '<ul class="list-group list-group-flush">';
     leaves.forEach(leave => {
-        // Simple JS Date formatting
         const start = new Date(leave.start_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
         const end = new Date(leave.end_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
         const dateDisplay = (start === end) ? start : `${start} - ${end}`;
@@ -207,8 +176,7 @@ function renderHolidaysList(holidays) {
     if (holidays.length === 0) {
         container.html(`
             <div class="text-center py-5 text-muted">
-                <i class="fas fa-calendar-alt fa-2x mb-3"></i>
-                <p class="mb-0">No upcoming holidays configured.</p>
+                <i class="fa-solid fa-calendar-days fa-2x mb-3"></i> <p class="mb-0">No upcoming holidays configured.</p>
             </div>
         `);
         return;
@@ -232,13 +200,57 @@ function renderHolidaysList(holidays) {
     container.html(html);
 }
 
-    // Welcome Msg
-    function setWelcomeMessage() {
-        const now = new Date();
-        const hrs = now.getHours();
-        let greet = (hrs < 12) ? "Good Morning! ☀️" : ((hrs >= 12 && hrs <= 17) ? "Good Afternoon! 🌤️" : "Good Evening! 🌙");
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        $('#status-message').html(`${greet} &nbsp;|&nbsp; Today is ${now.toLocaleDateString('en-US', options)}`);
-    }
+// ==============================================================================
+// 4. MAIN DATA FETCHER (Triggered on load and refresh)
+// ==============================================================================
+function loadDashboardData() {
+    // 1. Start Timer & Visual Feedback
+    spinnerStartTime = new Date().getTime(); 
+    const icon = $('#refresh-spinner');
+    icon.addClass('fa-spin text-teal'); 
+    $('#last-updated-time').text('Syncing...'); 
+
+    $.ajax({
+        url: 'api/get_dashboard_data.php',
+        type: 'GET',
+        dataType: 'json',
+        success: function(response) {
+            // Check for structure, though typically guaranteed by API
+            if (response.metrics) {
+                updateMetrics(response.metrics);
+                renderPayrollChart(response.payroll_history);
+                renderDeptChart(response.dept_data);
+                renderLeavesList(response.upcoming_leaves);
+                renderHolidaysList(response.upcoming_holidays);
+            }
+            
+            // 2. Success: Stop spin & Update Time using the safe function
+            stopSpinnerSafely();
+            
+            
+        },
+        error: function(err) {
+            console.error("Error loading dashboard data", err);
+            // On error, stop spin immediately and show error time
+            $('#refresh-spinner').removeClass('fa-spin text-teal');
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'});
+            $('#last-updated-time').text(`Error @ ${timeString}`);
+        }
+    });
+}
+
+
+$(document).ready(function() {
+    
+    // Set the welcome message immediately
     setWelcomeMessage();
+
+    // 1. Load data immediately when page opens
+    loadDashboardData();
+
+    // 2. CONNECT THE MASTER REFRESHER
+    // This hook is used by the Topbar buttons to reload this specific page content.
+    window.refreshPageContent = loadDashboardData;
+});
 </script>

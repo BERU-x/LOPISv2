@@ -2,13 +2,59 @@
 require '../db_connection.php';
 date_default_timezone_set('Asia/Manila');
 
-// ============================================
-// ⚠️ TESTING MODE CONFIGURATION ⚠️
-// ============================================
-$accessGranted = true; // Always allow access
-$status_based = 'OFB'; // Hardcoded to Office Base
-$friendly_location = 'On-site (OFB) [TESTING MODE]'; 
-// ============================================
+// --- 1. Initialize Access Variables ---
+$accessGranted = false;
+$status_based = ''; 
+$friendly_location = ''; 
+$swal_title = "Error";
+$swal_message = "An unknown error occurred.";
+$swal_icon = "error";
+
+// --- 2. Check for Token and Location ---
+if (!isset($_GET['token'])) {
+    $swal_title = "Access Denied";
+    $swal_message = "No access token provided. Please use a valid link.";
+} elseif (!isset($_GET['location'])) {
+    $swal_title = "Invalid Link";
+    $swal_message = "No work location was specified in the link.";
+} else {
+    $token = $_GET['token'];
+    $location = $_GET['location'];
+
+    // --- 3. Validate Location ---
+    if ($location == 'OFB') {
+        $status_based = 'OFB';
+        $friendly_location = 'On-site (OFB)';
+    } elseif ($location == 'WFH') {
+        $status_based = 'WFH';
+        $friendly_location = 'Work From Home (WFH)';
+    } else {
+        $swal_title = "Invalid Location";
+        $swal_message = "The work location in the link is not valid.";
+    }
+
+    // --- 4. Validate Token ---
+    if ($status_based != '') {
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM tbl_access_tokens WHERE token = ?");
+            $stmt->execute([$token]);
+            $token_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$token_data) {
+                $swal_title = "Access Denied";
+                $swal_message = "This link is invalid. Please get a new link for today.";
+            } elseif (strtotime($token_data['expires_at']) < time()) {
+                $swal_title = "Link Expired";
+                $swal_message = "This attendance link has expired. Please get a new link.";
+            } else {
+                $accessGranted = true;
+            }
+
+        } catch (Exception $e) {
+            $swal_message = "Database error: " . $e->getMessage();
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -16,17 +62,13 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Attendance TEST PAGE</title>
+    <title>Attendance Kiosk</title>
     
     <link rel="icon" href="../assets/images/favicon.ico" type="image/ico">
     <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../assets/vendor/fa6/css/all.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <link rel="stylesheet" href="../assets/css/time_styles.css"> 
-    <style>
-        /* Visual cue that this is a test page */
-        body { border-top: 10px solid #ffc107; }
-    </style>
 </head>
 <body>
 
@@ -35,6 +77,8 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
             <div class="card shadow-lg border-0">
                 <div class="card-body p-5 text-center">
 
+                <?php if ($accessGranted): ?>
+                    
                     <div class="text-center mb-4">
                         <img src="../assets/images/LOPISv2.png" alt="LOPISv2 Logo" class="img-fluid" style="max-height: 150px;">
                     </div>
@@ -42,10 +86,10 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                     <h1 class="display-4 fw-bold mb-3" id="digital-clock"></h1>
                     <p class="lead text-muted mb-2"><?php echo date("l, F j, Y"); ?></p>
                     
-                    <p class="h5 mb-4">Location: <strong class="text-warning"><?php echo htmlspecialchars($friendly_location); ?></strong></p>
+                    <p class="h5 mb-4">Location: <strong><?php echo htmlspecialchars($friendly_location); ?></strong></p>
 
                     <form id="attendance-form">
-                                                     
+                                                    
                         <div class="mb-3">
                             <div class="input-group">
                                 <span class="input-group-text">
@@ -55,31 +99,15 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                             </div>
                         </div>
 
-                        <div class="mb-3 p-2 border border-danger rounded" style="background-color: #fff3cd;">
-                            <div class="d-flex align-items-center justify-content-center mb-2">
-                                <i class="fas fa-bug text-danger me-2"></i>
-                                <strong class="text-danger small">DEVELOPER TEST MODE</strong>
+                        <div class="mb-3" id="password-group">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-lock"></i>
+                                </span>
+                                <input type="password" class="form-control" id="password" name="password" placeholder="Password" required autocomplete="off">
                             </div>
-                            
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <label class="small text-muted mb-1">Override Date</label>
-                                    <input type="date" class="form-control form-control-sm text-center font-monospace" 
-                                           name="custom_date" 
-                                           max="<?php echo date('Y-m-d'); ?>"> </div>
-
-                                <div class="col-6">
-                                    <label class="small text-muted mb-1">Override Time</label>
-                                    <input type="text" class="form-control form-control-sm text-center font-monospace" 
-                                           name="custom_time" 
-                                           placeholder="HH:MM:SS" value="">
-                                </div>
-                            </div>
-
-                            <small class="text-muted d-block mt-2" style="font-size: 11px;">
-                                Leave fields empty to use current Real Date & Time.
-                            </small>
                         </div>
+
                         <input type="hidden" id="action" name="action" value="">
                         <input type="hidden" name="status_based" value="<?php echo htmlspecialchars($status_based); ?>">
 
@@ -99,6 +127,16 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
 
                     </form>
 
+                <?php else: ?>
+
+                    <div class="text-center">
+                        <i class="fas fa-exclamation-triangle text-danger fa-3x mb-3"></i>
+                        <h3 class="text-danger"><?php echo $swal_title; ?></h3>
+                        <p class="text-muted"><?php echo $swal_message; ?></p>
+                    </div>
+
+                <?php endif; ?>
+
                 </div>
             </div>
         </div>
@@ -109,8 +147,24 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
+    // JAVASCRIPT: Disable Right Click Menu Globally
+    document.addEventListener('contextmenu', function(event) {
+        event.preventDefault(); // This blocks the menu from appearing
+    });
+
+    // OPTIONAL: Prevent F12 (DevTools) and other shortcuts if this is for strict security
+    document.onkeydown = function(e) {
+        if(e.keyCode == 123) { // F12
+            return false;
+        }
+        if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) { // Ctrl+Shift+I
+            return false;
+        }
+    }
+
         $(document).ready(function() {
             
+            // --- SweetAlert Setup ---
             const Toast = Swal.mixin({
                 toast: true,
                 position: 'top-end',
@@ -123,6 +177,10 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                 },
                 customClass: { popup: 'swal2-toast-popup' }
             });
+
+            <?php if (!$accessGranted): ?>
+                // Access Denied Logic (Optional: Auto-redirect or show alert on load)
+            <?php else: ?>
 
             // --- Clock Logic ---
             function updateClock() {
@@ -174,42 +232,47 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
 
             function handleStatusResponse(response) {
                 var status = response.status; 
-                var msg = response.message; 
+                var msg = response.message; // Capture "Forgot Time Out" message
 
-                // Reset UI (Hide everything first)
+                // Reset UI
                 $('#action-buttons').hide();
                 $('#btn-time-in').hide();
                 $('#btn-time-out').hide();
                 $('#status-message').hide();
                 $('#employee_id').removeClass('is-invalid is-valid');
 
+                // --- SCENARIO: LOCATION MISMATCH ---
                 if (status === 'location_mismatch') {
                     $('#employee_id').addClass('is-invalid');
                     Toast.fire({ 
                         icon: 'error', 
                         title: 'Wrong Location Link',
-                        text: 'Mismatch detected (simulated).'
+                        text: 'You Timed In at ' + response.required_location + '. You must Time Out using the ' + response.required_location + ' link.'
                     });
                 }
+                // --- SCENARIO 1: ID NOT FOUND ---
                 else if (status === 'invalid_id') {
                     $('#employee_id').addClass('is-invalid');
                     Toast.fire({ icon: 'error', title: 'Employee ID not found.' });
                 } 
+                // --- SCENARIO 2: ACCOUNT INACTIVE ---
                 else if (status === 'inactive') {
                     $('#employee_id').addClass('is-invalid');
                     Toast.fire({ icon: 'error', title: 'Account is inactive.' });
                 }
+                // --- SCENARIO 3: NEEDS TIME IN ---
                 else if (status === 'need_time_in') {
                     $('#employee_id').addClass('is-valid');
                     $('#action-buttons').fadeIn();
-                    $('#btn-time-in').show(); // Show Only Time In
+                    $('#btn-time-in').show();
                 } 
+                // --- SCENARIO 4: NEEDS TIME OUT ---
                 else if (status === 'need_time_out') {
                     $('#employee_id').addClass('is-valid');
                     $('#action-buttons').fadeIn();
-                    $('#btn-time-out').show(); // Show Only Time Out
+                    $('#btn-time-out').show();
 
-                    // Show Toast if there is a pending log warning
+                    // ⚠️ CHECK FOR WARNING MESSAGE (FORGOT TIME OUT)
                     if (msg) {
                         Toast.fire({ 
                             icon: 'warning', 
@@ -219,6 +282,7 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                         });
                     }
                 } 
+                // --- SCENARIO 5: COMPLETED ---
                 else if (status === 'completed') {
                     $('#employee_id').addClass('is-valid');
                     $('#status-message')
@@ -253,9 +317,10 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
 
             function submitAttendance() {
                 var employeeId = $('#employee_id').val();
+                var password = $('#password').val();
                 
-                if (employeeId.trim() === '') {
-                    Toast.fire({ icon: 'warning', title: 'Employee ID is required.' });
+                if (employeeId.trim() === '' || password.trim() === '') {
+                    Toast.fire({ icon: 'warning', title: 'Password is required.' });
                     return; 
                 }
 
@@ -263,7 +328,7 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
 
                 $.ajax({
                     type: 'POST',
-                    url: '../process/p_attendance.php', 
+                    url: '../process/p_attendance.php',
                     data: formData,
                     dataType: 'json',
                     success: function(response) {
@@ -275,11 +340,7 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                             if (response.status === 'success') {
                                 // Full Reset on Success
                                 $('#employee_id').val('');
-                                
-                                // Reset Test Fields
-                                $('input[name="custom_time"]').val('');
-                                $('input[name="custom_date"]').val(''); 
-                                
+                                $('#password').val('');
                                 resetButtonsOnly();
                             }
                         });
@@ -290,9 +351,24 @@ $friendly_location = 'On-site (OFB) [TESTING MODE]';
                 });
             }
 
+            // ============================================
+            // 3. ENTER KEY LISTENER
+            // ============================================
+            $('#password').on('keypress', function(e) {
+                if (e.which === 13) { 
+                    e.preventDefault(); 
+                    if ($('#btn-time-in').is(':visible')) {
+                        $('#btn-time-in').click();
+                    } else if ($('#btn-time-out').is(':visible')) {
+                        $('#btn-time-out').click();
+                    }
+                }
+            });
+
             $('#attendance-form').on('submit', function(e){
                 e.preventDefault();
             });
+            <?php endif; ?>
         });
     </script>
 </body>

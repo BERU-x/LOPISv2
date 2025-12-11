@@ -1,86 +1,77 @@
 <?php
-// --- 1. START BUFFERING IMMEDIATELY ---
+// --- 1. START BUFFERING ---
 ob_start(); 
 
+// Include checking.php (handles session start & 'Remember Me')
 require_once __DIR__ . '/../../checking.php';
 
-// --- 1.5 TIMEZONE SETUP ---
-// Set default timezone to Philippines (UTC+8)
+// --- 2. TIMEZONE SETUP ---
 date_default_timezone_set('Asia/Manila');
 
-// --- 2. SESSION AUTHENTICATION ---
+// --- 3. AUTHENTICATION CHECK ---
+// If checking.php didn't log them in, kick them out.
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header("Location: ../index.php"); 
     exit;
 }
 
-// --- 3. LOADER LOGIC ---
+// --- 4. ROLE ENFORCEMENT (GATEKEEPER) ---
+
+$user_type = $_SESSION['usertype'] ?? null;
+
+if ($user_type != 1) { 
+    // Redirect based on the user's actual role
+    switch ($user_type) {
+        case 0: // Superadmin
+            header("Location: ../superadmin/dashboard.php");
+            break;
+        case 2: // Employee
+            header("Location: ../user/dashboard.php");
+            break;
+        default: // Unknown/Banned
+            session_destroy();
+            header("Location: ../index.php");
+            break;
+    }
+    exit; // Stop script execution immediately
+}
+
+// --- 5. LOADER LOGIC ---
 $show_loader = false; 
 if (isset($_SESSION['show_loader']) && $_SESSION['show_loader'] === true) {
     $show_loader = true;
     unset($_SESSION['show_loader']); 
-    
-    // Force-save session
     session_write_close();
     session_start();
 }
 
-// --- 4. ROLE-BASED ACCESS (Admin = 1) ---
-// Note: You might want to allow Superadmin (0) here too if they share the same dashboard
-$user_type = $_SESSION['usertype'] ?? null;
-$redirect_map = [
-    // 0: Super Admin (If they have a separate folder, keep this.)
-    0 => '../superadmin/dashboard.php',
-    // 2: Employee
-    2 => '../user/dashboard.php', 
-];
-
-// Allow Admin (1). If Superadmin (0) should also access this, change to: ($user_type !== 1 && $user_type !== 0)
-if ($user_type != 1) { 
-    $redirect_url = $redirect_map[$user_type] ?? '../index.php';
-    header("Location: $redirect_url");
-    exit;
-}
-
-// --- 5. GET SESSION VARS ---
+// --- 6. GET SESSION DATA ---
 $fullname = $_SESSION['fullname'] ?? 'Admin User';
 $email = $_SESSION['email'] ?? '';
-
-// ⭐ ADDED: Profile Picture Logic (Matches Employee Header)
-// This ensures topbar.php always has a valid filename to use.
 $profile_picture = $_SESSION['profile_picture'] ?? 'default.png'; 
 
-// --- 5.5 NOTIFICATION SETUP ---
-$my_id = $_SESSION['user_id'] ?? $_SESSION['employee_id'] ?? 0;
-$my_role = 'Admin'; // Admin Role
+// --- 7. NOTIFICATIONS ---
+$my_id = $_SESSION['user_id'] ?? 0;
+$notifications = [];
+$notif_count = 0;
 
-// Include Model to fetch data
 $global_model_path = __DIR__ . '/../models/global_model.php';
-if (file_exists($global_model_path)) {
-    // Ensure $pdo exists from checking.php
-    if (isset($pdo)) {
-        require_once $global_model_path;
-        $notifications = function_exists('get_my_notifications') ? get_my_notifications($pdo, $my_id, $my_role) : [];
+if (file_exists($global_model_path) && isset($pdo)) {
+    require_once $global_model_path;
+    if (function_exists('get_my_notifications')) {
+        $notifications = get_my_notifications($pdo, $my_id, 'Admin');
         $notif_count = count($notifications);
-    } else {
-        $notifications = [];
-        $notif_count = 0;
     }
-} else {
-    $notifications = [];
-    $notif_count = 0;
 }
 
-// --- 6. PAGE TITLE ---
+// --- 8. PAGE TITLE & CLEAN BUFFER ---
 $page_title ??= 'Admin Portal - LOPISv2';
-
-// --- 7. CLEAN THE BUFFER ---
 ob_clean(); 
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf8">
+    <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title><?php echo htmlspecialchars($page_title); ?></title>
@@ -95,7 +86,6 @@ ob_clean();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Dropify/0.2.2/css/dropify.min.css">
     <link href="../assets/css/portal_styles.css" rel="stylesheet">
     <link href="../assets/css/loader_styles.css" rel="stylesheet">
-
 </head>
 
 <body id="page-top">

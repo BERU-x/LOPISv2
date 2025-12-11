@@ -1,77 +1,72 @@
 <?php
-// This is the Employee Header
-// It contains session auth, loader logic, and the HTML <head>
+// --- 1. START BUFFERING ---
+ob_start(); 
 
-date_default_timezone_set('Asia/Manila');
-
-// 1. INCLUDE AUTHENTICATION (This starts the session and checks cookies)
+// Include checking.php (handles session start & 'Remember Me')
 require_once __DIR__ . '/../../checking.php';
 
-// --- 2. SESSION AUTHENTICATION CHECK ---
+// --- 2. TIMEZONE SETUP ---
+date_default_timezone_set('Asia/Manila');
+
+// --- 3. AUTHENTICATION CHECK ---
+// If checking.php didn't log them in, kick them out.
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    header("Location: ../index.php"); // Redirect to login if not valid
+    header("Location: ../index.php"); 
     exit;
 }
 
-// --- 3. LOADER LOGIC ---
+// --- 4. ROLE ENFORCEMENT (GATEKEEPER) ---
+
+$user_type = $_SESSION['usertype'] ?? null;
+
+if ($user_type != 2) { 
+    // Redirect based on the user's actual role
+    switch ($user_type) {
+        case 0: // Superadmin
+            header("Location: ../superadmin/dashboard.php");
+            break;
+        case 2: // Employee
+            header("Location: ../user/dashboard.php");
+            break;
+        default: // Unknown/Banned
+            session_destroy();
+            header("Location: ../index.php");
+            break;
+    }
+    exit; // Stop script execution immediately
+}
+
+// --- 5. LOADER LOGIC ---
 $show_loader = false; 
 if (isset($_SESSION['show_loader']) && $_SESSION['show_loader'] === true) {
     $show_loader = true;
-    unset($_SESSION['show_loader']);
-    
-    // Force-save the session state so the loader flag is cleared immediately
+    unset($_SESSION['show_loader']); 
     session_write_close();
     session_start();
 }
 
-// --- 4. ROLE-BASED ACCESS (Employee = 2) ---
-if (!isset($_SESSION['usertype']) || $_SESSION['usertype'] != 2) {
-    // Redirect logic for non-employees
-    if (isset($_SESSION['usertype']) && $_SESSION['usertype'] == 0) {
-        header("Location: ../superadmin/dashboard.php");
-    } elseif (isset($_SESSION['usertype']) && $_SESSION['usertype'] == 1) { 
-        header("Location: ../admin/dashboard.php");
-    } else {
-        header("Location: ../index.php");
-    }
-    exit;
-}
-
-// --- 5. GET SESSION VARS ---
-$fullname = $_SESSION['fullname'] ?? 'Employee';
+// --- 6. GET SESSION DATA ---
+$fullname = $_SESSION['fullname'] ?? 'Admin User';
 $email = $_SESSION['email'] ?? '';
-$firstName = $fullname ? htmlspecialchars(explode(' ', $fullname)[0]) : 'User';
-
-// ⭐ UPDATED: Fetch the photo using the key set in checking.php ('profile_picture')
-// We also default to 'default.png' if it's missing to avoid NULL errors later.
 $profile_picture = $_SESSION['profile_picture'] ?? 'default.png'; 
 
-// --- 6. NOTIFICATION SETUP ---
-$my_id = $_SESSION['employee_id'] ?? 0;
-$my_role = 'Employee'; 
+// --- 7. NOTIFICATIONS ---
+$my_id = $_SESSION['user_id'] ?? 0;
+$notifications = [];
+$notif_count = 0;
 
-// Include Model to fetch notifications
-// We check if $pdo exists (from checking.php) before using it
 $global_model_path = __DIR__ . '/../models/global_model.php';
-
 if (file_exists($global_model_path) && isset($pdo)) {
     require_once $global_model_path;
-    
-    // Check if the function exists to prevent fatal errors
     if (function_exists('get_my_notifications')) {
-        $notifications = get_my_notifications($pdo, $my_id, $my_role);
+        $notifications = get_my_notifications($pdo, $my_id, 'Admin');
         $notif_count = count($notifications);
-    } else {
-        $notifications = [];
-        $notif_count = 0;
     }
-} else {
-    $notifications = [];
-    $notif_count = 0;
 }
 
-// --- 7. PAGE TITLE ---
-$page_title = $page_title ?? 'Employee Portal - LOPISv2';
+// --- 8. PAGE TITLE & CLEAN BUFFER ---
+$page_title ??= 'Employee Portal - LOPISv2';
+ob_clean(); 
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -82,17 +77,17 @@ $page_title = $page_title ?? 'Employee Portal - LOPISv2';
     <title><?php echo htmlspecialchars($page_title); ?></title>
 
     <link rel="icon" href="../assets/images/favicon.ico" type="image/ico">
-    
-    <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet">
-    <link href="../assets/vendor/fa6/css/all.min.css" rel="stylesheet" type="text/css">
-    
     <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
 
+    <link href="../assets/vendor/fa6/css/all.min.css" rel="stylesheet" type="text/css">
+    <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../assets/css/dataTables.min.css" rel="stylesheet"> 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">    
-
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Dropify/0.2.2/css/dropify.min.css">
     <link href="../assets/css/portal_styles.css" rel="stylesheet">
     <link href="../assets/css/loader_styles.css" rel="stylesheet">
 </head>
+
 <body id="page-top">
 
     <?php if ($show_loader): ?>
@@ -103,9 +98,9 @@ $page_title = $page_title ?? 'Employee Portal - LOPISv2';
                     <div class="progress-bar"></div>
                 </div>
                 <span id="loader-percentage">0%</span>
-                <p class="loader-text mt-3">Initializing your workspace...</p>
+                <p class="loader-text mt-3">Initializing workspace...</p>
             </div>
         </div>
     <?php endif; ?>
 
-    <div id="wrapper" class="d-flex">
+    <div id="wrapper">

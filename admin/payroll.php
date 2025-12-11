@@ -115,7 +115,7 @@ require 'template/topbar.php';
 
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-striped table-hover align-middle" id="payrollTable" width="100%" cellspacing="0">
+                <table class="table table-hover align-middle" id="payrollTable" width="100%" cellspacing="0">
                     <thead class="bg-light text-uppercase text-gray-600 text-xs font-weight-bold">
                         <tr>
                             <th class="text-center" style="width: 20px;">

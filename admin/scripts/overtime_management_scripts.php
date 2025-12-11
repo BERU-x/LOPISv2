@@ -1,12 +1,14 @@
 <script>
-// --- GLOBAL STATE VARIABLES AND HELPERS ---
+// ==============================================================================
+// 1. GLOBAL STATE & HELPER FUNCTIONS
+// ==============================================================================
 var otTable;
 var currentOTId;
 
-// 1. NEW: Global variable to track when the spin started
+// 1.1 Global variable to track when the spin started
 let spinnerStartTime = 0; 
 
-// 2. HELPER FUNCTION: Updates the final timestamp text
+// 1.2 HELPER FUNCTION: Updates the final timestamp text
 function updateLastSyncTime() {
     const now = new Date();
     const timeString = now.toLocaleTimeString('en-US', { 
@@ -17,7 +19,7 @@ function updateLastSyncTime() {
     $('#last-updated-time').text(timeString);
 }
 
-// 3. HELPER FUNCTION: Stops the spinner only after the minimum time has passed (500ms)
+// 1.3 HELPER FUNCTION: Stops the spinner safely (waits for minDisplayTime = 1000ms)
 function stopSpinnerSafely() {
     const icon = $('#refresh-spinner');
     const minDisplayTime = 1000; 
@@ -28,118 +30,33 @@ function stopSpinnerSafely() {
         updateLastSyncTime(); 
     };
 
-    // Check if network fetch was faster than 500ms
     if (timeElapsed < minDisplayTime) {
-        // Wait the remaining time before stopping
         setTimeout(finalizeStop, minDisplayTime - timeElapsed);
     } else {
-        // Stop immediately
         finalizeStop();
     }
 }
-// ---------------------------------------------------
 
-$(document).ready(function() {
-
-    // 4. INITIALIZE DATATABLE
-    otTable = $('#overtimeTable').DataTable({
-        processing: true,
-        serverSide: true,
-        ordering: true,
-        dom: 'rtip',
-        ajax: {
-            url: "api/overtime_action.php?action=fetch",
-            type: "GET",
-            data: function(d) {
-                d.start_date = $('#filter_start_date').val();
-                d.end_date = $('#filter_end_date').val();
-            }
-        },
-
-        // ⭐ CRITICAL MODIFICATION: Conditional drawCallback
-        drawCallback: function(settings) {
-            const icon = $('#refresh-spinner');
-            // Check if spinning to avoid running stop logic on first load cleanup
-            if (icon.hasClass('fa-spin')) {
-                stopSpinnerSafely();
-            } else {
-                // Initial load: Just set the current time
-                updateLastSyncTime(); 
-            }
-        },
-        // --------------------------------
-
-        columns: [
-            // Col 1: Employee
-            {
-                data: 'employee_id',
-                render: function(data, type, row) {
-                    var photo = row.photo ? '../assets/images/'+row.photo : '../assets/images/default.png';
-                    return `
-                        <div class="d-flex align-items-center">
-                            <img src="${photo}" class="rounded-circle me-3 border shadow-sm" style="width: 35px; height: 35px; object-fit: cover;">
-                            <div>
-                                <div class="fw-bold text-dark text-sm">${row.firstname} ${row.lastname}</div>
-                                <div class="text-xs text-muted">${row.department || ''}</div>
-                            </div>
-                        </div>`;
-                }
-            },
-            // Col 2: Date
-            { data: 'ot_date', className: "text-center" },
-            // Col 3: Req Hrs
-            { data: 'hours_requested', className: "text-center fw-bold" },
-            // Col 4: Status
-            { 
-                data: 'status', 
-                className: "text-center",
-                render: function(data) {
-                    if(data == 'Approved') return '<span class="badge bg-success">Approved</span>';
-                    if(data == 'Rejected') return '<span class="badge bg-danger">Rejected</span>';
-                    return '<span class="badge bg-warning text-dark">Pending</span>';
-                }
-            },
-            // Col 5: Actions
-            {
-                data: 'id',
-                orderable: false,
-                className: "text-center",
-                render: function(data) {
-                    return `<button class="btn btn-sm btn-outline-teal shadow-sm fw-bold" onclick="viewOT(${data})"><i class="fas fa-eye me-1"></i> Details </button>`;
-                }
-            }
-        ]
-    });
-
-    // Filters - Use the hook for reloads
-    $('#customSearch').on('keyup', function() { otTable.search(this.value).draw(); });
+// 1.4 MASTER REFRESHER HOOK (Must be global)
+window.refreshPageContent = function() {
+    // 1. Record Start Time
+    spinnerStartTime = new Date().getTime(); 
     
-    $('#applyFilterBtn').on('click', function() { 
-        window.refreshPageContent(); // Use the hook 
-    });
+    // 2. Start Visual feedback & Text
+    $('#refresh-spinner').addClass('fa-spin text-teal');
+    $('#last-updated-time').text('Syncing...');
     
-    $('#clearFilterBtn').on('click', function() { 
-        $('#filter_start_date, #filter_end_date, #customSearch').val('');
-        otTable.search('').draw();
-        window.refreshPageContent(); // Use the hook
-    });
-
-    // 5. MASTER REFRESHER HOOK (Modified)
-    window.refreshPageContent = function() {
-        // 1. Record Start Time
-        spinnerStartTime = new Date().getTime(); 
-        
-        // 2. Start Visual feedback & Text
-        $('#refresh-spinner').addClass('fa-spin text-teal');
-        $('#last-updated-time').text('Syncing...');
-        
-        // 3. Reload Table
+    // 3. Reload Table
+    if (otTable) {
         otTable.ajax.reload(null, false);
-    };
+    }
+};
 
-});
+// ==============================================================================
+// 2. MODAL LOGIC FUNCTIONS (Must be global for onclick binding)
+// ==============================================================================
 
-// --- VIEW DETAILS LOGIC (MODIFIED for better numerical handling) ---
+// --- VIEW DETAILS LOGIC ---
 function viewOT(id) {
     currentOTId = id;
     
@@ -148,28 +65,33 @@ function viewOT(id) {
     $('#modal_approved_display').text('').addClass('d-none');
     $('#modal_actions').removeClass('d-none');
 
+    // Show Loader
+    const modalBody = $('#viewOTModal .modal-body');
+    modalBody.html('<div class="text-center py-5"><div class="spinner-border text-teal" role="status"></div><p class="mt-2 text-muted">Loading...</p></div>');
+    
     $.ajax({
         url: 'api/overtime_action.php?action=get_details',
         type: 'POST',
         data: { id: id },
         dataType: 'json',
         success: function(data) {
-            // Populate Details
-            var photo = data.photo ? '../assets/images/'+data.photo : '../assets/images/default.png';
-            $('#modal_emp_photo').attr('src', photo);
+            
+            // Re-render the detailed body content after loading
+            // Note: Assuming your HTML structure requires a detailed layout
+            const requestedHours = parseFloat(data.hours_requested || 0);
+            const rawOtHours = parseFloat(data.raw_biometric_ot || 0);
+            
+            modalBody.html(renderOTDetails(data)); // Assuming you have a separate render function in HTML template, or replace this with detailed rendering logic
+
+            // Populate static details
+            $('#modal_emp_photo').attr('src', data.photo ? '../assets/images/'+data.photo : '../assets/images/default.png');
             $('#modal_emp_name').text(data.firstname + ' ' + data.lastname);
             $('#modal_emp_dept').text(data.department);
             $('#modal_ot_date').text(data.ot_date);
             $('#modal_reason').text(data.reason || 'No reason provided.');
-            
-            // Explicitly parse and display raw hours
-            const rawOtHours = parseFloat(data.raw_biometric_ot || 0);
-            const requestedHours = parseFloat(data.hours_requested || 0);
-            
             $('#modal_raw_ot').text(rawOtHours.toFixed(2));
             $('#modal_req_hrs').text(requestedHours.toFixed(2));
             
-            // Set Status Badge
             var statusHtml = '<span class="badge bg-warning text-dark">Pending</span>';
             if(data.status === 'Approved') statusHtml = '<span class="badge bg-success">Approved</span>';
             if(data.status === 'Rejected') statusHtml = '<span class="badge bg-danger">Rejected</span>';
@@ -178,44 +100,38 @@ function viewOT(id) {
             // Handle Logic based on status
             if(data.status === 'Pending') {
                 
-                // 1. Determine Initial Approved Value
+                // 1. Determine Initial Approved Value (Cap at requested or raw OT, whichever is lower)
                 let defaultApproved = requestedHours;
-                
-                // ⭐ CRITICAL CAP 1: Cap the default approved hours to the Raw OT
                 if (defaultApproved > rawOtHours) {
                     defaultApproved = rawOtHours;
                 }
                 
-                // Set the initial capped value in the input field
                 $('#modal_approved_input').val(defaultApproved.toFixed(2));
                 
-                // 2. Attach Real-time Input Cap Listener
-                // We use .off().on() to ensure the listener is clean every time the modal opens
+                // 2. Attach Real-time Input Cap Listener (Ensures input doesn't exceed Raw OT)
                 $('#modal_approved_input').off('input.ot_cap').on('input.ot_cap', function() {
-                    // Use 'input' event for immediate feedback
                     let enteredValue = parseFloat($(this).val());
-                    
-                    // If entered value is greater than the raw OT, reset it to the cap
                     if (!isNaN(enteredValue) && enteredValue > rawOtHours) {
-                        // Reset the input value to the maximum (Raw OT)
                         $(this).val(rawOtHours.toFixed(2));
-                        
-                        // Optional: Show a temporary warning to the user
-                        // You could add an alert here if needed for better UX.
                     }
                 });
 
-                $('#modal_actions').show(); // Show Approve/Reject buttons
+                $('#modal_actions').show(); 
+                $('#modal_approved_input').removeClass('d-none');
+                $('#modal_approved_display').addClass('d-none');
+                
             } else {
                 // Read-only mode
                 $('#modal_approved_input').addClass('d-none');
                 $('#modal_approved_display').text(data.hours_approved + ' hrs').removeClass('d-none');
-                $('#modal_actions').hide(); // Hide buttons
-                // Clean up the keyup listener when switching to read-only
-                $('#modal_approved_input').off('input.ot_cap');
+                $('#modal_actions').hide(); 
+                $('#modal_approved_input').off('input.ot_cap'); // Remove listener
             }
 
             $('#viewOTModal').modal('show');
+        },
+        error: function() {
+             modalBody.html('<div class="text-center py-5"><p class="text-danger">Failed to load details. Try again.</p></div>');
         }
     });
 }
@@ -255,9 +171,99 @@ function processOT(action) {
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }
+                },
+                error: function() {
+                    Swal.fire('Error', 'Server Error', 'error');
                 }
             });
         }
     });
 }
+
+
+$(document).ready(function() {
+
+    // 3. INITIALIZE DATATABLE
+    otTable = $('#overtimeTable').DataTable({
+        processing: true,
+        serverSide: true,
+        ordering: true,
+        dom: 'rtip',
+        
+        ajax: {
+            url: "api/overtime_action.php?action=fetch",
+            type: "GET",
+            data: function(d) {
+                d.start_date = $('#filter_start_date').val();
+                d.end_date = $('#filter_end_date').val();
+            }
+        },
+
+        drawCallback: function(settings) {
+            const icon = $('#refresh-spinner');
+            if (icon.hasClass('fa-spin')) {
+                stopSpinnerSafely();
+            } else {
+                updateLastSyncTime(); 
+            }
+        },
+
+        columns: [
+            // Col 1: Employee
+            {
+                data: 'employee_id',
+                className: "align-middle",
+                render: function(data, type, row) {
+                    var photo = row.photo ? '../assets/images/'+row.photo : '../assets/images/default.png';
+                    return `
+                        <div class="d-flex align-items-center">
+                            <img src="${photo}" class="rounded-circle me-3 border shadow-sm" 
+                                style="width: 35px; height: 35px; object-fit: cover;"
+                                onerror="this.src='../assets/images/default.png'">
+                            <div>
+                                <div class="fw-bold text-dark text-sm">${row.firstname} ${row.lastname}</div>
+                                <div class="text-xs text-muted">${row.department || ''}</div>
+                            </div>
+                        </div>`;
+                }
+            },
+            // Col 2: Date
+            { data: 'ot_date', className: "text-center align-middle" },
+            // Col 3: Req Hrs
+            { data: 'hours_requested', className: "text-center fw-bold align-middle" },
+            // Col 4: Status
+            { 
+                data: 'status', 
+                className: "text-center align-middle",
+                render: function(data) {
+                    if(data == 'Approved') return '<span class="badge bg-success">Approved</span>';
+                    if(data == 'Rejected') return '<span class="badge bg-danger">Rejected</span>';
+                    return '<span class="badge bg-warning text-dark">Pending</span>';
+                }
+            },
+            // Col 5: Actions (FA6 Update)
+            {
+                data: 'id',
+                orderable: false,
+                className: "text-center align-middle",
+                render: function(data) {
+                    return `<button class="btn btn-sm btn-outline-teal shadow-sm fw-bold" onclick="viewOT(${data})"><i class="fa-solid fa-eye me-1"></i> Details </button>`;
+                }
+            }
+        ]
+    });
+
+    // Filters - Use the hook for reloads
+    $('#customSearch').on('keyup', function() { otTable.search(this.value).draw(); });
+    
+    $('#applyFilterBtn').on('click', function() { 
+        window.refreshPageContent(); 
+    });
+    
+    $('#clearFilterBtn').on('click', function() { 
+        $('#filter_start_date, #filter_end_date, #customSearch').val('');
+        otTable.search('').draw();
+        window.refreshPageContent();
+    });
+});
 </script>

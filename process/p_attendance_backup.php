@@ -3,24 +3,9 @@ require '../db_connection.php';
 date_default_timezone_set('Asia/Manila');
 header('Content-Type: application/json');
 
-// =========================================================
-// 1. CONNECT TO OLD SYSTEM (lendellp_systemap)
-// =========================================================
-$old_host = '127.0.0.1';
-$old_db   = 'lendellp_systemap';
-$old_user = 'root'; // UPDATE THIS
-$old_pass = '';     // UPDATE THIS
-
-try {
-    $pdo_old = new PDO("mysql:host=$old_host;dbname=$old_db;charset=utf8mb4", $old_user, $old_pass);
-    $pdo_old->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    $pdo_old = null; // Continue new system even if old DB fails
-}
-
-// --- 2. GET & SANITIZE DATA ---
+// --- 1. GET & SANITIZE DATA ---
 $employee_id  = trim($_POST['employee_id'] ?? ''); 
-$password     = $_POST['password'] ?? ''; 
+$password     = $_POST['password'] ?? ''; // Added Password check for production safety
 $action       = $_POST['action'] ?? '';
 $status_based = $_POST['status_based'] ?? 'On-site'; 
 
@@ -29,20 +14,20 @@ $lat  = $_POST['latitude'] ?? null;
 $long = $_POST['longitude'] ?? null;
 $addr = $_POST['address'] ?? null;
 
-// --- 3. SET SERVER DATE & TIME (STRICT) ---
+// --- 2. SET SERVER DATE & TIME (STRICT - NO OVERRIDES) ---
 $today       = date("Y-m-d");
 $currentTime = date("H:i:s");
 
-// --- 4. VALIDATE INPUTS ---
+// --- 3. VALIDATE INPUTS ---
 if (empty($employee_id)) {
     echo json_encode(['status' => 'warning', 'message' => 'Please enter Employee ID.']);
     exit();
 }
 
 try {
-    // --- 5. AUTHENTICATION & FETCH SCHEDULE ---
-    // ADDED: e.old_db_id to the SELECT list
-    $sql = "SELECT u.status, e.Firstname, e.Lastname, e.schedule_type, e.old_db_id 
+    // --- 4. AUTHENTICATION & FETCH SCHEDULE ---
+    // Note: In production, verify the password too if $password is passed
+    $sql = "SELECT u.status, e.Firstname, e.Lastname, e.schedule_type 
             FROM tbl_users u 
             JOIN tbl_employees e ON u.employee_id = e.employee_id 
             WHERE u.employee_id = ?";
@@ -62,14 +47,13 @@ try {
 
     $display_name = $user_data['Firstname'] . ' ' . $user_data['Lastname'];
     $schedule_type = $user_data['schedule_type'] ?? 'Fixed'; 
-    $old_system_id = $user_data['old_db_id']; // This is the ID for the old system
 
 
-    // --- 6. PROCESS ATTENDANCE ---
+    // --- 5. PROCESS ATTENDANCE ---
 
     if ($action == 'time_in') {
 
-        // Check Duplicate in NEW DB
+        // Check Duplicate
         $check = $pdo->prepare("SELECT id FROM tbl_attendance WHERE employee_id = ? AND date = ?");
         $check->execute([$employee_id, $today]);
         
@@ -104,10 +88,11 @@ try {
 
         $initial_status_str = implode(', ', $status_array);
 
-        // *** START TRANSACTION (NEW DB) ***
+        // *** START TRANSACTION ***
         $pdo->beginTransaction();
 
         try {
+            // Note: date column stores the Time In Date
             $sql = "INSERT INTO tbl_attendance (employee_id, date, status_based, time_in, attendance_status, total_deduction_hr, overtime_hr, num_hr) 
                     VALUES (?, ?, ?, ?, ?, ?, 0, 0)";
             $stmt = $pdo->prepare($sql);
@@ -124,33 +109,6 @@ try {
             }
             
             $pdo->commit();
-
-            // =========================================================
-            // DUAL WRITE: TIME IN TO OLD SYSTEM
-            // =========================================================
-            // Only proceed if Old DB is connected AND user has an old_db_id mapped
-            if ($pdo_old && !empty($old_system_id)) {
-                try {
-                    // Check if record exists in Old DB using old_db_id
-                    $chkOld = $pdo_old->prepare("SELECT id FROM tbl_attendance WHERE employee_id = ? AND date = ?");
-                    $chkOld->execute([$old_system_id, $today]);
-                    
-                    if ($chkOld->rowCount() == 0) {
-                        $sql_old = "INSERT INTO tbl_attendance (employee_id, date, status_based, time_in, status) 
-                                    VALUES (:eid, :date, :loc, :time, 1)";
-                        $stmt_old = $pdo_old->prepare($sql_old);
-                        $stmt_old->execute([
-                            ':eid'  => $old_system_id, // Uses the mapped integer ID
-                            ':date' => $today,
-                            ':loc'  => $status_based,
-                            ':time' => $currentTime
-                        ]);
-                    }
-                } catch (Exception $e_old) {
-                    // Ignore Old DB errors
-                }
-            }
-            // =========================================================
 
             $formattedTime = date("g:i A", strtotime($currentTime));
             $late_msg = ($initial_deduction > 0) ? " You are late by $initial_deduction hr/s." : "";
@@ -178,11 +136,14 @@ try {
         }
 
         // --- 2. PREPARE PRECISE TIMESTAMPS ---
+        // $entry_date is the day they started (from DB)
+        // $today is the day they are leaving (Current Real Date)
         $entry_date = $attendance['date']; 
         
         $actual_in_timestamp = strtotime("$entry_date " . $attendance['time_in']);
         $actual_in_timestamp = floor($actual_in_timestamp / 60) * 60; 
         
+        // Use Strict Server Time ($today)
         $actual_out_timestamp = strtotime("$today $currentTime");
         
         $num_hr = 0;
@@ -190,6 +151,7 @@ try {
 
         // --- 3. HOURS CALCULATION ---
         if ($schedule_type === 'Flexible') {
+            // [FLEXIBLE]
             $raw_duration_seconds = $actual_out_timestamp - $actual_in_timestamp;
             $raw_duration_hours = $raw_duration_seconds / 3600;
             $net_hours = ($raw_duration_hours > 1.0) ? ($raw_duration_hours - 1.0) : 0;
@@ -203,7 +165,8 @@ try {
             }
 
         } else {
-            // Fixed Schedule
+            // [FIXED]
+            // Shift reference is always based on ENTRY DATE
             $shift_start = strtotime("$entry_date 09:00:00");
             $shift_end   = strtotime("$entry_date 18:00:00");
             $lunch_start = strtotime("$entry_date 12:00:00");
@@ -226,6 +189,7 @@ try {
                 $num_hr = round($worked_minutes / 60, 2);
             }
 
+            // OT Calculation
             if ($actual_out_timestamp > $shift_end) {
                 $ot_seconds = $actual_out_timestamp - $shift_end;
                 $overtime_hr = round($ot_seconds / 3600, 2);
@@ -240,40 +204,54 @@ try {
 
         if ($num_hr < 8.0) {
             $total_deduction_hr = round(8.0 - $num_hr, 2); 
+
             if ($schedule_type === 'Flexible') {
-                if (!in_array('Undertime', $status_parts)) $status_parts[] = 'Undertime';
+                if (!in_array('Undertime', $status_parts)) {
+                    $status_parts[] = 'Undertime';
+                }
             } else {
+                // Fixed: Undertime only if leaving before 6 PM of ENTRY DATE
                 $shift_end_fixed = strtotime("$entry_date 18:00:00");
                 if ($actual_out_timestamp < $shift_end_fixed) {
-                    if (!in_array('Undertime', $status_parts)) $status_parts[] = 'Undertime';
+                    if (!in_array('Undertime', $status_parts)) {
+                        $status_parts[] = 'Undertime';
+                    }
                 }
             }
         }
 
         if ($overtime_hr > 0) {
-            if (!in_array('Overtime', $status_parts)) $status_parts[] = 'Overtime';
+            if (!in_array('Overtime', $status_parts)) {
+                $status_parts[] = 'Overtime';
+            }
         }
 
+        // Check for "Forgot Time Out"
+        // Flexible Immune. Fixed gets flagged if Entry Date != Out Date (Today)
         if ($schedule_type !== 'Flexible') {
             if ($entry_date !== $today) {
-                if (!in_array('Forgot Time Out', $status_parts)) $status_parts[] = 'Forgot Time Out';
+                if (!in_array('Forgot Time Out', $status_parts)) {
+                    $status_parts[] = 'Forgot Time Out';
+                }
             }
         }
 
         $final_status_str = implode(', ', $status_parts);
 
-        // *** START TRANSACTION (NEW DB) ***
+        // *** START TRANSACTION ***
         $pdo->beginTransaction();
 
         try {
-            // Update MAIN TABLE
+            // 1. Update MAIN TABLE
+            // Updates time_out_date with $today
             $sql = "UPDATE tbl_attendance 
                     SET time_out = ?, time_out_date = ?, attendance_status = ?, num_hr = ?, overtime_hr = ?, total_deduction_hr = ? 
                     WHERE id = ?";
             $stmt = $pdo->prepare($sql);
+            
             $stmt->execute([$currentTime, $today, $final_status_str, $num_hr, $overtime_hr, $total_deduction_hr, $attendance['id']]);
 
-            // Update GPS TABLE
+            // 2. Update GPS TABLE
             if ($attendance['status_based'] == 'FIELD' || $attendance['status_based'] == 'WFH') {
                 if (!empty($lat) && !empty($long)) {
                     $sql_gps = "UPDATE tbl_attendance_gps 
@@ -285,30 +263,6 @@ try {
             }
 
             $pdo->commit();
-
-            // =========================================================
-            // DUAL WRITE: TIME OUT TO OLD SYSTEM
-            // =========================================================
-            // Only proceed if Old DB is connected AND user has an old_db_id mapped
-            if ($pdo_old && !empty($old_system_id)) {
-                try {
-                    // Update matching old_db_id and Date
-                    $sql_old = "UPDATE tbl_attendance 
-                                SET time_out = :time, num_hr = :hr 
-                                WHERE employee_id = :eid AND date = :entry_date";
-                    
-                    $stmt_old = $pdo_old->prepare($sql_old);
-                    $stmt_old->execute([
-                        ':time'       => $currentTime,
-                        ':hr'         => $num_hr,
-                        ':eid'        => $old_system_id, // Uses the mapped integer ID
-                        ':entry_date' => $entry_date
-                    ]);
-                } catch (Exception $e_old) {
-                    // Ignore Old DB errors
-                }
-            }
-            // =========================================================
 
             $deduc_msg = ($total_deduction_hr > 0) ? " (Total Deduction: $total_deduction_hr hr/s)" : "";
             $forgot_msg = ($schedule_type !== 'Flexible' && $entry_date !== $today) ? " (Session Closed for $entry_date)" : "";

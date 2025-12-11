@@ -5,101 +5,115 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../db_connection.php'; // Adjust path
 
 if (!isset($pdo)) {
-    echo json_encode(['status' => 'error', 'message' => 'Database connection failed.']);
+    // Standardized fatal error response
+    echo json_encode(['draw' => 0, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => [], 'error' => 'Database connection failed.']);
     exit;
 }
 
 $action = $_GET['action'] ?? '';
 $draw = (int)($_GET['draw'] ?? 1); // Get the draw ID from DataTables
 
-// --- 1. FETCH ALL (For DataTables) ---
+// =================================================================================
+// ACTION 1: FETCH ALL (For DataTables SSP)
+// =================================================================================
 if ($action === 'fetch') {
+    $start = (int)($_GET['start'] ?? 0);
+    $length = (int)($_GET['length'] ?? 10);
+    $search = trim($_GET['search']['value'] ?? '');
+    
     try {
         // --- 1a. Count Total Records (Unfiltered) ---
         $totalStmt = $pdo->query("SELECT COUNT(id) FROM tbl_holidays");
-        $recordsTotal = $totalStmt->fetchColumn();
+        $recordsTotal = (int)$totalStmt->fetchColumn();
 
         // --- 1b. Build Query with Search/Order ---
-        $search = $_GET['search']['value'] ?? '';
         $query = "SELECT * FROM tbl_holidays";
-        $where = "";
-        $params = [];
+        $where_params = [];
+        $where_bindings = [];
 
         if (!empty($search)) {
             // Simple search across name and type
-            $where = " WHERE holiday_name LIKE ? OR holiday_type LIKE ?";
-            $params[] = "%$search%";
-            $params[] = "%$search%";
+            $where_params[] = " (holiday_name LIKE :search_val OR holiday_type LIKE :search_val) ";
+            $where_bindings[':search_val'] = "%$search%";
         }
+        
+        $where_sql = !empty($where_params) ? " WHERE " . implode(' AND ', $where_params) : "";
         
         // Count Filtered Records
-        $filteredQuery = "SELECT COUNT(id) FROM tbl_holidays" . $where;
+        $filteredQuery = "SELECT COUNT(id) FROM tbl_holidays" . $where_sql;
         $filteredStmt = $pdo->prepare($filteredQuery);
-        $filteredStmt->execute($params);
-        $recordsFiltered = $filteredStmt->fetchColumn();
+        $filteredStmt->execute($where_bindings);
+        $recordsFiltered = (int)$filteredStmt->fetchColumn();
 
         // Ordering (Default: holiday_date DESC)
-        $order = " ORDER BY holiday_date DESC";
+        $order_sql = " ORDER BY holiday_date DESC";
         
-        // Pagination
-        $start = $_GET['start'] ?? 0;
-        $length = $_GET['length'] ?? 10;
-        $limit = " LIMIT :start, :length";
-
         // --- 1c. Fetch Data ---
-        $finalSql = $query . $where . $order . $limit;
+        $finalSql = $query . $where_sql . $order_sql . " LIMIT :start_limit, :length_limit";
         $stmt = $pdo->prepare($finalSql);
         
-        // Bind parameters for search AND limit
-        for ($i = 0; $i < count($params); $i++) {
-            $stmt->bindValue(($i + 1), $params[$i]);
+        // Bind parameters for search
+        foreach ($where_bindings as $key => $val) {
+            $stmt->bindValue($key, $val);
         }
-        $stmt->bindValue(':start', (int)$start, PDO::PARAM_INT);
-        $stmt->bindValue(':length', (int)$length, PDO::PARAM_INT);
+        
+        // Bind LIMIT parameters (using named placeholders for safety)
+        $stmt->bindValue(':start_limit', $start, PDO::PARAM_INT);
+        $stmt->bindValue(':length_limit', $length, PDO::PARAM_INT);
         $stmt->execute();
         $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // --- 1d. Final Output (CRITICAL FIX) ---
+        // --- 1d. Final Output (Standardized SSP) ---
         echo json_encode([
-            "draw" => $draw, // Return the draw ID sent by DataTables
-            "recordsTotal" => (int)$recordsTotal, // Total UNFILTERED records
-            "recordsFiltered" => (int)$recordsFiltered, // Total FILTERED records
-            "data" => $data // The row data for the current page
+            "draw" => $draw,
+            "recordsTotal" => $recordsTotal,
+            "recordsFiltered" => $recordsFiltered,
+            "data" => $data
         ]);
 
     } catch (Exception $e) {
-        // Log the error but return empty structure to prevent NaN crash
+        // Standardized SSP Error Response
         error_log("Holiday fetch error: " . $e->getMessage());
         echo json_encode([
             "draw" => $draw,
             "recordsTotal" => 0,
             "recordsFiltered" => 0,
-            "data" => []
+            "data" => [],
+            "error" => "Failed to fetch data: " . $e->getMessage()
         ]);
     }
     exit;
 }
 
-// --- 2. FETCH SINGLE (For Edit/View Modal) ---
+// =================================================================================
+// ACTION 2: FETCH SINGLE (For Edit/View Modal)
+// =================================================================================
 if ($action === 'get_details') {
-    $id = $_POST['id'] ?? 0;
+    $id = (int)($_POST['id'] ?? 0);
     try {
         $stmt = $pdo->prepare("SELECT * FROM tbl_holidays WHERE id = ?");
         $stmt->execute([$id]);
         $details = $stmt->fetch(PDO::FETCH_ASSOC);
-        echo json_encode(['success' => true, 'details' => $details]);
+        
+        if ($details) {
+            echo json_encode(['status' => 'success', 'details' => $details]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Holiday not found.']);
+        }
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
     exit;
 }
 
-// --- 3. CREATE NEW HOLIDAY ---
+// =================================================================================
+// ACTION 3: CREATE NEW HOLIDAY
+// =================================================================================
 if ($action === 'create') {
-    $date = $_POST['holiday_date'];
-    $name = trim($_POST['holiday_name']);
-    $type = $_POST['holiday_type'];
-    $rate = $_POST['payroll_multiplier'];
+    $date = trim($_POST['holiday_date'] ?? '');
+    $name = trim($_POST['holiday_name'] ?? '');
+    $type = trim($_POST['holiday_type'] ?? '');
+    $rate = (float)($_POST['payroll_multiplier'] ?? 1.00);
 
     if (empty($date) || empty($name)) {
         echo json_encode(['status' => 'error', 'message' => 'Date and Name are required.']);
@@ -123,21 +137,23 @@ if ($action === 'create') {
         echo json_encode(['status' => 'success', 'message' => $msg]);
 
     } catch (Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        echo json_encode(['status' => 'error', 'message' => 'Error creating holiday: ' . $e->getMessage()]);
     }
     exit;
 }
 
-// --- 4. UPDATE EXISTING HOLIDAY ---
+// =================================================================================
+// ACTION 4: UPDATE EXISTING HOLIDAY
+// =================================================================================
 if ($action === 'update') {
-    $id = $_POST['id'] ?? '';
-    $date = $_POST['holiday_date'];
-    $name = trim($_POST['holiday_name']);
-    $type = $_POST['holiday_type'];
-    $rate = $_POST['payroll_multiplier'];
+    $id = (int)($_POST['id'] ?? 0);
+    $date = trim($_POST['holiday_date'] ?? '');
+    $name = trim($_POST['holiday_name'] ?? '');
+    $type = trim($_POST['holiday_type'] ?? '');
+    $rate = (float)($_POST['payroll_multiplier'] ?? 1.00);
 
-    if (empty($id) || empty($date) || empty($name)) {
-        echo json_encode(['status' => 'error', 'message' => 'Missing required fields.']);
+    if ($id === 0 || empty($date) || empty($name)) {
+        echo json_encode(['status' => 'error', 'message' => 'Missing required fields (ID, Date, Name).']);
         exit;
     }
 
@@ -158,22 +174,33 @@ if ($action === 'update') {
         echo json_encode(['status' => 'success', 'message' => $msg]);
 
     } catch (Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        echo json_encode(['status' => 'error', 'message' => 'Error updating holiday: ' . $e->getMessage()]);
     }
     exit;
 }
 
 
-// --- 5. DELETE ---
+// =================================================================================
+// ACTION 5: DELETE
+// =================================================================================
 if ($action === 'delete') {
-    $id = $_POST['id'] ?? 0;
+    $id = (int)($_POST['id'] ?? 0);
+    if ($id === 0) {
+        echo json_encode(['status' => 'error', 'message' => 'Missing ID for deletion.']);
+        exit;
+    }
+    
     try {
         $stmt = $pdo->prepare("DELETE FROM tbl_holidays WHERE id = ?");
         $stmt->execute([$id]);
-        echo json_encode(['status' => 'success', 'message' => 'Holiday deleted.']);
+        
+        if ($stmt->rowCount() > 0) {
+            echo json_encode(['status' => 'success', 'message' => 'Holiday deleted.']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Holiday not found or already deleted.']);
+        }
     } catch (Exception $e) {
-        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        echo json_encode(['status' => 'error', 'message' => 'Error deleting holiday: ' . $e->getMessage()]);
     }
     exit;
 }
-?>
