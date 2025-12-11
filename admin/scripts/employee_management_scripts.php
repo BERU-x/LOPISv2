@@ -265,7 +265,7 @@ $(document).ready(function() {
             // Column 3: Daily Rate
             { 
                 data: 'daily_rate', 
-                className: 'text-end fw-bold align-middle text-teal',
+                className: 'text-end fw-bold align-middle',
                 render: $.fn.dataTable.render.number(',', '.', 2, '₱ ') 
             },
 

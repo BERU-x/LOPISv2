@@ -178,3 +178,75 @@ Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=
 Body (Stripped HTML):
 Hello Administrator,You have a new **cash_advance** notification.Aljhon Mark Alvior requested a Cash Advance of ₱50,000.00 needed by 2025-12-11.Please log in to the portal to view details:View Notification
 --------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 00:16:23 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Leave Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification.Aljhon Mark Alvior has requested 1 day(s) of Vacation Leave.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 00:18:41 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Leave Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **leave** notification.Aljhon Mark Alvior has requested 1 day(s) of Vacation Leave.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:25:25 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Overtime Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification.Aljhon Mark Alvior requested 2 hours of Overtime for 2025-12-05.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:32:49 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Overtime Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification.Aljhon Mark Alvior requested 4 hours of Overtime for 2025-12-04.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:34:06 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Overtime Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **overtime** notification.Aljhon Mark Alvior requested 2 hours of Overtime for 2025-12-03.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:37:07 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Cash Advance Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **cash_advance** notification.Aljhon Mark Alvior requested a Cash Advance of ₱10,000.00 needed by 2025-12-12.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:43:00 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Cash Advance Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **cash_advance** notification.Aljhon Mark Alvior requested a Cash Advance of ₱20,000.00 needed by 2025-12-13.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:43:23 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: Cash Advance Request Submitted
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body (Stripped HTML):
+Hello Administrator,You have a new **cash_advance** notification.Aljhon Mark Alvior requested a Cash Advance of ₱30,000.00 needed by 2025-12-15.Please log in to the portal to view details:View Notification
+--------------------------------------

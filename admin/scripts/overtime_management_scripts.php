@@ -46,9 +46,14 @@ window.refreshPageContent = function() {
     $('#refresh-spinner').addClass('fa-spin text-teal');
     $('#last-updated-time').text('Syncing...');
     
-    // 3. Reload Table
+    // 3. Reload Table - The robust check
     if (otTable) {
         otTable.ajax.reload(null, false);
+    } else if ($('#overtimeTable').length && $.fn.DataTable.isDataTable('#overtimeTable')) {
+        // Fallback check
+        $('#overtimeTable').DataTable().ajax.reload(null, false);
+    } else {
+        stopSpinnerSafely();
     }
 };
 
@@ -60,85 +65,187 @@ window.refreshPageContent = function() {
 function viewOT(id) {
     currentOTId = id;
     
-    // Reset Modal
-    $('#modal_approved_input').val('').removeClass('d-none');
-    $('#modal_approved_display').text('').addClass('d-none');
-    $('#modal_actions').removeClass('d-none');
-
     // Show Loader
-    const modalBody = $('#viewOTModal .modal-body');
-    modalBody.html('<div class="text-center py-5"><div class="spinner-border text-teal" role="status"></div><p class="mt-2 text-muted">Loading...</p></div>');
-    
+    const modalContent = $('#viewOTModal .modal-content');
+    modalContent.html(`
+        <div class="text-center py-5">
+            <div class="spinner-border text-teal" role="status"></div>
+            <p class="mt-2 text-muted">Loading...</p>
+        </div>
+    `);
+
     $.ajax({
         url: 'api/overtime_action.php?action=get_details',
         type: 'POST',
         data: { id: id },
         dataType: 'json',
-        success: function(data) {
+        success: function(res) {
             
-            // Re-render the detailed body content after loading
-            // Note: Assuming your HTML structure requires a detailed layout
+            // *** CRITICAL FIX: Ensure 'data' variable holds the 'details' object ***
+            let data = res.details; 
+            
+            if (!data) {
+                modalContent.html(`
+                    <div class="modal-header border-bottom-0">
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center py-5">
+                        <p class="text-danger">Error: Could not find 'details' in server response.</p>
+                        <button type="button" class="btn btn-secondary mt-3" data-bs-dismiss="modal">Close</button>
+                    </div>
+                `);
+                $('#viewOTModal').modal('show');
+                return;
+            }
+            // ***************************************************************
+
             const requestedHours = parseFloat(data.hours_requested || 0);
             const rawOtHours = parseFloat(data.raw_biometric_ot || 0);
+            const approvedHours = parseFloat(data.hours_approved || 0);
             
-            modalBody.html(renderOTDetails(data)); // Assuming you have a separate render function in HTML template, or replace this with detailed rendering logic
-
-            // Populate static details
-            $('#modal_emp_photo').attr('src', data.photo ? '../assets/images/'+data.photo : '../assets/images/default.png');
-            $('#modal_emp_name').text(data.firstname + ' ' + data.lastname);
-            $('#modal_emp_dept').text(data.department);
-            $('#modal_ot_date').text(data.ot_date);
-            $('#modal_reason').text(data.reason || 'No reason provided.');
-            $('#modal_raw_ot').text(rawOtHours.toFixed(2));
-            $('#modal_req_hrs').text(requestedHours.toFixed(2));
-            
-            var statusHtml = '<span class="badge bg-warning text-dark">Pending</span>';
+            var statusHtml = '';
             if(data.status === 'Approved') statusHtml = '<span class="badge bg-success">Approved</span>';
-            if(data.status === 'Rejected') statusHtml = '<span class="badge bg-danger">Rejected</span>';
-            $('#modal_status').html(statusHtml);
+            else if(data.status === 'Rejected') statusHtml = '<span class="badge bg-danger">Rejected</span>';
+            else statusHtml = '<span class="badge bg-warning">Pending</span>';
+
+
+            let approvedHtmlBlock = '';
+            let actionButtonsHtml = '';
 
             // Handle Logic based on status
             if(data.status === 'Pending') {
-                
-                // 1. Determine Initial Approved Value (Cap at requested or raw OT, whichever is lower)
+                // Determine Initial Approved Value (Cap at requested or raw OT, whichever is lower)
                 let defaultApproved = requestedHours;
                 if (defaultApproved > rawOtHours) {
                     defaultApproved = rawOtHours;
                 }
                 
-                $('#modal_approved_input').val(defaultApproved.toFixed(2));
+                approvedHtmlBlock = `
+                    <div id="approved_input_group">
+                        <input type="number" step="0.01" id="modal_approved_input" class="form-control form-control-sm text-center fw-bold" 
+                               value="${defaultApproved.toFixed(2)}" min="0" max="${rawOtHours.toFixed(2)}"
+                               title="Max allowed is ${rawOtHours.toFixed(2)} (Raw Biometric OT)">
+                    </div>
+                `;
                 
-                // 2. Attach Real-time Input Cap Listener (Ensures input doesn't exceed Raw OT)
-                $('#modal_approved_input').off('input.ot_cap').on('input.ot_cap', function() {
-                    let enteredValue = parseFloat($(this).val());
-                    if (!isNaN(enteredValue) && enteredValue > rawOtHours) {
-                        $(this).val(rawOtHours.toFixed(2));
-                    }
-                });
-
-                $('#modal_actions').show(); 
-                $('#modal_approved_input').removeClass('d-none');
-                $('#modal_approved_display').addClass('d-none');
+                // *** BUTTONS RENDERED FOR PENDING STATE ***
+                actionButtonsHtml = `
+                    <button type="button" class="btn btn-danger btn-action fw-bold shadow-sm" onclick="processOT('reject')">
+                        <i class="fas fa-times me-1"></i> Reject
+                    </button>
+                    <button type="button" class="btn btn-teal btn-action fw-bold shadow-sm ms-2" onclick="processOT('approve')">
+                        <i class="fas fa-check me-1"></i> Approve
+                    </button>
+                `;
                 
             } else {
                 // Read-only mode
-                $('#modal_approved_input').addClass('d-none');
-                $('#modal_approved_display').text(data.hours_approved + ' hrs').removeClass('d-none');
-                $('#modal_actions').hide(); 
-                $('#modal_approved_input').off('input.ot_cap'); // Remove listener
+                approvedHtmlBlock = `
+                    <span id="modal_approved_display" class="fw-bold text-lg">
+                        ${approvedHours.toFixed(2)} hrs
+                    </span>
+                `;
+            }
+
+            // --- Full Modal Body HTML ---
+            const fullModalHtml = `
+                <div class="modal-header border-bottom-0 p-4"> 
+                    <h5 class="modal-title fw-bold text-label" id="viewOTModalLabel">
+                        <i class="fas fa-clock me-2"></i> Overtime Request Details
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 pt-0">
+                    <div class="row g-4">
+                        <div class="col-md-5 text-center border-end">
+                            <img src="${data.photo ? '../assets/images/'+data.photo : '../assets/images/default.png'}" 
+                                 id="modal_emp_photo" class="rounded-circle border shadow-sm mb-3" 
+                                 style="width: 80px; height: 80px; object-fit: cover;" onerror="this.src='../assets/images/default.png'">
+                            <h5 class="fw-bold" id="modal_emp_name">${data.firstname} ${data.lastname}</h5>
+                            <p class="text-muted small mb-0" id="modal_emp_dept">${data.department}</p>
+                            <p class="text-muted small">Employee ID: ${data.employee_id}</p>
+                            
+                            <hr class="my-3">
+                            <p class="small text-start">
+                                <strong>Request Date:</strong> <span class="float-end" id="modal_ot_date">${data.ot_date}</span><br>
+                                <strong>Date Filed:</strong> <span class="float-end">${data.created_at}</span>
+                            </p>
+                        </div>
+
+                        <div class="col-md-7">
+                            <h6 class="fw-bold text-gray-600 mb-3">Approval Overview</h6>
+                            <table class="table table-sm small">
+                                <tr>
+                                    <td class="fw-bold">Status:</td>
+                                    <td class="text-end">${statusHtml}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Requested Hours:</td>
+                                    <td class="text-end fw-bold text-teal">${requestedHours.toFixed(2)} hrs</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Raw Biometric OT:</td>
+                                    <td class="text-end fw-bold text-danger">${rawOtHours.toFixed(2)} hrs</td>
+                                </tr>
+                            </table>
+
+                            <h6 class="fw-bold text-gray-600 mt-4 mb-2">Approved Hours</h6>
+                            ${approvedHtmlBlock}
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    <h6 class="fw-bold text-gray-600 mb-2">Reason for Overtime</h6>
+                    <div class="alert alert-light border small" id="modal_reason">${data.reason || 'No reason provided.'}</div>
+                </div>
+
+                <div class="modal-footer border-top-0 p-4 justify-content-center" id="modal_actions_footer">
+                    ${actionButtonsHtml}
+                    <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="modal">Close</button>
+                </div>
+            `;
+            
+            modalContent.html(fullModalHtml);
+            
+            // Re-attach real-time input listener (if in Pending mode)
+            if (data.status === 'Pending') {
+                 // Raw OT max limit
+                 const maxOt = parseFloat(data.raw_biometric_ot || 0);
+
+                $('#modal_approved_input').off('input.ot_cap').on('input.ot_cap', function() {
+                    let enteredValue = parseFloat($(this).val());
+                    if (isNaN(enteredValue) || enteredValue < 0) {
+                         $(this).val(0.00); // Set to zero if NaN or negative
+                         enteredValue = 0;
+                    } 
+                    if (enteredValue > maxOt) {
+                        $(this).val(maxOt.toFixed(2));
+                    }
+                });
             }
 
             $('#viewOTModal').modal('show');
         },
-        error: function() {
-             modalBody.html('<div class="text-center py-5"><p class="text-danger">Failed to load details. Try again.</p></div>');
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error("AJAX Error:", textStatus, errorThrown, jqXHR.responseText);
+            modalContent.html(`
+                <div class="modal-header border-bottom-0">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center py-5">
+                    <p class="text-danger">Failed to load details. Server status: ${textStatus}.</p>
+                    <button type="button" class="btn btn-secondary mt-3" data-bs-dismiss="modal">Close</button>
+                </div>
+            `);
+            $('#viewOTModal').modal('show');
         }
     });
 }
 
 // --- APPROVE/REJECT LOGIC ---
 function processOT(action) {
-    var approvedHrs = $('#modal_approved_input').val();
+    // Note: Since the input field is dynamically rebuilt, scope the lookup to the modal
+    var approvedHrs = $('#viewOTModal').find('#modal_approved_input').val();
 
     if(action === 'approve' && (approvedHrs === '' || parseFloat(approvedHrs) <= 0)) {
         Swal.fire('Error', 'Please enter valid approved hours.', 'error');
@@ -236,9 +343,9 @@ $(document).ready(function() {
                 data: 'status', 
                 className: "text-center align-middle",
                 render: function(data) {
-                    if(data == 'Approved') return '<span class="badge bg-success">Approved</span>';
-                    if(data == 'Rejected') return '<span class="badge bg-danger">Rejected</span>';
-                    return '<span class="badge bg-warning text-dark">Pending</span>';
+                    if(data == 'Approved') return '<span class="badge bg-soft-success text-success border border-success px-3 shadow-sm rounded-pill"><i class="fa-solid fa-check me-1"></i> Approved</span>';
+                    if(data == 'Rejected') return '<span class="badge bg-soft-danger text-danger border border-danger px-3 shadow-sm rounded-pill"><i class="fa-solid fa-times me-1"></i> Rejected</span>';
+                    return '<span class="badge bg-soft-warning text-warning border border-warning px-3 shadow-sm rounded-pill"><i class="fa-solid fa-clock me-1"></i> Pending</span>';
                 }
             },
             // Col 5: Actions (FA6 Update)

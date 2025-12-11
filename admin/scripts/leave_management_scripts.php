@@ -44,9 +44,16 @@ window.refreshPageContent = function() {
     $('#last-updated-time').text('Syncing...');
     
     // 3. Reload Table
-    if (leaveTable) {
+    // Check if the global variable holds an instance AND if that instance is active
+    if (leaveTable && $.fn.DataTable.isDataTable(leaveTable)) {
         // Reloads the table, which triggers the drawCallback for cleanup
         leaveTable.ajax.reload(null, false);
+    } else if ($('#leaveTable').length && $.fn.DataTable.isDataTable('#leaveTable')) {
+        // Fallback: If the global var is messed up, try to get the instance directly from the element
+        $('#leaveTable').DataTable().ajax.reload(null, false);
+    } else {
+        // If neither is true, reset spinner immediately
+        stopSpinnerSafely();
     }
 };
 
@@ -71,10 +78,13 @@ $(document).ready(function() {
     // 2. INITIALIZE DATATABLE
     if ($('#leaveTable').length) {
         
+        // Use the standard DataTables jQuery API
         if ($.fn.DataTable.isDataTable('#leaveTable')) {
-            $('#leaveTable').DataTable().destroy();
+            // Destroy is safe, but technically optional if you just re-init
+            $('#leaveTable').DataTable().destroy(); 
         }
 
+        // Initialize and store the instance in the global variable
         leaveTable = $('#leaveTable').DataTable({
             processing: true,
             destroy: true, 
@@ -107,7 +117,7 @@ $(document).ready(function() {
             },
             // ------------------------------------------
 
-            "order": [[ 1, "desc" ]],
+            "order": [[ 2, "asc" ]],
             "columns": [
                 // Col 0: Employee
                 {
@@ -223,7 +233,8 @@ function viewDetails(id) {
         data: { leave_id: id },
         dataType: 'json',
         success: function(res) {
-            if(res.success) {
+            // **CRITICAL FIX:** Check for res.status === 'success' instead of res.success
+            if(res.status === 'success') { 
                 const d = res.details;
                 
                 // Status Badge Logic
@@ -265,7 +276,8 @@ function viewDetails(id) {
                     `);
                 }
             } else {
-                content.html('<div class="alert alert-danger">Could not fetch details.</div>');
+                // If the PHP returned status: error
+                content.html('<div class="alert alert-danger">Could not fetch details: ' + (res.message || 'Unknown error') + '</div>');
             }
         },
         error: function() {

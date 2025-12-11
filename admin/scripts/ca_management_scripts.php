@@ -56,13 +56,69 @@ window.refreshPageContent = function() {
 // 2. MODAL LOGIC FUNCTIONS (Global for onclick binding)
 // ==============================================================================
 
+// Function to render the static HTML structure of the modal body (required for viewCA function)
+function renderCAModalBody(data, statusHtml, amountFormatted) {
+    const photo = (data.photo && data.photo.trim() !== '') ? '../assets/images/'+data.photo : '../assets/images/default.png';
+    const requestedAmount = parseFloat(data.amount || 0);
+    const isPending = data.status === 'Pending';
+    
+    let approvedInputHtml = '';
+    
+    if(isPending) {
+        // Input field for pending status, pre-filled with requested amount
+        approvedInputHtml = `
+            <input type="number" step="0.01" id="modal_approved_input" 
+                class="form-control form-control-sm w-75 d-inline" 
+                value="${requestedAmount.toFixed(2)}" />
+            <span id="modal_approved_display" class="fw-bold text-success d-none"></span>
+        `;
+    } else {
+        // Display only for approved/paid/rejected status
+        const approvedDisplay = data.status === 'Cancelled' ? 'N/A' : amountFormatted;
+        
+        approvedInputHtml = `
+            <input type="number" step="0.01" id="modal_approved_input" class="form-control form-control-sm w-75 d-inline d-none" />
+            <span id="modal_approved_display" class="fw-bold text-success">${approvedDisplay}</span>
+        `;
+    }
+
+    return `
+        <div class="row">
+            <div class="col-md-5 text-center border-end">
+                <img id="modal_emp_photo" src="${photo}" class="rounded-circle border shadow-sm mb-3" style="width: 100px; height: 100px; object-fit: cover;">
+                <h5 class="fw-bold" id="modal_emp_name">${data.firstname} ${data.lastname}</h5>
+                <p class="text-muted small" id="modal_emp_dept">${data.department || 'Employee'}</p>
+            </div>
+            <div class="col-md-7">
+                <h6 class="fw-bold text-gray-600 mb-3">Request Details</h6>
+                <table class="table table-sm small">
+                    <tr><td class="fw-bold">Status:</td><td>${statusHtml}</td></tr>
+                    <tr><td class="fw-bold">Date Requested:</td><td>${data.date_requested}</td></tr>
+                    <tr><td class="fw-bold">Requested Amount:</td><td class="fw-bold text-teal">${amountFormatted}</td></tr>
+                    
+                    <tr class="align-items-center">
+                        <td class="fw-bold">Approved Amount:</td>
+                        <td>
+                            ${approvedInputHtml}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <hr>
+        <h6 class="fw-bold text-gray-600 mb-3">Remarks</h6>
+        <div class="alert alert-light border small" id="modal_remarks">${data.remarks || 'No remarks provided.'}</div>
+    `;
+}
+
 // --- VIEW DETAILS LOGIC ---
 function viewCA(id) {
     currentCAId = id;
+    const modalBody = $('#viewCAModal .modal-body');
     const modalActions = $('#modal-actions');
     
     // Reset Modal UI and show loader in main modal body
-    $('#viewCAModal .modal-body').html('<div class="text-center py-5"><div class="spinner-border text-teal" role="status"></div><p class="mt-2 text-muted">Loading details...</p></div>');
+    modalBody.html('<div class="text-center py-5"><div class="spinner-border text-teal" role="status"></div><p class="mt-2 text-muted">Loading details...</p></div>');
     modalActions.empty(); // Clear old buttons
     
     $.ajax({
@@ -70,45 +126,39 @@ function viewCA(id) {
         type: 'POST',
         data: { id: id },
         dataType: 'json',
-        success: function(data) {
+        success: function(res) {
             
-            // Re-render detailed content (Replace the loader)
-            $('#viewCAModal .modal-body').html(renderCAModalBody(data)); 
+            if (res.status !== 'success' || !res.details) {
+                modalBody.html('<div class="text-center py-5"><p class="text-danger">Failed to fetch CA details.</p></div>');
+                $('#viewCAModal').modal('show');
+                return;
+            }
             
-            // Populate Fields
-            var photo = (data.photo) ? '../assets/images/'+data.photo : '../assets/images/default.png';
-            $('#modal_emp_photo').attr('src', photo);
-            $('#modal_emp_name').text(data.firstname + ' ' + data.lastname);
-            $('#modal_emp_dept').text(data.department || 'Employee');
+            const data = res.details;
+            const amountFormatted = '₱ ' + parseFloat(data.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
             
-            $('#modal_date_req').text(data.date_requested);
-            $('#modal_remarks').text(data.remarks || 'No remarks provided.');
-            $('#modal_req_amount').text('₱ ' + parseFloat(data.amount).toLocaleString('en-US', {minimumFractionDigits: 2}));
-
-            // Status Badge
+            // Status Badge HTML
             var statusHtml = '<span class="badge bg-warning text-dark">Pending</span>';
             if(data.status === 'Paid') statusHtml = '<span class="badge bg-secondary">Paid</span>';
             if(data.status === 'Deducted') statusHtml = '<span class="badge bg-success">Approved</span>';
             if(data.status === 'Cancelled') statusHtml = '<span class="badge bg-danger">Rejected</span>';
-            $('#modal_status').html(statusHtml);
 
+            // Re-render detailed content with all data populated directly
+            modalBody.html(renderCAModalBody(data, statusHtml, amountFormatted)); 
+            
             // Conditional Logic & Action Buttons
             if(data.status === 'Pending') {
-                $('#modal_approved_input').val(data.amount).removeClass('d-none'); // Default to requested amount
-                $('#modal_approved_display').addClass('d-none');
-                
                 // Add Approve/Reject Buttons to the footer
                 modalActions.append(`
                     <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="processCA('reject')">Reject</button>
-                    <button type="button" class="btn btn-success fw-bold shadow-sm" onclick="processCA('approve')">Approve</button>
+                    <button type="button" class="btn btn-teal fw-bold shadow-sm ms-2" onclick="processCA('approve')">Approve</button>
                 `);
-            } else {
-                // Read-only mode
-                $('#modal_approved_input').addClass('d-none');
-                $('#modal_approved_display').text('₱ ' + parseFloat(data.amount).toLocaleString('en-US', {minimumFractionDigits: 2})).removeClass('d-none');
-                // modalActions is already empty from the initial reset
-            }
-
+            } 
+            
+            $('#viewCAModal').modal('show');
+        },
+        error: function() {
+            modalBody.html('<div class="text-center py-5"><p class="text-danger">Server connection failed. Could not load details.</p></div>');
             $('#viewCAModal').modal('show');
         }
     });
@@ -116,7 +166,8 @@ function viewCA(id) {
 
 // --- APPROVE/REJECT LOGIC ---
 function processCA(type) {
-    var amount = $('#modal_approved_input').val();
+    // Scope the lookup to the modal body now that the input is rendered directly.
+    var amount = $('#viewCAModal').find('#modal_approved_input').val();
 
     if(type === 'approve' && (amount === '' || parseFloat(amount) <= 0)) {
         Swal.fire('Error', 'Please enter a valid amount.', 'error');
@@ -156,43 +207,6 @@ function processCA(type) {
             });
         }
     });
-}
-
-// Function to render the static HTML structure of the modal body (required for viewCA function)
-function renderCAModalBody(data) {
-    // This function assumes your main modal structure (viewCAModal) has target IDs like 
-    // #modal_emp_photo, #modal_emp_name, etc. in its static HTML.
-    // We return the content that replaces the initial loader.
-    
-    // Note: You must ensure this HTML structure matches your modal template.
-    return `
-        <div class="row">
-            <div class="col-md-5 text-center border-end">
-                <img id="modal_emp_photo" src="" class="rounded-circle border shadow-sm mb-3" style="width: 100px; height: 100px; object-fit: cover;">
-                <h5 class="fw-bold" id="modal_emp_name"></h5>
-                <p class="text-muted small" id="modal_emp_dept"></p>
-            </div>
-            <div class="col-md-7">
-                <h6 class="fw-bold text-gray-600 mb-3">Request Details</h6>
-                <table class="table table-sm small">
-                    <tr><td class="fw-bold">Status:</td><td id="modal_status"></td></tr>
-                    <tr><td class="fw-bold">Date Requested:</td><td id="modal_date_req"></td></tr>
-                    <tr><td class="fw-bold">Requested Amount:</td><td id="modal_req_amount" class="fw-bold text-teal"></td></tr>
-                    
-                    <tr class="align-items-center">
-                        <td class="fw-bold">Approved Amount:</td>
-                        <td>
-                            <input type="number" step="0.01" id="modal_approved_input" class="form-control form-control-sm w-75 d-inline" />
-                            <span id="modal_approved_display" class="fw-bold text-success d-none"></span>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-        <hr>
-        <h6 class="fw-bold text-gray-600 mb-3">Remarks</h6>
-        <div class="alert alert-light border small" id="modal_remarks"></div>
-    `;
 }
 
 // ==============================================================================
@@ -255,10 +269,10 @@ $(document).ready(function() {
                 data: 'status', 
                 className: 'text-center align-middle',
                 render: function(data) {
-                    if (data === 'Paid') return '<span class="badge bg-secondary">Paid</span>';
-                    if (data === 'Deducted') return '<span class="badge bg-success">Approved</span>';
-                    if (data === 'Pending') return '<span class="badge bg-warning text-dark">Pending</span>';
-                    if (data === 'Cancelled') return '<span class="badge bg-danger">Rejected</span>';
+                    if (data === 'Paid') return '<span class="badge bg-soft-secondary text-secondary border border-secondary px-3 shadow-sm rounded-pill"><i class="fa-solid fa-file-invoice me-1"></i> Paid</span>';
+                    if (data === 'Deducted') return '<span class="badge bg-soft-success text-success border border-success px-3 shadow-sm rounded-pill"><i class="fa-solid fa-check me-1"></i> Approved</span>';
+                    if (data === 'Pending') return '<span class="badge bg-soft-warning text-warning border border-warning px-3 shadow-sm rounded-pill"><i class="fa-solid fa-clock me-1"></i> Pending</span>';
+                    if (data === 'Cancelled') return '<span class="badge bg-soft-danger text-danger border border-danger px-3 shadow-sm rounded-pill"><i class="fa-solid fa-times me-1"></i> Rejected</span>';
                     return `<span class="badge bg-secondary">${data}</span>`;
                 }
             },

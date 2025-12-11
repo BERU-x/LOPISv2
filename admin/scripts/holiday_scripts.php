@@ -81,15 +81,22 @@ function openModal(id = null) {
             dataType: 'json',
             success: function(data) {
                 Swal.close();
-                if (data.success) {
-                    $('#holiday_id').val(data.details.id);
-                    $('#holiday_date').val(data.details.holiday_date);
-                    $('#holiday_name').val(data.details.holiday_name);
-                    $('#holiday_type').val(data.details.holiday_type);
-                    $('#payroll_multiplier').val(parseFloat(data.details.payroll_multiplier).toFixed(2));
+                
+                // *** CRITICAL FIX: Check for data.status === 'success' ***
+                if (data.status === 'success' && data.details) {
+                    const details = data.details; // Use a clean variable name
+                    
+                    $('#holiday_id').val(details.id);
+                    $('#holiday_date').val(details.holiday_date);
+                    $('#holiday_name').val(details.holiday_name);
+                    $('#holiday_type').val(details.holiday_type);
+                    
+                    // Ensure multiplier is parsed and formatted correctly before display
+                    $('#payroll_multiplier').val(parseFloat(details.payroll_multiplier || 1.00).toFixed(2));
                     $('#holidayModal').modal('show');
                 } else {
-                    Swal.fire('Error', 'Could not fetch holiday details.', 'error');
+                    // Use data.message if available, otherwise generic error
+                    Swal.fire('Error', data.message || 'Could not fetch holiday details.', 'error');
                 }
             },
             error: function() {

@@ -187,3 +187,93 @@ Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=
 Body:
 Hello Aljhon Mark,You have a new **payroll** notification from Administrator:Payslip for Oct 28 - Nov 11 is available.Please log in to the portal to view details:View Notification
 --------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 00:18:29 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from 23:Your Vacation Leave request starting Dec 12, 2025 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 00:18:56 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from 24:Your Vacation Leave request starting Dec 13, 2025 has been REJECTED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 00:19:21 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Administrator,You have a new **leave** notification from 25:New Vacation Leave request filed for Aljhon Mark Alvior (1 days).Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 00:19:21 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from 25:A Vacation Leave request (1 days) has been successfully filed.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 00:22:28 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Administrator,You have a new **leave** notification from 26:Admin approved Vacation Leave filed for Aljhon Mark Alvior (1 days).Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 00:22:28 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from 26:A Vacation Leave request (1 days) has been APPROVED by the Admin.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:32:18 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **overtime** notification from 12:Your Overtime request for Dec 05 has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:33:05 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: overtime Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **overtime** notification from 13:Your Overtime request for Dec 04 has been REJECTED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:42:44 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: cash_advance Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **cash_advance** notification from 10:Your Cash Advance request has been APPROVED.Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 02:43:04 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: cash_advance Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **cash_advance** notification from 11:Your Cash Advance request has been REJECTED.Please log in to the portal to view details:View Notification
+--------------------------------------

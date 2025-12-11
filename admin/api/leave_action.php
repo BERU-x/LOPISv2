@@ -15,8 +15,7 @@ if (!isset($pdo)) {
 $action = $_GET['action'] ?? '';
 
 // =================================================================================
-// ACTION 1: FETCH ALL DATA (Table + Stats)
-// NOTE: This uses client-side pagination, NOT true DataTables SSP.
+// ACTION 1: FETCH ALL DATA (Table + Stats) - UNCHANGED
 // =================================================================================
 if ($action === 'fetch') {
     try {
@@ -55,7 +54,7 @@ if ($action === 'fetch') {
 }
 
 // =================================================================================
-// ACTION 2: FETCH EMPLOYEE DROPDOWN
+// ACTION 2: FETCH EMPLOYEE DROPDOWN - UNCHANGED
 // =================================================================================
 if ($action === 'fetch_employees') {
     try {
@@ -70,7 +69,7 @@ if ($action === 'fetch_employees') {
 }
 
 // =================================================================================
-// ACTION 3: CREATE NEW LEAVE
+// ACTION 3: CREATE NEW LEAVE (AUTOMATIC APPROVAL FOR ADMIN)
 // =================================================================================
 if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $emp_id = trim($_POST['employee_id'] ?? '');
@@ -87,17 +86,20 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     
     try {
         // A. Calculate Days Count
-        // NOTE: This simple calculation does not account for weekends or holidays.
         $start = new DateTime($start_date);
         $end = new DateTime($end_date);
         $diff = $start->diff($end);
         $days = $diff->days + 1;
 
+        // *** CRITICAL CHANGE: Set status to 1 (Approved) ***
+        $auto_status = 1;
+        $status_message = 'Leave filed and automatically approved by Admin.';
+
         $pdo->beginTransaction();
 
         // B. Insert Record
         $sql = "INSERT INTO tbl_leave (employee_id, leave_type, start_date, end_date, days_count, reason, status, created_on) 
-                VALUES (:employee_id, :leave_type, :start_date, :end_date, :days_count, :reason, 0, NOW())";
+                VALUES (:employee_id, :leave_type, :start_date, :end_date, :days_count, :reason, :status, NOW())";
         
         $stmt = $pdo->prepare($sql);
         $result = $stmt->execute([
@@ -106,7 +108,8 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             ':start_date'  => $start_date,
             ':end_date'    => $end_date,
             ':days_count'  => $days,
-            ':reason'      => $reason
+            ':reason'      => $reason,
+            ':status'      => $auto_status // Use the approved status
         ]);
         
         $last_id = $pdo->lastInsertId();
@@ -118,17 +121,16 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $emp_name = $emp_data ? ($emp_data['firstname'] . ' ' . $emp_data['lastname']) : $emp_id;
 
         if($result) {
-            // --- NOTIFICATION 1: ALERT ADMINS ---
-            $admin_msg = "New {$type} request filed for {$emp_name} ({$days} days).";
-            // Pass the leave ID as reference ID
+            // --- NOTIFICATION 1: ADMIN ---
+            $admin_msg = "Admin approved {$type} filed for {$emp_name} ({$days} days).";
             send_notification($pdo, null, 'Admin', 'leave', $admin_msg, 'leave_management.php', $last_id);
 
-            // --- NOTIFICATION 2: ALERT THE EMPLOYEE ---
-            $emp_msg = "A {$type} request ({$days} days) has been successfully filed.";
+            // --- NOTIFICATION 2: EMPLOYEE ---
+            $emp_msg = "A {$type} request ({$days} days) has been APPROVED by the Admin.";
             send_notification($pdo, $emp_id, 'Employee', 'leave', $emp_msg, 'my_leaves.php', $last_id);
 
             $pdo->commit();
-            echo json_encode(['status' => 'success', 'message' => 'Leave filed successfully!']);
+            echo json_encode(['status' => 'success', 'message' => $status_message]);
         } else {
             $pdo->rollBack();
             echo json_encode(['status' => 'error', 'message' => 'Failed to save record.']);
@@ -142,7 +144,7 @@ if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // =================================================================================
-// ACTION 4: UPDATE STATUS (Approve/Reject)
+// ACTION 4: UPDATE STATUS (Approve/Reject) - UNCHANGED
 // =================================================================================
 if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int)($_POST['id'] ?? 0);
@@ -193,7 +195,7 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // =================================================================================
-// ACTION 5: GET SINGLE DETAILS (For Modal)
+// ACTION 5: GET SINGLE DETAILS (For Modal) - UNCHANGED
 // =================================================================================
 if ($action === 'get_details' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int)($_POST['leave_id'] ?? 0);
