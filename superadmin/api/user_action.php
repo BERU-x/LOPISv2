@@ -1,10 +1,10 @@
 <?php
-// api/admin_action.php
-// Handles CRUD operations for System Administrators (usertype = 1)
+// api/user_action.php
+// Handles CRUD operations for Employee Accounts (usertype = 2)
 header('Content-Type: application/json');
 session_start();
 
-// Adjust path to your actual file structure
+// Adjust path based on your directory structure
 require_once __DIR__ . '/../../db_connection.php'; 
 
 if (!isset($pdo)) {
@@ -13,18 +13,20 @@ if (!isset($pdo)) {
     exit;
 }
 
-// Get the Action (GET for fetch, POST for others)
 $action = $_REQUEST['action'] ?? '';
+
+// CONSTANT FOR THIS FILE:
+$TARGET_USERTYPE = 2; // Employees
 
 try {
 
     // =================================================================================
-    // ACTION 1: FETCH ALL ADMINS (Server-Side DataTables)
+    // ACTION 1: FETCH (Server-Side DataTables)
     // =================================================================================
     if ($action === 'fetch') {
         
         // 1. Base Query
-        $sql = "SELECT * FROM tbl_users WHERE usertype = 1";
+        $sql = "SELECT * FROM tbl_users WHERE usertype = $TARGET_USERTYPE";
         $params = [];
 
         // 2. Search Logic
@@ -41,12 +43,10 @@ try {
         $recordsFiltered = $stmtCount->rowCount();
 
         // 4. Ordering
-        $columns = ['employee_id', 'email', 'status', 'created_at']; // Column index map
+        $columns = ['employee_id', 'email', 'status', 'created_at']; 
         if (isset($_POST['order'][0]['column'])) {
             $colIndex = $_POST['order'][0]['column'];
             $colDir = $_POST['order'][0]['dir'] === 'desc' ? 'DESC' : 'ASC';
-            
-            // Map column index to DB column name (safeguard against injection)
             $orderBy = $columns[$colIndex] ?? 'created_at';
             $sql .= " ORDER BY $orderBy $colDir";
         } else {
@@ -63,11 +63,10 @@ try {
         $stmt->execute($params);
         $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // 7. Get Total Records (Unfiltered)
-        $totalStmt = $pdo->query("SELECT COUNT(*) FROM tbl_users WHERE usertype = 1");
+        // 7. Get Total Records
+        $totalStmt = $pdo->query("SELECT COUNT(*) FROM tbl_users WHERE usertype = $TARGET_USERTYPE");
         $recordsTotal = $totalStmt->fetchColumn();
 
-        // 8. Return JSON
         echo json_encode([
             "draw" => intval($_POST['draw'] ?? 1),
             "recordsTotal" => intval($recordsTotal),
@@ -78,34 +77,33 @@ try {
     }
 
     // =================================================================================
-    // ACTION 2: GET SINGLE DETAILS
+    // ACTION 2: GET DETAILS
     // =================================================================================
     if ($action === 'get_details') {
         $id = $_POST['id'] ?? 0;
-        $stmt = $pdo->prepare("SELECT * FROM tbl_users WHERE id = ? AND usertype = 1");
+        $stmt = $pdo->prepare("SELECT * FROM tbl_users WHERE id = ? AND usertype = $TARGET_USERTYPE");
         $stmt->execute([$id]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($data) {
             echo json_encode(['status' => 'success', 'details' => $data]);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Admin not found.']);
+            echo json_encode(['status' => 'error', 'message' => 'Account not found.']);
         }
         exit;
     }
 
     // =================================================================================
-    // ACTION 3: CREATE NEW ADMIN
+    // ACTION 3: CREATE ACCOUNT
     // =================================================================================
     if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $employee_id = trim($_POST['employee_id']);
         $email = trim($_POST['email']);
         $status = $_POST['status'] ?? 1;
-        // Default password if not provided
-        $raw_password = !empty($_POST['password']) ? $_POST['password'] : 'admin123'; 
+        $raw_password = !empty($_POST['password']) ? $_POST['password'] : 'employee123'; 
 
-        // Validate
+        // Validate Uniqueness (Global check across all users to ensure no duplicate EmpID anywhere)
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_users WHERE employee_id = ? OR email = ?");
         $stmt->execute([$employee_id, $email]);
         if ($stmt->fetchColumn() > 0) {
@@ -113,27 +111,34 @@ try {
             exit;
         }
 
+        // Validate existence in tbl_employees (Optional but recommended)
+        // $stmtEmp = $pdo->prepare("SELECT COUNT(*) FROM tbl_employees WHERE employee_id = ?");
+        // $stmtEmp->execute([$employee_id]);
+        // if ($stmtEmp->fetchColumn() == 0) {
+        //     echo json_encode(['status' => 'error', 'message' => 'Employee Profile not found in HR Database. Create profile first.']);
+        //     exit;
+        // }
+
         $hashed_password = password_hash($raw_password, PASSWORD_DEFAULT);
-        $usertype = 1; // Admin
 
         $sql = "INSERT INTO tbl_users (employee_id, email, password, usertype, status, created_at) 
                 VALUES (?, ?, ?, ?, ?, NOW())";
         $stmt = $pdo->prepare($sql);
         
-        if ($stmt->execute([$employee_id, $email, $hashed_password, $usertype, $status])) {
-            echo json_encode(['status' => 'success', 'message' => 'New Admin added successfully!']);
+        if ($stmt->execute([$employee_id, $email, $hashed_password, $TARGET_USERTYPE, $status])) {
+            echo json_encode(['status' => 'success', 'message' => 'Employee Account created successfully!']);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Failed to add admin.']);
+            echo json_encode(['status' => 'error', 'message' => 'Failed to create account.']);
         }
         exit;
     }
 
     // =================================================================================
-    // ACTION 4: UPDATE ADMIN
+    // ACTION 4: UPDATE ACCOUNT
     // =================================================================================
     if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         
-        $id = $_POST['id']; // Hidden input name="id"
+        $id = $_POST['id'];
         $employee_id = trim($_POST['employee_id']);
         $email = trim($_POST['email']);
         $status = $_POST['status'];
@@ -146,50 +151,41 @@ try {
             exit;
         }
 
-        // Prepare Update
         $params = [$employee_id, $email, $status];
         $sql = "UPDATE tbl_users SET employee_id = ?, email = ?, status = ?";
 
-        // Only update password if provided
         if (!empty($_POST['password'])) {
             $sql .= ", password = ?";
             $params[] = password_hash($_POST['password'], PASSWORD_DEFAULT);
         }
 
-        $sql .= " WHERE id = ?";
+        $sql .= " WHERE id = ? AND usertype = $TARGET_USERTYPE";
         $params[] = $id;
 
         $stmt = $pdo->prepare($sql);
         if ($stmt->execute($params)) {
-            echo json_encode(['status' => 'success', 'message' => 'Admin updated successfully!']);
+            echo json_encode(['status' => 'success', 'message' => 'Account updated successfully!']);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Failed to update admin.']);
+            echo json_encode(['status' => 'error', 'message' => 'Failed to update account.']);
         }
         exit;
     }
 
     // =================================================================================
-    // ACTION 5: DELETE ADMIN
+    // ACTION 5: DELETE ACCOUNT
     // =================================================================================
     if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = $_POST['id'];
 
-        // Prevent deleting self (Optional safety check)
-        if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $id) {
-            echo json_encode(['status' => 'error', 'message' => 'You cannot delete your own account!']);
-            exit;
-        }
-
-        $stmt = $pdo->prepare("DELETE FROM tbl_users WHERE id = ?");
+        $stmt = $pdo->prepare("DELETE FROM tbl_users WHERE id = ? AND usertype = $TARGET_USERTYPE");
         if ($stmt->execute([$id])) {
-            echo json_encode(['status' => 'success', 'message' => 'Admin deleted successfully.']);
+            echo json_encode(['status' => 'success', 'message' => 'Account removed successfully.']);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Failed to delete admin.']);
+            echo json_encode(['status' => 'error', 'message' => 'Failed to delete account.']);
         }
         exit;
     }
 
-    // Fallback
     echo json_encode(['status' => 'error', 'message' => 'Invalid action.']);
 
 } catch (Exception $e) {

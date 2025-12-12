@@ -3,11 +3,7 @@ session_start();
 
 // If the user is already logged in, redirect them to their dashboard
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
-    // We can add logic here to redirect based on usertype if needed
-    // For now, a generic dashboard.
-    
     // --- FIX: Check if redirect URL is already in session ---
-    // (This assumes login_handler.php sets it)
     if (isset($_SESSION['usertype'])) {
         $redirect_url = 'user/dashboard.php'; // Default for user (2)
         if ($_SESSION['usertype'] == 0) {
@@ -84,7 +80,7 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                         
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="remember" name="remember">
-                            <label class="form-check-label" for="remember">Remember Me</label>
+                            <label class="form-check-label" for="remember">Keep me Signed In</label>
                         </div>
 
                         <div class="d-grid">
@@ -113,7 +109,7 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                 toast: true,
                 position: 'top-end', // Upper right corner
                 showConfirmButton: false,
-                timer: 1500, // Disappears after 3 seconds
+                timer: 1500, // Disappears after 1.5 seconds
                 timerProgressBar: true,
                 didOpen: (toast) => {
                     toast.addEventListener('mouseenter', Swal.stopTimer);
@@ -124,7 +120,7 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                 }
             });
 
-            // --- 3. ADDED: Password Toggle Visibility Handler ---
+            // --- Password Toggle Visibility Handler ---
             $('#toggle-password').click(function() {
                 var passwordField = $('#password');
                 var fieldType = passwordField.attr('type');
@@ -196,7 +192,7 @@ if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
                     }
                 });
             });
-            // --- 4. ADDED: Caps Lock Detection ---
+            // --- Caps Lock Detection ---
             $('#password').on('keyup keydown click focus', function(e) {
                 // getModifierState is a native DOM method, so we use e.originalEvent
                 if (e.originalEvent.getModifierState('CapsLock')) {

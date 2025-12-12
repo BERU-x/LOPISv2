@@ -74,13 +74,6 @@ function isActive($page_name, $current_page) {
         </a>
     </li> 
 
-    <li class="nav-item <?php echo isActive('pay_schedules', $current_page); ?>">
-        <a class="nav-link" href="pay_schedules.php">
-            <i class="fa-solid fa-fw fa-calendar-days"></i>
-            <span>Pay Schedules</span>
-        </a>
-    </li> 
-
     <hr class="sidebar-divider">
 
     <div class="sidebar-heading">

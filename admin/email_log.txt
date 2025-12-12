@@ -277,3 +277,21 @@ Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=
 Body:
 Hello Aljhon Mark,You have a new **cash_advance** notification from 11:Your Cash Advance request has been REJECTED.Please log in to the portal to view details:View Notification
 --------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 13:51:37 ---
+To: dennis.gayapa@lendell.ph,ella.sepe@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Administrator,You have a new **leave** notification from 23:Admin approved Vacation Leave filed for Aljhon Mark Alvior (2 days).Please log in to the portal to view details:View Notification
+--------------------------------------
+
+
+--- EMAIL SENT @ 2025-12-12 13:51:37 ---
+To: aljhon.alvior@lendell.ph
+Subject: HRIS ALERT: leave Notification Received
+Headers: From: LOPISv2 <no-reply@lendell.ph> | Content-Type: text/html; charset=UTF-8
+Body:
+Hello Aljhon Mark,You have a new **leave** notification from 23:A Vacation Leave request (2 days) has been APPROVED by the Admin.Please log in to the portal to view details:View Notification
+--------------------------------------

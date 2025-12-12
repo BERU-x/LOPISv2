@@ -32,8 +32,7 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="../assets/js/jquery-3.7.1.min.js"></script> 
 <script src="../assets/vendor/bs5/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
@@ -209,7 +208,7 @@
                 });
             }
 
-        }, 60000); // 60 seconds
+        }, 30000); // 30 seconds
     }); 
 </script>
 

@@ -2,22 +2,25 @@
 // dashboard.php
 $page_title = 'Dashboard - LOPISv2';
 $current_page = 'dashboard';
+
 require 'template/header.php';
 require 'template/sidebar.php';
 require 'template/topbar.php';
 ?>
 
 <div class="container-fluid">
+
     <div class="welcome-banner shadow mb-4">
         <div class="d-flex justify-content-between align-items-center">
             <div>
                 <h1 class="h3 font-weight-bold mb-1">Dashboard Overview</h1>
-                <p class="text-white mb-0 opacity-75" id="status-message"></p> 
+                <p class="text-white mb-0 opacity-75" id="status-message"></p>
             </div>
         </div>
     </div>
-    
+
     <div class="row mb-4">
+        
         <div class="col-xl-3 col-md-6 mb-4 mb-xl-0">
             <div class="card h-100 border-left-teal shadow-sm">
                 <div class="card-body">
@@ -52,7 +55,7 @@ require 'template/topbar.php';
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs" id="status-pending-ca">
-                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -84,7 +87,8 @@ require 'template/topbar.php';
                         <div>
                             <div class="text-label">Today Attendance</div>
                             <div class="text-value h4 font-weight-bold mb-0">
-                                <span id="val-attendance-today"><i class="fas fa-spinner fa-spin text-muted text-xs"></i></span>
+                                <span id="val-attendance-today"><i
+                                        class="fas fa-spinner fa-spin text-muted text-xs"></i></span>
                                 <span class="text-muted" style="font-size: 0.6em;">
                                     / <span id="val-attendance-total">0</span>
                                 </span>
@@ -98,7 +102,7 @@ require 'template/topbar.php';
             </div>
         </div>
     </div>
-    
+
     <div class="row mb-4">
         <div class="col-xl-8 col-lg-7">
             <div class="card h-100 shadow">
@@ -131,7 +135,8 @@ require 'template/topbar.php';
     <div class="row mb-4">
         <div class="col-xl-6 col-lg-6 mb-4">
             <div class="card h-100 shadow">
-                <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
+                <div
+                    class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
                     <h6 class="m-0 font-weight-bold text-label">Upcoming Approved Leaves</h6>
                     <a href="leave_management.php" class="text-decoration-none text-sm text-muted">See All &rarr;</a>
                 </div>
@@ -140,15 +145,16 @@ require 'template/topbar.php';
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-6 col-lg-6 mb-4">
             <div class="card h-100 shadow">
-                <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
+                <div
+                    class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
                     <h6 class="m-0 font-weight-bold text-label">Upcoming Company Holidays</h6>
                     <a href="holidays.php" class="text-decoration-none text-sm text-muted">Manage &rarr;</a>
                 </div>
                 <div class="card-body pt-0" id="list-upcoming-holidays">
-                     <div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x"></i></div>
+                    <div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x"></i></div>
                 </div>
             </div>
         </div>

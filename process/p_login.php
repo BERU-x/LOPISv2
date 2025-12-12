@@ -33,7 +33,7 @@ try {
                 u.*, 
                 CONCAT(e.firstname, ' ', e.lastname) AS fullname 
             FROM tbl_users u
-            LEFT JOIN tbl_employees e ON u.employee_id = e.employee_id -- 🔥 FIX: Join on employee_id = employee_id
+            LEFT JOIN tbl_employees e ON u.employee_id = e.employee_id
             WHERE {$login_field} = ?";
     
     $stmt = $pdo->prepare($sql);
@@ -64,7 +64,7 @@ try {
         $_SESSION['usertype'] = $user['usertype'];
         $_SESSION['show_loader'] = true;
 
-        // --- "Remember Me" Logic ---
+        // --- "Keep me Signed In" Logic ---
         if ($remember_me) {
             // Generate secure tokens
             $selector = bin2hex(random_bytes(16));
@@ -78,22 +78,21 @@ try {
             
             // Store in the database
             try {
-                // NOTE: This assumes tbl_auth_tokens table exists with correct columns
+                // FIX: Changed 'user_id' column reference to 'employee_id' to match DB schema.
                 $stmt_token = $pdo->prepare(
-                    "INSERT INTO tbl_auth_tokens (selector, hashed_token, user_id, expires_at) 
+                    "INSERT INTO tbl_auth_tokens (selector, hashed_token, employee_id, expires_at) 
                     VALUES (?, ?, ?, ?)"
                 );
-                $stmt_token->execute([$selector, $hashed_token, $user['id'], $expires_at]);
+                // FIX: Pass $user['employee_id'] instead of $user['id'].
+                $stmt_token->execute([$selector, $hashed_token, $user['employee_id'], $expires_at]);
                 
                 // Set cookies (httponly = true for security)
-                // Adjust cookie options based on your environment
                 $cookie_options = [
                     'expires' => time() + (86400 * 30),
                     'path' => '/',
-                    // 'domain' => 'lendell.ph', // Remove if running locally or not setting a specific domain
-                    'secure' => false, // !! CHANGE TO TRUE FOR PRODUCTION (HTTPS) !!
+                    'secure' => false, 
                     'httponly' => true,
-                    'samesite' => 'Lax' // Or 'Strict'
+                    'samesite' => 'Lax'
                 ];
                 
                 // Set 'secure' based on environment
@@ -108,7 +107,7 @@ try {
                 error_log('Remember Me cookie token insert failed: ' . $e->getMessage());
             }
         }
-        // --- End of "Remember Me" Logic ---
+        // --- End of "Keep me Signed In" Logic ---
 
         // Determine redirect URL
         $redirect_url = 'user/dashboard.php'; // Default for user (2)

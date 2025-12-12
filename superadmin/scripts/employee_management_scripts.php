@@ -2,22 +2,18 @@
 // ==============================================================================
 // 1. GLOBAL STATE & HELPER FUNCTIONS
 // ==============================================================================
-var adminTable;
+var employeeTable;
 let spinnerStartTime = 0; 
-let currentAdminId = null;
+let currentUserId = null;
 
-// 1.1 Helper: Updates the final timestamp text (e.g., "10:30:05 AM")
+// 1.1 Helper: Updates the final timestamp text
 function updateLastSyncTime() {
     const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
+    const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
     $('#last-updated-time').text(timeString);
 }
 
-// 1.2 Helper: Stops the spinner safely (ensures it runs for at least 500ms)
+// 1.2 Helper: Stops the spinner safely
 function stopSpinnerSafely() {
     const icon = $('#refresh-spinner');
     const minDisplayTime = 500; 
@@ -41,31 +37,33 @@ window.refreshPageContent = function() {
     $('#refresh-spinner').addClass('fa-spin text-teal');
     $('#last-updated-time').text('Syncing...');
     
-    if (adminTable) {
-        adminTable.ajax.reload(null, false);
+    if (employeeTable) {
+        employeeTable.ajax.reload(null, false);
     }
 };
 
 // ==============================================================================
-// 2. MODAL & CRUD LOGIC (Standardized)
+// 2. MODAL & CRUD LOGIC
 // ==============================================================================
 
 // 2.1 Open Modal (Add or Edit)
 function openModal(id = null) {
-    currentAdminId = id;
+    currentUserId = id;
     
     // Reset Form & UI
-    $('#adminForm')[0].reset();
-    $('#admin_id').val('');
-    $('#modalTitle').text(id ? 'Edit Admin' : 'Add New Admin');
+    $('#employeeForm')[0].reset();
+    $('#user_id').val('');
+    $('#modalTitle').text(id ? 'Edit Account' : 'Add New Account');
     
     // Password Hint Logic
     if(id) {
         $('#password_hint').removeClass('d-none');
         $('#password').removeAttr('required').attr('placeholder', 'Leave blank to keep current');
+        $('#employee_id').attr('readonly', true); // Prevent changing ID on edit to avoid mismatches
     } else {
         $('#password_hint').addClass('d-none');
-        $('#password').attr('required', 'required').attr('placeholder', 'Default: admin123');
+        $('#password').attr('required', 'required').attr('placeholder', 'Default: employee123');
+        $('#employee_id').attr('readonly', false);
     }
 
     if (id) {
@@ -73,19 +71,19 @@ function openModal(id = null) {
         Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
         
         $.ajax({
-            url: 'api/admin_action.php', // Consolidated URL
+            url: 'api/user_action.php', // Note path adjustment
             type: 'POST',
-            data: { action: 'get_details', id: id }, // Standardized data payload
+            data: { action: 'get_details', id: id },
             dataType: 'json',
             success: function(res) {
                 Swal.close();
                 if (res.status === 'success' && res.details) {
                     const d = res.details;
-                    $('#admin_id').val(d.id);
+                    $('#user_id').val(d.id);
                     $('#employee_id').val(d.employee_id);
                     $('#email').val(d.email);
                     $('#status').val(d.status);
-                    $('#adminModal').modal('show');
+                    $('#employeeModal').modal('show');
                 } else {
                     Swal.fire('Error', res.message || 'Could not fetch details.', 'error');
                 }
@@ -96,15 +94,15 @@ function openModal(id = null) {
         });
     } else {
         // ADD MODE
-        $('#adminModal').modal('show');
+        $('#employeeModal').modal('show');
     }
 }
 
-// 2.2 Delete Admin
-function deleteAdmin(id) {
+// 2.2 Delete Account
+function deleteAccount(id) {
     Swal.fire({
         title: 'Are you sure?',
-        text: "You won't be able to revert this!",
+        text: "This user will lose access to the system.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
@@ -112,7 +110,7 @@ function deleteAdmin(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: 'api/admin_action.php',
+                url: '../api/user_action.php',
                 type: 'POST',
                 data: { action: 'delete', id: id },
                 dataType: 'json',
@@ -138,15 +136,15 @@ function deleteAdmin(id) {
 $(document).ready(function() {
     
     // 3.1 Initialize DataTable
-    adminTable = $('#adminTable').DataTable({ // Updated ID to match standard HTML
+    employeeTable = $('#employeeTable').DataTable({
         processing: true,
         serverSide: true,
         ordering: true, 
-        dom: 'rtip', // Clean layout
+        dom: 'rtip', 
         ajax: {
-            url: "api/admin_action.php",
+            url: "api/user_action.php", // Points to the generic User API
             type: "POST",
-            data: { action: 'fetch' }
+            data: { action: 'fetch' } // The API defaults to usertype=2 if not specified, or we handle it there
         },
         drawCallback: function(settings) {
             const icon = $('#refresh-spinner');
@@ -162,7 +160,7 @@ $(document).ready(function() {
                 data: 'employee_id', 
                 className: "align-middle fw-bold",
                 render: function(data) { 
-                    return '<span class="badge bg-soft-primary text-primary border border-primary px-2">' + data + '</span>'; 
+                    return '<span class="badge bg-soft-info text-info border border-info px-2">' + data + '</span>'; 
                 } 
             },
             // Col 2: Email
@@ -195,35 +193,34 @@ $(document).ready(function() {
                         <button class="btn btn-sm btn-outline-primary shadow-sm me-1" onclick="openModal(${data})" title="Edit">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteAdmin(${data})" title="Delete">
+                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteAccount(${data})" title="Delete">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     `;
                 }
             }
         ],
-        language: { emptyTable: "No administrators found." }
+        language: { emptyTable: "No employee accounts found." }
     });
 
     // 3.2 Handle Form Submission
-    $('#adminForm').on('submit', function(e) {
+    $('#employeeForm').on('submit', function(e) {
         e.preventDefault();
         
-        // Determine action based on hidden ID field
-        const action = $('#admin_id').val() ? 'update' : 'create';
-        const formData = $(this).serialize() + '&action=' + action; // Append action to form data
+        const action = $('#user_id').val() ? 'update' : 'create';
+        const formData = $(this).serialize() + '&action=' + action;
 
         Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
-            url: 'api/admin_action.php',
+            url: 'api/user_action.php',
             type: 'POST',
             data: formData,
             dataType: 'json',
             success: function(res) {
                 Swal.close();
                 if (res.status === 'success') {
-                    $('#adminModal').modal('hide');
+                    $('#employeeModal').modal('hide');
                     Swal.fire({
                         icon: 'success',
                         title: 'Success',

@@ -1,7 +1,8 @@
 <?php
+// superadmin/employee_management.php
 // --- 1. PAGE CONFIGURATION ---
-$page_title = 'Admin Management - LOPISv2';
-$current_page = 'admin_management';
+$page_title = 'Employee Accounts - LOPISv2';
+$current_page = 'employee_management';
 
 require 'template/header.php';
 require 'template/sidebar.php';
@@ -11,15 +12,15 @@ require 'template/topbar.php';
 <div class="container-fluid">
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Admin Management</h1>
+        <h1 class="h3 mb-0 text-gray-800">Employee Account Management</h1>
         <button class="btn btn-primary shadow-sm" onclick="openModal()">
-            <i class="fa-solid fa-plus fa-sm text-white-50 me-2"></i>Add New Admin
+            <i class="fa-solid fa-plus fa-sm text-white-50 me-2"></i>Add New Account
         </button>
     </div>
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-            <h6 class="m-0 font-weight-bold text-primary">List of System Administrators</h6>
+            <h6 class="m-0 font-weight-bold text-primary">List of Employee Accounts</h6>
             <div class="dropdown no-arrow">
                  <button class="btn btn-link btn-sm text-decoration-none" onclick="window.refreshPageContent()">
                     <i id="refresh-spinner" class="fas fa-sync-alt fa-sm fa-fw text-gray-400"></i>
@@ -28,7 +29,7 @@ require 'template/topbar.php';
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-striped table-hover align-middle" id="adminTable" width="100%" cellspacing="0">
+                <table class="table table-striped table-hover align-middle" id="employeeTable" width="100%" cellspacing="0">
                     <thead class="bg-light text-uppercase text-gray-600 text-xs font-weight-bold">
                         <tr>
                             <th class="border-0">Employee ID</th>
@@ -47,26 +48,26 @@ require 'template/topbar.php';
 
 </div>
 
-<div class="modal fade" id="adminModal" tabindex="-1" data-bs-backdrop="static">
+<div class="modal fade" id="employeeModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="adminForm">
+            <form id="employeeForm">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="modalTitle">Add New Admin</h5>
+                    <h5 class="modal-title fw-bold" id="modalTitle">Add New Account</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" id="admin_id" name="id">
+                    <input type="hidden" id="user_id" name="id">
                     
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Employee ID</label>
-                        <input type="text" class="form-control" id="employee_id" name="employee_id" required placeholder="e.g. 101">
-                        <small class="text-muted">Must match an existing Employee ID.</small>
+                        <input type="text" class="form-control" id="employee_id" name="employee_id" required placeholder="e.g. 101" maxlength="3">
+                        <small class="text-muted">Must match an existing profile in HR.</small>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Email Address</label>
-                        <input type="email" class="form-control" id="email" name="email" required placeholder="admin@example.com">
+                        <input type="email" class="form-control" id="email" name="email" required placeholder="employee@example.com">
                     </div>
 
                     <div class="mb-3">
@@ -93,4 +94,4 @@ require 'template/topbar.php';
 </div>
 
 <?php require 'template/footer.php'; ?>
-<?php require 'scripts/admin_management_scripts.php'; ?>
+<?php require 'scripts/employee_management_scripts.php'; ?>
