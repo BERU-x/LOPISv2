@@ -3,62 +3,71 @@
 // 1. GLOBAL STATE & HELPER FUNCTIONS
 // ==============================================================================
 var holidayTable;
-let spinnerStartTime = 0; 
 let currentHolidayId = null;
 
-// 1.1 Helper function: Updates the final timestamp text
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    $('#last-updated-time').text(timeString);
-}
+/**
+ * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 1.2 Helper function: Stops the spinner only after the minimum time has passed (Standardized to 1000ms)
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 1000; // Standardized to 1 second
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
+    $dot.removeClass('text-success text-warning text-danger');
 
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime(); 
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-// 1.3 Map Philippine Holiday Types to standard payroll multipliers 
+// 1.2 MASTER REFRESHER TRIGGER
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
+    if (holidayTable) {
+        // 1. Visual Feedback for Manual Actions
+        if(isManual) {
+            $('#refreshIcon').addClass('fa-spin');
+            updateSyncStatus('loading');
+        }
+        
+        // 2. Reload DataTable (false = keep paging)
+        holidayTable.ajax.reload(null, false);
+    }
+};
+
+// ==============================================================================
+// 2. BUSINESS LOGIC (Modal, Multiplier, Delete)
+// ==============================================================================
+
+// 2.1 Map Philippine Holiday Types to standard payroll multipliers 
 function getMultiplier(type) {
     switch (type) {
-        case 'Regular':
-            return 2.00;
-        case 'Special Non-Working':
-            return 1.30;
-        case 'Special Working':
-            return 1.00;
-        case 'National Local':
-            return 1.00;
-        default:
-            return 1.00;
+        case 'Regular': return 2.00;
+        case 'Special Non-Working': return 1.30;
+        case 'Special Working': return 1.00;
+        case 'National Local': return 1.00;
+        default: return 1.00;
     }
 }
 
-// 1.4 Function triggered by the Holiday Type dropdown change
+// 2.2 Function triggered by the Holiday Type dropdown change
 function updateMultiplier() {
     const selectedType = $('#holiday_type').val();
     const multiplier = getMultiplier(selectedType);
     $('#payroll_multiplier').val(multiplier.toFixed(2));
 }
 
-// 1.5 Function to reset and open the Add/Edit Modal (Used for both Edit and View)
+// 2.3 Function to reset and open the Add/Edit Modal
 function openModal(id = null) {
     currentHolidayId = id;
     $('#holidayForm')[0].reset();
@@ -70,10 +79,9 @@ function openModal(id = null) {
         $('#deleteHolidayBtn').toggle(!!id);
     }
 
-
     if (id) {
         Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-        // Fetch existing data for editing
+        
         $.ajax({
             url: 'api/holiday_action.php?action=get_details',
             type: 'POST',
@@ -82,20 +90,17 @@ function openModal(id = null) {
             success: function(data) {
                 Swal.close();
                 
-                // *** CRITICAL FIX: Check for data.status === 'success' ***
                 if (data.status === 'success' && data.details) {
-                    const details = data.details; // Use a clean variable name
+                    const details = data.details;
                     
                     $('#holiday_id').val(details.id);
                     $('#holiday_date').val(details.holiday_date);
                     $('#holiday_name').val(details.holiday_name);
                     $('#holiday_type').val(details.holiday_type);
                     
-                    // Ensure multiplier is parsed and formatted correctly before display
                     $('#payroll_multiplier').val(parseFloat(details.payroll_multiplier || 1.00).toFixed(2));
                     $('#holidayModal').modal('show');
                 } else {
-                    // Use data.message if available, otherwise generic error
                     Swal.fire('Error', data.message || 'Could not fetch holiday details.', 'error');
                 }
             },
@@ -110,7 +115,7 @@ function openModal(id = null) {
     }
 }
 
-// 1.6 Function to delete a holiday
+// 2.4 Function to delete a holiday
 function deleteHoliday(id) {
     Swal.fire({
         title: 'Are you sure?',
@@ -121,6 +126,8 @@ function deleteHoliday(id) {
         confirmButtonText: 'Yes, delete it!'
     }).then((result) => {
         if (result.isConfirmed) {
+            Swal.fire({ title: 'Deleting...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
             $.ajax({
                 url: 'api/holiday_action.php?action=delete',
                 type: 'POST',
@@ -129,7 +136,7 @@ function deleteHoliday(id) {
                 success: function(res) {
                     if (res.status === 'success') {
                         Swal.fire('Deleted!', res.message, 'success');
-                        window.refreshPageContent(); // Refresh table using hook
+                        window.refreshPageContent(true); // Visual Refresh
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }
@@ -142,23 +149,12 @@ function deleteHoliday(id) {
     });
 }
 
-// 1.7 MASTER REFRESHER HOOK
-window.refreshPageContent = function() {
-    // Start animation timer and text
-    spinnerStartTime = new Date().getTime(); 
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    
-    // Reload table 
-    if (holidayTable) {
-        holidayTable.ajax.reload(null, false);
-    }
-};
-
-
+// ==============================================================================
+// 3. INITIALIZATION
+// ==============================================================================
 $(document).ready(function() {
 
-    // Attach global functions to window scope for HTML onclick/form events
+    // 3.1 Attach global functions to window scope
     window.updateMultiplier = updateMultiplier;
     window.openModal = openModal;
     window.deleteHoliday = deleteHoliday;
@@ -169,13 +165,12 @@ $(document).ready(function() {
     // Bind delete button inside modal to the current ID
     $('#deleteHolidayBtn').on('click', function() {
         if(currentHolidayId) {
-            $('#holidayModal').modal('hide'); // Close modal before SweetAlert
+            $('#holidayModal').modal('hide'); 
             deleteHoliday(currentHolidayId);
         }
     });
 
-
-    // 2. INITIALIZE DATATABLE
+    // 3.2 INITIALIZE DATATABLE
     holidayTable = $('#holidayTable').DataTable({
         processing: true,
         serverSide: true,
@@ -186,14 +181,10 @@ $(document).ready(function() {
             type: "GET",
         },
 
-        // CRITICAL: Triggers the safe stop function after data is received and drawn
+        // DRAW CALLBACK: Standardized UI updates
         drawCallback: function(settings) {
-            const icon = $('#refresh-spinner');
-            if (icon.hasClass('fa-spin')) {
-                stopSpinnerSafely();
-            } else {
-                updateLastSyncTime(); 
-            }
+            updateSyncStatus('success');
+            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
         },
 
         columns: [
@@ -209,7 +200,7 @@ $(document).ready(function() {
             { data: 'holiday_name', className: 'align-middle' },
             // Col 2: Type
             { data: 'holiday_type', className: 'align-middle' },
-            // Col 3: Action (Updated to FA6 icon)
+            // Col 3: Action
             { 
                 data: 'id',
                 orderable: false,
@@ -225,8 +216,15 @@ $(document).ready(function() {
         ],
         language: { "emptyTable": "No holidays configured." }
     });
+
+    // 3.3 DETECT LOADING STATE
+    $('#holidayTable').on('processing.dt', function (e, settings, processing) {
+        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
+            updateSyncStatus('loading');
+        }
+    });
     
-    // 3. FORM SUBMISSION (Create/Update)
+    // 3.4 FORM SUBMISSION (Create/Update)
     $('#holidayForm').on('submit', function(e) {
         e.preventDefault();
         
@@ -243,7 +241,7 @@ $(document).ready(function() {
                 if (res.status === 'success') {
                     $('#holidayModal').modal('hide');
                     Swal.fire('Success', res.message, 'success');
-                    window.refreshPageContent(); // Refresh table using hook
+                    window.refreshPageContent(true); // Visual Refresh
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
@@ -254,7 +252,10 @@ $(document).ready(function() {
         });
     });
     
-    // Ensure initial load updates the time
-    updateLastSyncTime();
+    // 3.5 Manual Refresh Listener
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault();
+        window.refreshPageContent(true);
+    });
 });
 </script>

@@ -12,22 +12,17 @@ require 'template/topbar.php';
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">Pay Components</h1>
-        <div class="dropdown no-arrow">
-             <button class="btn btn-link btn-sm text-decoration-none" onclick="window.refreshPageContent()">
-                <i id="refresh-spinner" class="fas fa-sync-alt fa-sm fa-fw text-gray-400"></i> Refresh Data
-            </button>
-        </div>
     </div>
 
     <ul class="nav nav-tabs mb-4" id="componentTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active fw-bold" id="earnings-tab" data-bs-toggle="tab" data-bs-target="#earnings" type="button" role="tab">
-                <i class="fas fa-plus-circle text-success me-2"></i>Earnings
+                <i class="fas fa-plus-circle text-teal me-2"></i>Earnings
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link fw-bold" id="deductions-tab" data-bs-toggle="tab" data-bs-target="#deductions" type="button" role="tab">
-                <i class="fas fa-minus-circle text-danger me-2"></i>Deductions
+                <i class="fas fa-minus-circle text-teal me-2"></i>Deductions
             </button>
         </li>
     </ul>
@@ -37,8 +32,8 @@ require 'template/topbar.php';
         <div class="tab-pane fade show active" id="earnings" role="tabpanel">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-success">Earning Components</h6>
-                    <button class="btn btn-success btn-sm shadow-sm" onclick="openModal('earning')">
+                    <h6 class="m-0 font-weight-bold text-label">Earning Components</h6>
+                    <button class="btn btn-teal btn-sm shadow-sm" onclick="openModal('earning')">
                         <i class="fas fa-plus fa-sm text-white-50 me-1"></i> Add Earning
                     </button>
                 </div>
@@ -62,8 +57,8 @@ require 'template/topbar.php';
         <div class="tab-pane fade" id="deductions" role="tabpanel">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-danger">Deduction Components</h6>
-                    <button class="btn btn-danger btn-sm shadow-sm" onclick="openModal('deduction')">
+                    <h6 class="m-0 font-weight-bold text-label  ">Deduction Components</h6>
+                    <button class="btn btn-teal btn-sm shadow-sm" onclick="openModal('deduction')">
                         <i class="fas fa-plus fa-sm text-white-50 me-1"></i> Add Deduction
                     </button>
                 </div>
@@ -125,7 +120,7 @@ require 'template/topbar.php';
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="submit" class="btn btn-teal">Save Changes</button>
                 </div>
             </form>
         </div>

@@ -18,7 +18,7 @@ require 'template/topbar.php';
         <div class="col-lg-8">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">General Financial Settings</h6>
+                    <h6 class="m-0 font-weight-bold text-label">General Financial Settings</h6>
                     <span id="last-updated-text" class="small text-muted"></span>
                 </div>
                 <div class="card-body">
@@ -65,7 +65,7 @@ require 'template/topbar.php';
                         </div>
 
                         <div class="d-flex justify-content-end">
-                            <button class="btn btn-primary px-4" type="submit" id="saveBtn">
+                            <button class="btn btn-teal px-4" type="submit" id="saveBtn">
                                 <i class="fas fa-save me-1"></i> Save Configuration
                             </button>
                         </div>

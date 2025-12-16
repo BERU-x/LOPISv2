@@ -10,7 +10,6 @@ if (!isset($employment_statuses)) {
 // 1. GLOBAL STATE & HELPER FUNCTIONS
 // ==============================================================================
 var employeesTable; 
-let spinnerStartTime = 0; 
 // CRITICAL: Variable to hold the photo URL fetched by AJAX
 window.currentPhotoUrl = null; 
 
@@ -18,112 +17,94 @@ var employmentStatuses = {
     <?php foreach ($employment_statuses as $id => $name) { echo "$id: '$name',"; } ?>
 };
 
-// 1.0 HELPER: Dynamically finds the project base URL (e.g., http://localhost/LOPISv2/)
+// 1.0 HELPER: Dynamically finds the project base URL
 function getProjectBaseUrl() {
-    // Current URL is typically something like: http://localhost/LOPISv2/admin/employee_management.php
     const pathArray = window.location.pathname.split('/');
-    
-    // We assume the project folder is the second segment (index 1) after the domain root (index 0 is empty)
     const projectFolder = pathArray[1]; 
-    
-    // Return the absolute base URL including the project folder
     return window.location.origin + '/' + projectFolder + '/';
 }
 
-// 1.1 HELPER: Updates the final timestamp text (Must be globally accessible)
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    $('#last-updated-time').text(timeString);
-}
+/**
+ * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 1.2 HELPER: Stops the spinner safely (Calls the global updateLastSyncTime)
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 1000; 
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
+    $dot.removeClass('text-success text-warning text-danger');
 
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime(); 
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-// 1.3 MASTER REFRESHER TRIGGER (Hook for Topbar/Buttons)
-window.refreshPageContent = function() {
-    // 1. Start Sync Visuals
-    spinnerStartTime = new Date().getTime(); 
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    
-    // 2. Reload the DataTable
-    if (employeesTable) { // Safety check added
+// 1.2 MASTER REFRESHER TRIGGER
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
+    if (employeesTable) {
+        // 1. Visual Feedback for Manual Actions
+        if(isManual) {
+            $('#refreshIcon').addClass('fa-spin');
+            updateSyncStatus('loading');
+        }
+        
+        // 2. Reload DataTable (false = keep paging)
         employeesTable.ajax.reload(null, false);
     }
 };
 
-// 1.4 INTERNAL RELOAD (Used after CRUD operations)
-function reloadEmployeeTable() {
-    window.refreshPageContent();
-}
-
-// 1.5 HELPER: Function to safely reset and re-initialize Dropify (FINAL BRUTE FORCE ID CHANGE)
+// 1.3 HELPER: Function to safely reset and re-initialize Dropify (PRESERVED LOGIC)
 function resetDropify(targetId, defaultFile = null) {
     const $dropify = $(`#${targetId}`);
     
-    // 1. If an instance exists, destroy it.
+    // Destroy instance
     if ($dropify.data('dropify')) {
         $dropify.dropify('destroy'); 
     }
     
-    // 2. Clear old data attribute
+    // Clear old data
     $dropify.removeAttr('data-default-file'); 
     
-    // 3. Set the new default file URL using the HTML attribute
+    // Set new default
     if (defaultFile) {
         $dropify.attr('data-default-file', defaultFile);
     }
     
-    // 4. CRITICAL: Change the ID and then immediately change it back (or give it a temp unique ID)
-    // We will clear the element's inner HTML wrapper if it's there
+    // Brute force DOM recreation to fix Dropify glitches
     const $wrapper = $dropify.closest('.dropify-wrapper').parent();
     if ($wrapper.length) {
-        $wrapper.html($dropify.prop('outerHTML')); // Recreate the input element cleanly
-        $dropify.remove(); // Remove the old jquery reference
+        $wrapper.html($dropify.prop('outerHTML')); 
+        $dropify.remove(); 
         
-        // Re-establish the reference to the newly inserted element
         const newId = targetId + '_temp_' + Date.now();
-        $(`#${targetId}`).attr('id', newId).removeClass('dropify-touched'); // Change ID and reset class
+        $(`#${targetId}`).attr('id', newId).removeClass('dropify-touched'); 
         
         const $newDropify = $(`#${newId}`);
-        $newDropify.attr('name', 'photo'); // Ensure name is correct
+        $newDropify.attr('name', 'photo'); 
         
         if (defaultFile) {
             $newDropify.attr('data-default-file', defaultFile);
         }
         
-        // 5. Re-initialize Dropify on the new element.
         $newDropify.dropify();
-        
-        // Restore the original ID for form submission (optional, but safe)
         $newDropify.attr('id', targetId);
     } else {
-        // If the wrapper structure is not found, just re-initialize the original element as a fallback
         $dropify.dropify();
     }
 }
 
-// 1.6 HELPER: Resets the primary Add form
+// 1.4 HELPER: Resets the primary Add form
 function resetForm() {
     $('#addEmployeeForm')[0].reset();
     resetDropify('photo');
@@ -131,9 +112,8 @@ function resetForm() {
 
 // 2. WINDOW.EDITEMPLOYEE FUNCTION (Data Fetch for Edit Modal)
 window.editEmployee = function(id) {
-    Swal.fire({ title: 'Fetching Employee Data...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+    Swal.fire({ title: 'Fetching Data...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
     
-    // Reset temporary URL store before AJAX call
     window.currentPhotoUrl = null; 
 
     $.ajax({
@@ -172,17 +152,14 @@ window.editEmployee = function(id) {
                 form.find('#edit_bank_name').val(data.bank_name);
                 form.find('#edit_account_number').val(data.account_number);
 
-                // --- Photo FIX: CALCULATE URL AND STORE IT GLOBALLY ---
+                // --- Photo Logic ---
                 if (data.photo) {
                     const baseUrl = getProjectBaseUrl();
                     window.currentPhotoUrl = `${baseUrl}assets/images/${data.photo}`;
-                    console.log("Final Brute Force URL:", window.currentPhotoUrl); 
                 } else {
                     window.currentPhotoUrl = null;
                 }
                 
-                // CRITICAL: SHOW THE MODAL FIRST. Dropify re-initialization will happen
-                // in the 'shown.bs.modal' event listener.
                 $('#editModal').modal('show'); 
                 
             } else {
@@ -198,7 +175,7 @@ window.editEmployee = function(id) {
 
 $(document).ready(function() {
 
-    // --- INITIALIZE DROPIFY for ADD modal (Once) ---
+    // --- INITIALIZE DROPIFY ---
     if(typeof $('.dropify').dropify === 'function') {
         $('#photo').dropify(); 
         $('#photo_edit').dropify(); 
@@ -210,27 +187,20 @@ $(document).ready(function() {
         serverSide: true,
         ordering: true, 
         dom: 'rtip', 
-        
         ajax: {
             url: "api/employee_action.php?action=fetch", 
             type: "GET"
         },
-        
-        // DRAW CALLBACK: Triggers the safe stop function after data is drawn
+        // DRAW CALLBACK: Standardized UI updates
         drawCallback: function(settings) {
-            const icon = $('#refresh-spinner');
-            if (icon.hasClass('fa-spin')) { 
-                stopSpinnerSafely();
-            } else {
-                updateLastSyncTime(); // Update time on initial load
-            }
+            updateSyncStatus('success');
+            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
         },
-        
         columns: [
-            // Column 0: ID
+            // Col 0: ID
             { data: 'employee_id', className: 'fw-bold text-gray-700 align-middle' },
             
-            // Column 1: Name & Position
+            // Col 1: Name & Position
             { 
                 data: 'lastname', 
                 className: 'align-middle',
@@ -251,7 +221,7 @@ $(document).ready(function() {
                 }
             },
             
-            // Column 2: Status
+            // Col 2: Status
             { 
                 data: 'employment_status', 
                 className: 'text-center align-middle',
@@ -262,14 +232,14 @@ $(document).ready(function() {
                 }
             },
             
-            // Column 3: Daily Rate
+            // Col 3: Daily Rate
             { 
                 data: 'daily_rate', 
                 className: 'text-end fw-bold align-middle',
                 render: $.fn.dataTable.render.number(',', '.', 2, '₱ ') 
             },
 
-            // Column 4: Actions
+            // Col 4: Actions
             {
                 data: 'employee_id',
                 orderable: false,
@@ -287,7 +257,14 @@ $(document).ready(function() {
         employeesTable.search(this.value).draw();
     });
 
-    // --- 3. Handle Form Submission: CREATE (Add Modal) ---
+    // --- 3. DETECT LOADING STATE ---
+    $('#employeesTable').on('processing.dt', function (e, settings, processing) {
+        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
+            updateSyncStatus('loading');
+        }
+    });
+
+    // --- 4. Handle Form Submission: CREATE ---
     $('#addEmployeeForm').on('submit', function(e) {
         e.preventDefault();
         var formData = new FormData(this);
@@ -300,20 +277,19 @@ $(document).ready(function() {
                 if(res.status === 'success') {
                     Swal.fire('Success', res.message, 'success');
                     $('#addModal').modal('hide');
-                    reloadEmployeeTable();
+                    window.refreshPageContent(true); // Visual Refresh
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
             },
             error: function(xhr) {
                 Swal.close();
-                console.error("AJAX Error:", xhr.responseText);
-                Swal.fire('Error', 'Server request failed. Check console for details.', 'error');
+                Swal.fire('Error', 'Server request failed.', 'error');
             }
         });
     });
 
-    // --- 4. Handle Form Submission: UPDATE (Edit Modal) ---
+    // --- 5. Handle Form Submission: UPDATE ---
     $('#editEmployeeForm').on('submit', function(e) {
         e.preventDefault();
         var formData = new FormData(this);
@@ -326,43 +302,42 @@ $(document).ready(function() {
                 if(res.status === 'success') {
                     Swal.fire('Success', res.message, 'success');
                     $('#editModal').modal('hide');
-                    reloadEmployeeTable();
+                    window.refreshPageContent(true); // Visual Refresh
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
             },
             error: function(xhr) {
                 Swal.close();
-                console.error("AJAX Error:", xhr.responseText);
-                Swal.fire('Error', 'Server request failed. Check console for details.', 'error');
+                Swal.fire('Error', 'Server request failed.', 'error');
             }
         });
     });
     
     // --- 6. CRITICAL FIX: Initialize Dropify ONLY when the modal is fully visible ---
     $('#editModal').on('shown.bs.modal', function() {
-        // This runs after the modal has fully finished transitioning and is visible.
-        
-        // We ensure Dropify is destroyed/re-initialized now with the correct URL.
         if (window.currentPhotoUrl) {
             resetDropify('photo_edit', window.currentPhotoUrl);
         } else {
-            // Re-initialize to ensure it displays the "Click or Drag" message cleanly
             resetDropify('photo_edit');
         }
     });
 
-    // --- 5. Modal Hide Listeners (Resets forms after closing) ---
-
+    // --- 7. Modal Hide Listeners ---
     $('#addModal').on('hidden.bs.modal', function() {
         resetForm();
     });
 
     $('#editModal').on('hidden.bs.modal', function() {
         $('#editEmployeeForm')[0].reset();
-        // Reset the input field but also ensure the global URL is cleared
         resetDropify('photo_edit'); 
         window.currentPhotoUrl = null;
+    });
+
+    // --- 8. Manual Refresh Listener ---
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault();
+        window.refreshPageContent(true);
     });
 });
 </script>

@@ -22,7 +22,7 @@ require 'template/topbar.php';
             <div class="col-lg-6">
                 <div class="card shadow mb-4">
                     <div class="card-header py-3 border-left-info">
-                        <h6 class="m-0 font-weight-bold text-info">
+                        <h6 class="m-0 font-weight-bold text-label">
                             <i class="fas fa-cogs me-2"></i>System Parameters
                         </h6>
                     </div>
@@ -71,7 +71,7 @@ require 'template/topbar.php';
             <div class="col-lg-6">
                 <div class="card shadow mb-4">
                     <div class="card-header py-3 border-left-warning">
-                        <h6 class="m-0 font-weight-bold text-warning">
+                        <h6 class="m-0 font-weight-bold text-label">
                             <i class="fas fa-bell me-2"></i>Notification & SMTP
                         </h6>
                     </div>
@@ -131,7 +131,7 @@ require 'template/topbar.php';
         <div class="card shadow mb-5 border-top-primary">
             <div class="card-body d-flex justify-content-between align-items-center py-3">
                 <span id="last-updated-text" class="small text-muted font-italic">Loading configuration...</span>
-                <button class="btn btn-primary px-4 shadow" type="submit" id="saveBtn">
+                <button class="btn btn-teal px-4 shadow" type="submit" id="saveBtn">
                     <i class="fas fa-save me-2"></i> Save Configuration
                 </button>
             </div>

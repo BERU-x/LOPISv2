@@ -1,73 +1,60 @@
 <script>
 // ==============================================================================
-// 1. GLOBAL STATE & HELPER FUNCTIONS (Defined Globally)
+// 1. GLOBAL STATE & HELPER FUNCTIONS
 // ==============================================================================
-let attendanceTable; 
-let spinnerStartTime = 0; // Global variable to track when the spin started
+var attendanceTable; 
 
-// 1.1 HELPER FUNCTION: Updates the final timestamp text
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    $('#last-updated-time').text(timeString);
-}
+/**
+ * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 1.2 HELPER FUNCTION: Stops the spinner only after the minimum time has passed
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 1000; 
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
+    $dot.removeClass('text-success text-warning text-danger');
 
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime(); 
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        // Wait the remaining time before stopping
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        // Stop immediately
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-// ⭐ 1.3 MASTER REFRESHER TRIGGER (Hook for Topbar/Buttons)
-// Defined globally for immediate access by external scripts/templates.
-window.refreshPageContent = function() {
-    // 1. Record Start Time
-    spinnerStartTime = new Date().getTime(); 
-    
-    // 2. Start Visual feedback & Text
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    
-    // 3. Reload table (only if initialized)
+// 1.2 MASTER REFRESHER TRIGGER
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
     if (attendanceTable) {
+        // 1. Visual Feedback for Manual Actions
+        if(isManual) {
+            $('#refreshIcon').addClass('fa-spin');
+            updateSyncStatus('loading');
+        }
+        
+        // 2. Reload DataTable (false = keep paging)
         attendanceTable.ajax.reload(null, false);
     }
 };
 
-
+// ==============================================================================
+// 2. INITIALIZATION
+// ==============================================================================
 $(document).ready(function() {
 
-    // Check if table exists
     if ($('#attendanceTable').length) {
         
-        // Destroy existing if needed
-        if ($.fn.DataTable.isDataTable('#attendanceTable')) {
-            $('#attendanceTable').DataTable().destroy();
-        }
-
-        // Initialize DataTable
+        // 2.1 Initialize DataTable
         attendanceTable = $('#attendanceTable').DataTable({
             processing: true,
             serverSide: true,
-            destroy: true, 
             ordering: false, 
             dom: 'rtip', 
 
@@ -81,23 +68,17 @@ $(document).ready(function() {
                 }
             },
             
-            // ⭐ CRITICAL: Triggers the safe stop function after data is received and drawn
+            // DRAW CALLBACK: Standardized UI updates
             drawCallback: function(settings) {
-                const icon = $('#refresh-spinner');
-                
-                // Only run the time check if the icon is currently spinning.
-                if (icon.hasClass('fa-spin')) { 
-                    stopSpinnerSafely();
-                } else {
-                    // If not spinning (e.g., initial page load), just update the time immediately.
-                    updateLastSyncTime(); 
-                }
+                updateSyncStatus('success');
+                setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
             },
 
             columns: [
+                // Col 1: Employee
                 { 
                     data: 'employee_name',
-                    className: 'align-middle', // Add alignment for consistency
+                    className: 'align-middle', 
                     render: function(data, type, row) {
                         var photo = row.photo ? '../assets/images/' + row.photo : '../assets/images/default.png';
                         var id = row.employee_id ? row.employee_id : '';
@@ -115,11 +96,15 @@ $(document).ready(function() {
                         `;
                     }
                 },
+                // Col 2: Date
                 { data: 'date', className: "text-nowrap align-middle" },
+                // Col 3: Time In
                 { data: 'time_in', className: "fw-bold text-dark align-middle" },
-                // Assuming status column renders badges via API; otherwise, update render function
+                // Col 4: Status (Badges)
                 { data: 'status', className: "text-center align-middle", render: function (data) { return data; } }, 
+                // Col 5: Time Out
                 { data: 'time_out', className: "fw-bold text-dark align-middle" },
+                // Col 6: Hours
                 { 
                     data: 'num_hr',
                     className: "text-center fw-bold text-gray-700 align-middle",
@@ -127,6 +112,7 @@ $(document).ready(function() {
                         return data > 0 ? parseFloat(data).toFixed(2) : '—';
                     }
                 },
+                // Col 7: Overtime
                 { 
                     data: 'overtime_hr',
                     className: "text-center align-middle",
@@ -143,29 +129,40 @@ $(document).ready(function() {
             }
         });
 
-        // --- Custom Search Binding ---
+        // 2.2 DETECT LOADING STATE
+        $('#attendanceTable').on('processing.dt', function (e, settings, processing) {
+            if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
+                updateSyncStatus('loading');
+            }
+        });
+
+        // 2.3 Custom Search Binding
         $('#customSearch').on('keyup', function() {
             attendanceTable.search(this.value).draw();
         });
 
-        // --- Buttons ---
+        // 2.4 Apply Filter Button
         $('#applyFilterBtn').off('click').on('click', function() {
-            // This button triggers a data fetch using the global hook
-            window.refreshPageContent(); 
+            window.refreshPageContent(true); // Manual Refresh
         });
         
+        // 2.5 Clear Filter Button
         $('#clearFilterBtn').off('click').on('click', function() {
-            // Reset filters first
+            // Reset filters
             $('#filter_start_date').val('');
             $('#filter_end_date').val('');
             $('#customSearch').val(''); 
             
-            // Clear DataTables internal search then trigger refresh
-            attendanceTable.search('').draw(); 
-            window.refreshPageContent(); 
+            // Clear Search & Refresh
+            attendanceTable.search(''); 
+            window.refreshPageContent(true); 
         });
 
-        // No need to redefine window.refreshPageContent here, it's defined globally above.
+        // 2.6 Topbar Refresh Button
+        $('#btn-refresh').on('click', function(e) {
+            e.preventDefault();
+            window.refreshPageContent(true);
+        });
     }
 });
 </script>

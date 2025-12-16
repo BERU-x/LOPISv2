@@ -17,15 +17,16 @@
                 <li class="nav-item d-none d-sm-flex align-items-center me-3">
                     <div class="d-flex flex-column text-end lh-1">
                         
-                        <div class="mb-1">
-                            <i class="fas fa-sync-alt me-1 text-gray-400" id="refresh-spinner" style="font-size: 0.75rem;"></i>
-                            <span class="text-xs font-weight-bold text-gray-500 text-uppercase">Last Sync</span>
-                        </div>
+                    <div class="mb-1 d-flex align-items-center justify-content-end">
+                        <i class="fas fa-sync-alt me-1 text-secondary" id="refreshIcon" style="font-size: 0.75rem;"></i>
+                        <span class="small fw-bold text-secondary text-uppercase">SYNC STATUS</span>
+                    </div>
 
-                        <div class="small font-weight-bold text-gray-800 d-flex align-items-center justify-content-end">
-                            <i class="fas fa-circle text-success live-dot me-2" style="font-size: 8px;"></i>
-                            <span id="last-updated-time">Live Data</span>
-                        </div>
+                    <div class="d-flex align-items-center justify-content-end">
+                        <i class="fas fa-circle text-warning live-dot me-2" style="font-size: 8px;"></i>
+                        
+                        <span id="last-updated-time" class="small fw-bold text-dark">Syncing...</span>
+                    </div>
 
                     </div>
                 </li>

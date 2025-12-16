@@ -188,22 +188,33 @@
             setTimeout(updateProgress, 10);
         }
 
-        // --- 5. MASTER REFRESHER (Improved) ---
+        // ==============================================================================
+        // MASTER AUTO-REFRESHER (Runs every 30 seconds)
+        // ==============================================================================
         setInterval(function() {
             
-            // A. Check for global page function (for dashboards/custom pages)
-            if (typeof window.refreshPageContent === "function") {
-                window.refreshPageContent();
+            // 1. PERFORMANCE CHECK: Is the tab visible?
+            // If the user is watching YouTube in another tab, STOP refreshing to save resources.
+            if (document.hidden) {
+                console.log("Tab hidden, skipping global auto-refresh.");
+                return; 
             }
 
-            // B. Auto-refresh DataTables (API Method - More Robust)
+            // 2. CUSTOM PAGE FUNCTIONS (Dashboards, etc.)
+            // We pass 'false' to indicate this is an AUTO refresh (Silent Mode)
+            if (typeof window.refreshPageContent === "function") {
+                window.refreshPageContent(false); 
+            }
+
+            // 3. DATATABLES AUTO-REFRESH
             if ($.fn.DataTable) {
-                var tables = $.fn.dataTable.tables({ api: true }); // Get all tables
+                var tables = $.fn.dataTable.tables({ api: true }); 
                 
                 tables.each(function(dt) {
-                    // Check if this specific table has an AJAX source
+                    // Only reload if the table has an AJAX URL (server-side tables)
                     if (dt.ajax.url()) {
-                        // Reload data without resetting paging (User stays on page 2)
+                        // null = Reset Paging? NO. 
+                        // false = Reset Paging? NO (Keep user on current page)
                         dt.ajax.reload(null, false); 
                     }
                 });

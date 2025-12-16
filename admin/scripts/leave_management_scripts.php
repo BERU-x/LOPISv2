@@ -1,67 +1,55 @@
 <script>
 // ==============================================================================
-// 1. GLOBAL STATE & HELPER FUNCTIONS (Defined Globally)
+// 1. GLOBAL STATE & HELPER FUNCTIONS
 // ==============================================================================
-var leaveTable;
-let spinnerStartTime = 0; // Global variable to track when the spin started
+var leaveTable; 
 
-// 1.1 HELPER FUNCTION: Updates the final timestamp text
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    $('#last-updated-time').text(timeString);
-}
+/**
+ * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 1.2 HELPER FUNCTION: Stops the spinner safely (waits for minDisplayTime = 1000ms)
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 1000; 
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
+    $dot.removeClass('text-success text-warning text-danger');
 
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime(); 
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-// 1.3 MASTER REFRESHER TRIGGER (Hook for Topbar/Buttons)
-window.refreshPageContent = function() {
-    // 1. Record Start Time
-    spinnerStartTime = new Date().getTime(); 
-    
-    // 2. Start Visual feedback & Text
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    
-    // 3. Reload Table
-    // Check if the global variable holds an instance AND if that instance is active
-    if (leaveTable && $.fn.DataTable.isDataTable(leaveTable)) {
-        // Reloads the table, which triggers the drawCallback for cleanup
+// 1.2 MASTER REFRESHER TRIGGER
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
+    if (leaveTable) {
+        // 1. Visual Feedback for Manual Actions
+        if(isManual) {
+            $('#refreshIcon').addClass('fa-spin');
+            updateSyncStatus('loading');
+        }
+        
+        // 2. Reload DataTable (false = keep paging)
         leaveTable.ajax.reload(null, false);
-    } else if ($('#leaveTable').length && $.fn.DataTable.isDataTable('#leaveTable')) {
-        // Fallback: If the global var is messed up, try to get the instance directly from the element
-        $('#leaveTable').DataTable().ajax.reload(null, false);
-    } else {
-        // If neither is true, reset spinner immediately
-        stopSpinnerSafely();
     }
 };
 
-// ---------------------------------------------------
-
+// ==============================================================================
+// 2. INITIALIZATION
+// ==============================================================================
 $(document).ready(function() {
 
-    // 1. POPULATE EMPLOYEE DROPDOWN
+    // 2.1 POPULATE EMPLOYEE DROPDOWN
     $.ajax({
         url: 'api/leave_action.php?action=fetch_employees',
         type: 'GET',
@@ -75,55 +63,42 @@ $(document).ready(function() {
         }
     });
 
-    // 2. INITIALIZE DATATABLE
+    // 2.2 INITIALIZE DATATABLE
     if ($('#leaveTable').length) {
         
-        // Use the standard DataTables jQuery API
-        if ($.fn.DataTable.isDataTable('#leaveTable')) {
-            // Destroy is safe, but technically optional if you just re-init
-            $('#leaveTable').DataTable().destroy(); 
-        }
-
-        // Initialize and store the instance in the global variable
         leaveTable = $('#leaveTable').DataTable({
             processing: true,
-            destroy: true, 
+            serverSide: false, // Usually client-side for leave history unless huge data
             ordering: true, 
             dom: 'rtip', 
 
             ajax: {
-                "url": "api/leave_action.php?action=fetch",
-                "type": "GET",
-                "dataSrc": function (json) {
-                    // Update Stats Cards
+                url: "api/leave_action.php?action=fetch",
+                type: "GET",
+                dataSrc: function (json) {
+                    // Update Stats Cards automatically on every refresh
                     if (json.stats) {
                         $('#stat-pending').text(json.stats.pending);
                         $('#stat-approved').text(json.stats.approved);
                     }
-                    
-                    // This line MUST return the array of rows
                     return json.data; 
                 }
             },
             
-            // --- B. VISUAL FEEDBACK DRAW CALLBACK ---
-            "drawCallback": function(settings) {
-                const icon = $('#refresh-spinner');
-                if (icon.hasClass('fa-spin')) {
-                    stopSpinnerSafely();
-                } else {
-                    updateLastSyncTime(); 
-                }
+            // DRAW CALLBACK: Standardized UI updates
+            drawCallback: function(settings) {
+                updateSyncStatus('success');
+                setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
             },
-            // ------------------------------------------
 
-            "order": [[ 2, "asc" ]],
-            "columns": [
+            order: [[ 2, "asc" ]], // Order by Start Date
+            
+            columns: [
                 // Col 0: Employee
                 {
-                    "data": null,
-                    "className": "align-middle",
-                    "render": function(data, type, row) {
+                    data: null,
+                    className: "align-middle",
+                    render: function(data, type, row) {
                         let photo = row.photo ? row.photo : 'default.png';
                         return `
                             <div class="d-flex align-items-center">
@@ -139,9 +114,9 @@ $(document).ready(function() {
                 },
                 // Col 1: Details
                 {
-                    "data": null,
-                    "className": "align-middle",
-                    "render": function(data, type, row) {
+                    data: null,
+                    className: "align-middle",
+                    render: function(data, type, row) {
                         let start = new Date(row.start_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
                         let end = new Date(row.end_date).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
                         return `
@@ -155,22 +130,22 @@ $(document).ready(function() {
                     }
                 },
                 // Col 2: Days
-                { "data": "days_count", "className": "fw-bold text-center text-gray-700 align-middle" },
-                // Col 3: Status (FA6 icons)
+                { data: "days_count", className: "fw-bold text-center text-gray-700 align-middle" },
+                // Col 3: Status
                 {
-                    "data": "status",
-                    "className": "text-center align-middle",
-                    "render": function(data) {
+                    data: "status",
+                    className: "text-center align-middle",
+                    render: function(data) {
                         if(data == 0) return '<span class="badge bg-soft-warning text-warning border border-warning px-3 shadow-sm rounded-pill"><i class="fa-solid fa-clock me-1"></i> Pending</span>';
                         if(data == 1) return '<span class="badge bg-soft-success text-success border border-success px-3 shadow-sm rounded-pill"><i class="fa-solid fa-check me-1"></i> Approved</span>';
                         return '<span class="badge bg-soft-danger text-danger border border-danger px-3 shadow-sm rounded-pill"><i class="fa-solid fa-times me-1"></i> Rejected</span>';
                     }
                 },
-                // Col 4: Actions (FA6 icon)
+                // Col 4: Actions
                 {
-                    "data": null,
-                    "className": "text-center align-middle",
-                    "render": function(data, type, row) {
+                    data: null,
+                    className: "text-center align-middle",
+                    render: function(data, type, row) {
                         return `
                             <button onclick="viewDetails(${row.leave_id})" 
                                 class="btn btn-sm btn-outline-teal shadow-sm fw-bold" 
@@ -180,19 +155,24 @@ $(document).ready(function() {
                     }
                 }
             ],
-            "dom": 'rtip',
-            "language": { "emptyTable": "No leave requests found." }
+            language: { emptyTable: "No leave requests found." }
         });
     }
 
-    // 4. SEARCH & FORMS
+    // 2.3 DETECT LOADING STATE
+    $('#leaveTable').on('processing.dt', function (e, settings, processing) {
+        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
+            updateSyncStatus('loading');
+        }
+    });
+
+    // 2.4 SEARCH & FORMS
     $('#customSearch').on('keyup', function() {
         if(leaveTable) leaveTable.search(this.value).draw();
     });
 
     $('#applyLeaveForm').on('submit', function(e) {
         e.preventDefault();
-        
         Swal.fire({ title: 'Submitting Leave...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
@@ -206,7 +186,7 @@ $(document).ready(function() {
                     $('#applyLeaveModal').modal('hide');
                     $('#applyLeaveForm')[0].reset();
                     Swal.fire('Success', res.message, 'success');
-                    window.refreshPageContent(); 
+                    window.refreshPageContent(true); // Visual Refresh
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
@@ -216,9 +196,19 @@ $(document).ready(function() {
             }
         });
     });
+
+    // 2.5 Manual Refresh Button Listener
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault();
+        window.refreshPageContent(true);
+    });
 });
 
-// 6. VIEW DETAILS LOGIC 
+// ==============================================================================
+// 3. ACTION LOGIC
+// ==============================================================================
+
+// 3.1 VIEW DETAILS
 function viewDetails(id) {
     const content = $('#leave-details-content');
     const footer = $('#modal-footer-actions');
@@ -233,11 +223,9 @@ function viewDetails(id) {
         data: { leave_id: id },
         dataType: 'json',
         success: function(res) {
-            // **CRITICAL FIX:** Check for res.status === 'success' instead of res.success
             if(res.status === 'success') { 
                 const d = res.details;
                 
-                // Status Badge Logic
                 let badge = '';
                 if(d.status == 0) badge = '<span class="badge bg-warning">Pending</span>';
                 else if(d.status == 1) badge = '<span class="badge bg-success">Approved</span>';
@@ -276,7 +264,6 @@ function viewDetails(id) {
                     `);
                 }
             } else {
-                // If the PHP returned status: error
                 content.html('<div class="alert alert-danger">Could not fetch details: ' + (res.message || 'Unknown error') + '</div>');
             }
         },
@@ -286,7 +273,7 @@ function viewDetails(id) {
     });
 }
 
-// 7. UPDATE STATUS (Approve/Reject)
+// 3.2 UPDATE STATUS (Approve/Reject)
 function updateStatus(id, action) {
     Swal.fire({
         title: action === 'approve' ? 'Approve Request?' : 'Reject Request?',
@@ -297,6 +284,8 @@ function updateStatus(id, action) {
         confirmButtonText: 'Yes, ' + action
     }).then((result) => {
         if (result.isConfirmed) {
+            Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
             $.ajax({
                 url: 'api/leave_action.php?action=update_status',
                 type: 'POST',
@@ -306,7 +295,7 @@ function updateStatus(id, action) {
                     if(res.status === 'success') {
                         $('#detailsModal').modal('hide');
                         Swal.fire('Updated!', res.message, 'success');
-                        window.refreshPageContent(); 
+                        window.refreshPageContent(true); // Visual Refresh
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }

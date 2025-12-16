@@ -1,59 +1,52 @@
 <script>
 // ==============================================================================
-// 1. GLOBAL STATE & HELPER FUNCTIONS (Synchronization and Logic)
+// 1. GLOBAL STATE & HELPER FUNCTIONS
 // ==============================================================================
 var payrollTable;
 
-// 1.1 Synchronization Variables (New/Re-inserted)
-let spinnerStartTime = 0; 
-// Note: We use a simple structure since the script doesn't need to track currentCAId etc.
+/**
+ * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 1.2 Helper function: Updates the final timestamp text (New/Re-inserted)
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    $('#last-updated-time').text(timeString);
-}
+    $dot.removeClass('text-success text-warning text-danger');
 
-// 1.3 Helper function: Stops the spinner safely (New/Re-inserted)
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 1000; 
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
-
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime(); 
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-
-// 1.4 MASTER REFRESHER HOOK (Modified to include spinner start)
-window.refreshPageContent = function() {
-    // 1. Start Sync Visuals (NEW)
-    spinnerStartTime = new Date().getTime(); 
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    
-    // 2. Reload the table
+// 1.2 MASTER REFRESHER TRIGGER
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
     if (payrollTable) {
+        // 1. Visual Feedback for Manual Actions
+        if(isManual) {
+            $('#refreshIcon').addClass('fa-spin');
+            updateSyncStatus('loading');
+        }
+        
+        // 2. Reload DataTable (false = keep paging)
         payrollTable.ajax.reload(null, false);
     }
-    // 3. Reload the stats cards
+    // 3. Reload stats silently
     loadStats();
 };
 
-// 1.5 Helper: Load Top Stats
+// 1.3 Helper: Load Top Stats
 function loadStats() {
     $.ajax({
         url: 'api/payroll_action.php?action=stats',
@@ -68,7 +61,11 @@ function loadStats() {
     });
 }
 
-// 1.6 Helper: Batch Logic
+// ==============================================================================
+// 2. BATCH ACTIONS & PRINTING
+// ==============================================================================
+
+// 2.1 Batch Action Logic
 function performBatchAction(subAction) {
     var selectedIds = [];
     $('.payroll-checkbox:checked').each(function() { selectedIds.push($(this).val()); });
@@ -97,7 +94,7 @@ function performBatchAction(subAction) {
                     Swal.close();
                     if (res.status === 'success') {
                         Swal.fire('Success', res.message, 'success');
-                        window.refreshPageContent(); 
+                        window.refreshPageContent(true); // Visual Refresh
                         $('#selectAll').prop('checked', false);
                     } else {
                         Swal.fire('Error', res.message, 'error');
@@ -111,7 +108,7 @@ function performBatchAction(subAction) {
     });
 }
 
-// 1.7 Helper: Print Batch Payslips
+// 2.2 Print Batch Payslips
 function printBatchPayslips() {
     var start = $('#filter_start_date').val();
     var end = $('#filter_end_date').val();
@@ -122,16 +119,19 @@ function printBatchPayslips() {
     window.open(`functions/print_batch_payslips.php?start=${start}&end=${end}`, '_blank');
 }
 
-
+// ==============================================================================
+// 3. INITIALIZATION
+// ==============================================================================
 $(document).ready(function() {
-    // Attach global functions to window scope for HTML onclick
+    
+    // 3.1 Attach global functions
     window.performBatchAction = performBatchAction;
     window.printBatchPayslips = printBatchPayslips;
 
-    // 1. Load Stats
+    // 3.2 Load Stats
     loadStats();
 
-    // 2. Initialize DataTables
+    // 3.3 Initialize DataTable
     payrollTable = $('#payrollTable').DataTable({
         processing: true,
         serverSide: true,
@@ -146,14 +146,10 @@ $(document).ready(function() {
             }
         },
         
-        // ⭐ DRAW CALLBACK: Integrates spinner stop logic
+        // DRAW CALLBACK: Standardized UI updates
         drawCallback: function(settings) {
-            const icon = $('#refresh-spinner');
-            if (icon.hasClass('fa-spin')) {
-                stopSpinnerSafely(); // Stops spinner and updates time
-            } else {
-                updateLastSyncTime(); // Initial load time update
-            }
+            updateSyncStatus('success');
+            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
         },
         
         columns: [
@@ -184,7 +180,7 @@ $(document).ready(function() {
                     `;
                 }
             },
-            // Col 2: Cut-Off (FA6 Update)
+            // Col 2: Cut-Off
             { 
                 data: 'cut_off_start',
                 className: 'align-middle',
@@ -207,7 +203,7 @@ $(document).ready(function() {
                     return '<span class="badge bg-soft-warning text-warning border border-warning px-3 shadow-sm rounded-pill">Pending</span>';
                 }
             },
-            // Col 5: Action (FA6 Update)
+            // Col 5: Action
             {
                 data: 'id',
                 orderable: false, 
@@ -219,23 +215,30 @@ $(document).ready(function() {
         ]
     });
 
-    // --- Search & Filter ---
+    // 3.4 DETECT LOADING STATE
+    $('#payrollTable').on('processing.dt', function (e, settings, processing) {
+        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
+            updateSyncStatus('loading');
+        }
+    });
+
+    // 3.5 Filters & Search
     $('#customSearch').on('keyup', function() { payrollTable.search(this.value).draw(); });
-    $('#applyFilterBtn').on('click', function() { window.refreshPageContent(); }); 
+    $('#applyFilterBtn').on('click', function() { window.refreshPageContent(true); }); 
     
     $('#clearFilterBtn').on('click', function() {
         $('#filter_start_date, #filter_end_date, #customSearch').val('');
         payrollTable.search('').draw();
-        window.refreshPageContent(); // Use hook for consistency
+        window.refreshPageContent(true); 
     });
 
-    // --- Select All ---
+    // 3.6 Select All Checkbox
     $('#selectAll').on('click', function(){
         var rows = payrollTable.rows({ 'search': 'applied' }).nodes();
         $('input[type="checkbox"]', rows).prop('checked', this.checked);
     });
 
-    // --- GENERATE PAYROLL SUBMIT ---
+    // 3.7 GENERATE PAYROLL SUBMIT
     $('#generatePayrollForm').on('submit', function(e) {
         e.preventDefault();
         
@@ -255,7 +258,7 @@ $(document).ready(function() {
                 if(res.status === 'success') {
                     $('#generatePayrollModal').modal('hide');
                     Swal.fire('Success', res.message, 'success');
-                    window.refreshPageContent(); // Use hook for table/stats reload
+                    window.refreshPageContent(true); // Visual Refresh
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
@@ -267,7 +270,10 @@ $(document).ready(function() {
         });
     });
 
-    // --- BATCH ACTIONS ---
-    // The functions are defined globally and attached to buttons with onclick in the HTML.
+    // 3.8 Manual Refresh Button
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault();
+        window.refreshPageContent(true);
+    });
 });
 </script>

@@ -22,7 +22,7 @@ require 'template/topbar.php';
             <div class="col-lg-6">
                 <div class="card shadow mb-4">
                     <div class="card-header py-3 border-left-primary">
-                        <h6 class="m-0 font-weight-bold text-primary">
+                        <h6 class="m-0 font-weight-bold text-label">
                             <i class="fas fa-business-time me-2"></i>Attendance & Work Hours
                         </h6>
                     </div>
@@ -62,7 +62,7 @@ require 'template/topbar.php';
             <div class="col-lg-6">
                 <div class="card shadow mb-4">
                     <div class="card-header py-3 border-left-success">
-                        <h6 class="m-0 font-weight-bold text-success">
+                        <h6 class="m-0 font-weight-bold text-label">
                             <i class="fas fa-plane-departure me-2"></i>Leave Configuration
                         </h6>
                     </div>
@@ -106,7 +106,7 @@ require 'template/topbar.php';
         <div class="card shadow mb-4 border-bottom-secondary">
             <div class="card-body d-flex justify-content-between align-items-center">
                 <span id="last-updated-text" class="small text-muted font-italic">Loading...</span>
-                <button class="btn btn-primary px-4 shadow-sm" type="submit" id="saveBtn">
+                <button class="btn btn-teal px-4 shadow-sm" type="submit" id="saveBtn">
                     <i class="fas fa-save me-2"></i> Save Policies
                 </button>
             </div>

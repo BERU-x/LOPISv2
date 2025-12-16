@@ -22,7 +22,7 @@ require 'template/topbar.php';
             <div class="col-lg-6">
                 <div class="card shadow mb-4">
                     <div class="card-header py-3 border-left-danger">
-                        <h6 class="m-0 font-weight-bold text-danger">
+                        <h6 class="m-0 font-weight-bold text-label">
                             <i class="fas fa-key me-2"></i>Password Policies
                         </h6>
                     </div>
@@ -78,7 +78,7 @@ require 'template/topbar.php';
             <div class="col-lg-6">
                 <div class="card shadow mb-4">
                     <div class="card-header py-3 border-left-warning">
-                        <h6 class="m-0 font-weight-bold text-warning">
+                        <h6 class="m-0 font-weight-bold text-label">
                             <i class="fas fa-shield-alt me-2"></i>Access Control
                         </h6>
                     </div>
@@ -112,7 +112,7 @@ require 'template/topbar.php';
         <div class="card shadow mb-5 border-top-primary">
             <div class="card-body d-flex justify-content-between align-items-center py-3">
                 <span id="last-updated-text" class="small text-muted font-italic">Loading settings...</span>
-                <button class="btn btn-primary px-4 shadow" type="submit" id="saveBtn">
+                <button class="btn btn-teal px-4 shadow" type="submit" id="saveBtn">
                     <i class="fas fa-save me-2"></i> Save Security Rules
                 </button>
             </div>

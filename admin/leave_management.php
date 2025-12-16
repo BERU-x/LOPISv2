@@ -55,7 +55,7 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
-            <h6 class="m-0 font-weight-bold text-gray-800"><i class="fas fa-list-alt me-2"></i>Request History</h6>
+            <h6 class="m-0 font-weight-bold text-label"><i class="fas fa-list-alt me-2"></i>Request History</h6>
             <div class="input-group" style="max-width: 250px;">
                 <span class="input-group-text bg-light border-0"><i class="fas fa-search text-gray-400"></i></span>
                 <input type="text" id="customSearch" class="form-control bg-light border-0 small" placeholder="Search requests..." aria-label="Search">

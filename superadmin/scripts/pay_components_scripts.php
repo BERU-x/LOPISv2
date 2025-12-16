@@ -1,25 +1,55 @@
 <script>
-// GLOBAL VARS
+// ==============================================================================
+// 1. GLOBAL STATE & UI HELPERS
+// ==============================================================================
 var earningsTable, deductionsTable;
-let spinnerStartTime = 0;
 
-// HELPER: Sync Logic
-function updateLastSyncTime() {
-    const now = new Date();
-    $('#last-updated-time').text(now.toLocaleTimeString());
+/**
+ * Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+    $dot.removeClass('text-success text-warning text-danger');
+
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
+    }
 }
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    setTimeout(() => { icon.removeClass('fa-spin text-teal'); updateLastSyncTime(); }, 500);
-}
-window.refreshPageContent = function() {
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    earningsTable.ajax.reload(null, false);
-    deductionsTable.ajax.reload(null, false);
+
+// 1.2 MASTER REFRESHER HOOK
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
+    // 1. Visual Feedback for Manual Click
+    if(isManual) {
+        $('#refreshIcon').addClass('fa-spin');
+        updateSyncStatus('loading');
+    }
+
+    // 2. Reload Tables (Silent)
+    // We use a promise-like approach to wait for both tables, though DataTables async is tricky.
+    // Simpler approach: Reload both, the last one to finish triggers 'success'.
+    if (earningsTable) earningsTable.ajax.reload(null, false);
+    if (deductionsTable) deductionsTable.ajax.reload(null, false);
 };
 
-// MODAL LOGIC
+// ==============================================================================
+// 2. MODAL & CRUD LOGIC
+// ==============================================================================
+
+// 2.1 Open Modal (Add or Edit)
 function openModal(type, id = null) {
     $('#componentForm')[0].reset();
     $('#comp_id').val('');
@@ -30,7 +60,8 @@ function openModal(type, id = null) {
     $('#modalTitle').text(id ? 'Edit ' + typeLabel : 'Add New ' + typeLabel);
 
     if(id) {
-        Swal.fire({ title: 'Loading...', didOpen: () => Swal.showLoading() });
+        Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        
         $.ajax({
             url: 'api/pay_components_action.php',
             type: 'POST',
@@ -45,7 +76,12 @@ function openModal(type, id = null) {
                     $('#is_taxable').val(d.is_taxable);
                     $('#is_recurring').val(d.is_recurring);
                     $('#componentModal').modal('show');
+                } else {
+                    Swal.fire('Error', res.message || 'Fetch failed', 'error');
                 }
+            },
+            error: function() {
+                Swal.fire('Error', 'Server connection failed', 'error');
             }
         });
     } else {
@@ -53,16 +89,21 @@ function openModal(type, id = null) {
     }
 }
 
+// 2.2 Delete Component
 function deleteComponent(id) {
     Swal.fire({
-        title: 'Delete Component?', text: "This will remove it from future calculations.",
-        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Yes, delete it!'
+        title: 'Delete Component?', 
+        text: "This will remove it from future calculations.",
+        icon: 'warning', 
+        showCancelButton: true, 
+        confirmButtonColor: '#d33', 
+        confirmButtonText: 'Yes, delete it!'
     }).then((res) => {
         if(res.isConfirmed) {
             $.post('api/pay_components_action.php', { action: 'delete', id: id }, function(data) {
                 if(data.status === 'success') {
                     Swal.fire('Deleted', data.message, 'success');
-                    window.refreshPageContent();
+                    window.refreshPageContent(true); // Trigger Manual Refresh Style
                 } else {
                     Swal.fire('Error', data.message, 'error');
                 }
@@ -71,12 +112,16 @@ function deleteComponent(id) {
     });
 }
 
+// ==============================================================================
+// 3. INITIALIZATION
+// ==============================================================================
 $(document).ready(function() {
-    // Shared Column Config
+    
+    // 3.1 Shared Column Config
     const columnsConfig = [
-        { data: 'name', className: 'fw-bold' },
+        { data: 'name', className: 'align-middle fw-bold' },
         { 
-            data: 'is_taxable', className: 'text-center',
+            data: 'is_taxable', className: 'text-center align-middle',
             render: function(data) {
                 return data == 1 
                     ? '<span class="badge bg-soft-primary text-primary">Taxable</span>' 
@@ -84,7 +129,7 @@ $(document).ready(function() {
             }
         },
         { 
-            data: 'is_recurring', className: 'text-center',
+            data: 'is_recurring', className: 'text-center align-middle',
             render: function(data) {
                 return data == 1 
                     ? '<i class="fas fa-redo text-success" title="Recurring"></i>' 
@@ -92,48 +137,66 @@ $(document).ready(function() {
             }
         },
         {
-            data: 'id', orderable: false, className: 'text-center',
+            data: 'id', orderable: false, className: 'text-center align-middle',
             render: function(data, type, row) {
                 return `
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="openModal('${row.type}', ${data})"><i class="fas fa-pen"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComponent(${data})"><i class="fas fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="openModal('${row.type}', ${data})"><i class="fas fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteComponent(${data})"><i class="fas fa-trash"></i></button>
                 `;
             }
         }
     ];
 
-    // Initialize Earnings Table
+    // 3.2 Initialize Earnings Table
     earningsTable = $('#earningsTable').DataTable({
         ajax: { url: 'api/pay_components_action.php', type: 'POST', data: { action: 'fetch', type: 'earning' } },
         columns: columnsConfig,
         dom: 'rtip',
-        drawCallback: function() { stopSpinnerSafely(); }
+        drawCallback: function() { 
+            // Only update sync status on the main table to avoid double-firing
+            updateSyncStatus('success'); 
+            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+        }
     });
 
-    // Initialize Deductions Table
+    // 3.3 Initialize Deductions Table
     deductionsTable = $('#deductionsTable').DataTable({
         ajax: { url: 'api/pay_components_action.php', type: 'POST', data: { action: 'fetch', type: 'deduction' } },
         columns: columnsConfig,
         dom: 'rtip'
     });
 
-    // Form Submit
+    // 3.4 Detect Loading State (For visual 'Syncing...' feedback)
+    $('#earningsTable').on('processing.dt', function (e, settings, processing) {
+        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
+            updateSyncStatus('loading');
+        }
+    });
+
+    // 3.5 Form Submit
     $('#componentForm').on('submit', function(e) {
         e.preventDefault();
         let action = $('#comp_id').val() ? 'update' : 'create';
         let formData = $(this).serialize() + '&action=' + action;
 
+        Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
         $.post('api/pay_components_action.php', formData, function(res) {
+            Swal.close();
             if(res.status === 'success') {
                 $('#componentModal').modal('hide');
-                Swal.fire('Success', res.message, 'success');
-                window.refreshPageContent();
+                Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 1500, showConfirmButton: false });
+                window.refreshPageContent(true);
             } else {
                 Swal.fire('Error', res.message, 'error');
             }
         }, 'json');
     });
     
-    updateLastSyncTime();
+    // 3.6 Manual Refresh Button Listener
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault();
+        window.refreshPageContent(true);
+    });
 });
 </script>

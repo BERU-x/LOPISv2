@@ -19,10 +19,7 @@ require 'template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-            <h6 class="m-0 font-weight-bold text-primary">Activity History</h6>
-            <button class="btn btn-link btn-sm text-decoration-none" onclick="window.refreshPageContent()">
-                <i id="refresh-spinner" class="fas fa-sync-alt fa-sm fa-fw text-gray-400"></i> Refresh
-            </button>
+            <h6 class="m-0 font-weight-bold text-label">Activity History</h6>
         </div>
         <div class="card-body">
             <div class="table-responsive">

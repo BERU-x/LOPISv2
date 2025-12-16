@@ -2,54 +2,53 @@
 // ==============================================================================
 // 1. GLOBAL STATE VARIABLES
 // ==============================================================================
-let spinnerStartTime = 0; // Global variable to track when the spin started
-let payrollChart = null;  // Chart.js instance for Payroll
-let deptChart = null;     // Chart.js instance for Department Distribution
+let spinnerStartTime = 0; 
+let payrollChart = null; 
+let deptChart = null;    
 
 // ==============================================================================
 // 2. HELPER FUNCTIONS (Sync, Time, & UI)
 // ==============================================================================
 
-// 2.1 Updates the final timestamp text (e.g., "10:30:05 AM")
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    $('#last-updated-time').text(timeString);
-}
+/**
+ * Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 2.2 Stops the spinner safely (runs for at least 1000ms)
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 1000; 
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
+    $dot.removeClass('text-success text-warning text-danger');
 
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime();
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-// 2.3 Sets the Greeting and Current Date in the header
+// 2.2 Sets the Greeting
 function setWelcomeMessage() {
     const now = new Date();
     const hrs = now.getHours();
     let greet = (hrs < 12) ? "Good Morning! ☀️" : ((hrs >= 12 && hrs <= 17) ? "Good Afternoon! 🌤️" : "Good Evening! 🌙");
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    $('#status-message').html(`${greet} &nbsp;|&nbsp; Today is ${now.toLocaleDateString('en-US', options)}`);
+    
+    if($('#status-message').length) {
+        $('#status-message').html(`${greet} &nbsp;|&nbsp; Today is ${now.toLocaleDateString('en-US', options)}`);
+    }
 }
 
 // ==============================================================================
-// 3. RENDER FUNCTIONS (Updating specific UI blocks)
+// 3. RENDER FUNCTIONS
 // ==============================================================================
 
 function updateMetrics(metrics) {
@@ -61,7 +60,7 @@ function updateMetrics(metrics) {
     if(metrics.pending_ca_count > 0) {
         $('#status-pending-ca').html(`<a href="cashadv_approval.php" class="text-decoration-none text-muted">View Details &rarr;</a>`);
     } else {
-        $('#status-pending-ca').html(`<span class="text-muted font-weight-bold">All Cleared</span>`);
+        $('#status-pending-ca').html(`<span class="text-muted fw-bold">All Cleared</span>`);
     }
 
     $('#val-pending-leaves').text(Number(metrics.pending_leave_count).toLocaleString());
@@ -73,7 +72,6 @@ function updateMetrics(metrics) {
 
 function renderPayrollChart(history) {
     const ctx = document.getElementById("payrollHistoryChart").getContext('2d');
-    
     if(payrollChart) payrollChart.destroy();
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
@@ -113,16 +111,12 @@ function renderDeptChart(dataObj) {
     const ctx = document.getElementById("deptDistributionChart");
     if(deptChart) deptChart.destroy();
 
-    const labels = Object.keys(dataObj);
-    const values = Object.values(dataObj);
-
     deptChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: labels,
+            labels: Object.keys(dataObj),
             datasets: [{
-                data: values,
-                // Using consistent, hardcoded colors for stability
+                data: Object.values(dataObj),
                 backgroundColor: ['#0CC0DF', '#4e73df', '#6b36ccff', '#f6c23e', '#e74a3b', '#1cc88a', '#858796'], 
                 borderWidth: 5,
                 hoverBorderColor: "#ffffff"
@@ -201,21 +195,24 @@ function renderHolidaysList(holidays) {
 }
 
 // ==============================================================================
-// 4. MAIN DATA FETCHER (Triggered on load and refresh)
+// 4. MAIN DATA FETCHER (Smart)
 // ==============================================================================
-function loadDashboardData() {
-    // 1. Start Timer & Visual Feedback
-    spinnerStartTime = new Date().getTime(); 
-    const icon = $('#refresh-spinner');
-    icon.addClass('fa-spin text-teal'); 
-    $('#last-updated-time').text('Syncing...'); 
+// isManual = true (Show Spinner) | isManual = false (Silent Update)
+function loadDashboardData(isManual = false) {
+    
+    // 1. Visual Feedback
+    if(isManual) {
+        $('#refreshIcon').addClass('fa-spin'); 
+    }
+    
+    // 2. Always set dot to yellow
+    updateSyncStatus('loading');
 
     $.ajax({
         url: 'api/get_dashboard_data.php',
         type: 'GET',
         dataType: 'json',
         success: function(response) {
-            // Check for structure, though typically guaranteed by API
             if (response.metrics) {
                 updateMetrics(response.metrics);
                 renderPayrollChart(response.payroll_history);
@@ -223,34 +220,36 @@ function loadDashboardData() {
                 renderLeavesList(response.upcoming_leaves);
                 renderHolidaysList(response.upcoming_holidays);
             }
-            
-            // 2. Success: Stop spin & Update Time using the safe function
-            stopSpinnerSafely();
-            
-            
+            updateSyncStatus('success');
         },
         error: function(err) {
-            console.error("Error loading dashboard data", err);
-            // On error, stop spin immediately and show error time
-            $('#refresh-spinner').removeClass('fa-spin text-teal');
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'});
-            $('#last-updated-time').text(`Error @ ${timeString}`);
+            console.error("Dashboard Sync Error", err);
+            updateSyncStatus('error');
+        },
+        complete: function() {
+            if(isManual) setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
         }
     });
 }
 
-
+// ==============================================================================
+// 5. INITIALIZATION
+// ==============================================================================
 $(document).ready(function() {
-    
-    // Set the welcome message immediately
     setWelcomeMessage();
 
-    // 1. Load data immediately when page opens
-    loadDashboardData();
+    // 1. Initial Load (Visual)
+    loadDashboardData(true);
 
-    // 2. CONNECT THE MASTER REFRESHER
-    // This hook is used by the Topbar buttons to reload this specific page content.
-    window.refreshPageContent = loadDashboardData;
+    // 2. Global Refresher Hook (Silent Mode capable)
+    window.refreshPageContent = function(isManual) {
+        loadDashboardData(isManual);
+    };
+
+    // 3. Manual Button Click
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault(); 
+        loadDashboardData(true);
+    });
 });
 </script>

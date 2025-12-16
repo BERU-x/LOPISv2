@@ -12,19 +12,14 @@ require 'template/topbar.php';
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">Admin Management</h1>
-        <button class="btn btn-primary shadow-sm" onclick="openModal()">
+        <button class="btn btn-teal shadow-sm" onclick="openModal()">
             <i class="fa-solid fa-plus fa-sm text-white-50 me-2"></i>Add New Admin
         </button>
     </div>
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-            <h6 class="m-0 font-weight-bold text-primary">List of System Administrators</h6>
-            <div class="dropdown no-arrow">
-                 <button class="btn btn-link btn-sm text-decoration-none" onclick="window.refreshPageContent()">
-                    <i id="refresh-spinner" class="fas fa-sync-alt fa-sm fa-fw text-gray-400"></i>
-                </button>
-            </div>
+            <h6 class="m-0 font-weight-bold text-label">List of System Administrators</h6>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -85,7 +80,7 @@ require 'template/topbar.php';
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="submit" class="btn btn-teal">Save Changes</button>
                 </div>
             </form>
         </div>

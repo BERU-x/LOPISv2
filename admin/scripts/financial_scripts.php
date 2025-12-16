@@ -13,38 +13,33 @@ if (!isset($employment_statuses)) {
 // ==============================================================================
 var financialTable;
 var currentViewedEmployeeId = null; 
-let spinnerStartTime = 0; 
 
-// 1.1 HELPER: Updates the final timestamp text (Refresher Logic)
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    $('#last-updated-time').text(timeString);
-}
+/**
+ * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 1.2 HELPER: Stops the spinner safely (Refresher Logic)
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 1000; 
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
+    $dot.removeClass('text-success text-warning text-danger');
 
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime(); 
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-// 1.3 HELPER: Format Currency (PHP)
+// 1.2 HELPER: Format Currency (PHP)
 function formatCurrency(amount) {
     amount = parseFloat(amount) || 0; 
     return new Intl.NumberFormat('en-PH', { 
@@ -54,18 +49,26 @@ function formatCurrency(amount) {
     }).format(amount);
 }
 
-// 1.4 MASTER REFRESHER TRIGGER (Hook for Topbar/Buttons)
-window.refreshPageContent = function() {
-    spinnerStartTime = new Date().getTime(); 
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    
-    if(financialTable) {
+// 1.3 MASTER REFRESHER TRIGGER
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
+    if (financialTable) {
+        // 1. Visual Feedback for Manual Actions
+        if(isManual) {
+            $('#refreshIcon').addClass('fa-spin');
+            updateSyncStatus('loading');
+        }
+        
+        // 2. Reload DataTable (false = keep paging)
         financialTable.ajax.reload(null, false);
     }
 };
 
-// 1.5 NEW MAIN FUNCTION: Manages both View and Update in one modal
+// ==============================================================================
+// 2. BUSINESS LOGIC (View/Edit/Ledger)
+// ==============================================================================
+
+// 2.1 NEW MAIN FUNCTION: Manages both View and Update in one modal
 window.manageFinancialRecord = function(id, encodedName) {
     currentViewedEmployeeId = id; 
     const name = decodeURIComponent(encodedName); 
@@ -127,17 +130,15 @@ window.manageFinancialRecord = function(id, encodedName) {
     .fail(function(jqXHR, textStatus, errorThrown) {
         Swal.close();
         let errorMessage = `Network/Parsing Error during fetch. Status: ${textStatus}.`;
-        
         if (jqXHR.responseText) {
              console.error("AJAX Failed Response Text:", jqXHR.responseText);
              errorMessage += " Check console for server error details.";
         }
-        
         Swal.fire('Error', errorMessage, 'error');
     });
 };
 
-// 1.6 Helper to populate the Ledger Table (History Tab)
+// 2.2 Helper to populate the Ledger Table (History Tab)
 function populateLedgerTable(data) {
     const tableBody = $('#ledgerTableBody');
     tableBody.empty();
@@ -169,7 +170,7 @@ function populateLedgerTable(data) {
     }
 }
 
-// 1.7 Helper to populate the Adjustment/Update Form
+// 2.3 Helper to populate the Adjustment/Update Form
 function populateAdjustmentForm(data, name) {
     // Update header/hidden ID
     $('#combined_employee_name').text(name);
@@ -194,7 +195,7 @@ function populateAdjustmentForm(data, name) {
     $('#adjustment_remarks').val(''); 
 }
 
-// 1.8 Helper to filter Ledger data (used on history tab filter change)
+// 2.4 Helper to filter Ledger data (used on history tab filter change)
 function loadLedgerData(empId, category) {
     const tableBody = $('#ledgerTableBody');
     tableBody.html('<tr><td colspan="7" class="text-center py-4 text-muted"><i class="fa-solid fa-spinner fa-spin me-2"></i> Loading history...</td></tr>');
@@ -217,10 +218,12 @@ function loadLedgerData(empId, category) {
     });
 }
 
-// --- MAIN DOCUMENT READY BLOCK ---
+// ==============================================================================
+// 3. INITIALIZATION
+// ==============================================================================
 $(document).ready(function() {
 
-    // --- 1. Initialize Financial Overview DataTable ---
+    // --- 3.1 Initialize Financial Overview DataTable ---
     if ($('#financialTable').length) {
         
         financialTable = $('#financialTable').DataTable({
@@ -232,16 +235,11 @@ $(document).ready(function() {
                 url: "api/financial_action.php?action=fetch_overview", 
                 type: "GET"
             },
-            
+            // DRAW CALLBACK: Standardized UI updates
             drawCallback: function(settings) {
-                const icon = $('#refresh-spinner');
-                if (icon.hasClass('fa-spin')) { 
-                    stopSpinnerSafely();
-                } else {
-                    updateLastSyncTime(); 
-                }
+                updateSyncStatus('success');
+                setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
             },
-
             columns: [
                 // Col 1: Name & ID
                 { 
@@ -256,7 +254,7 @@ $(document).ready(function() {
                         `;
                     }
                 },
-                // Col 2-6: Balances (Unchanged)
+                // Col 2-6: Balances
                 { 
                     data: 'savings_bal', 
                     className: 'text-end align-middle',
@@ -305,23 +303,28 @@ $(document).ready(function() {
         });
     }
 
-    // --- 2. Custom Search Link ---
+    // --- 3.2 DETECT LOADING STATE ---
+    $('#financialTable').on('processing.dt', function (e, settings, processing) {
+        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
+            updateSyncStatus('loading');
+        }
+    });
+
+    // --- 3.3 Custom Search Link ---
     $('#financialSearch').on('keyup', function() {
         if (financialTable) {
             financialTable.search(this.value).draw();
         }
     });
 
-    // --- 3. Handle History Filter Change ---
-    // Now applies to the combined modal's history tab
+    // --- 3.4 Handle History Filter Change ---
     $('#filter_category').on('change', function() {
         if(currentViewedEmployeeId) {
-            // Note: The select is inside the history pane of the combined modal
             loadLedgerData(currentViewedEmployeeId, this.value);
         }
     });
     
-    // --- 4. Handle Adjustment Form Submission ---
+    // --- 3.5 Handle Adjustment Form Submission ---
     $('#adjustmentForm').on('submit', function(e) {
         e.preventDefault();
         
@@ -345,7 +348,7 @@ $(document).ready(function() {
                 if(res.status === 'success') {
                     Swal.fire('Success', res.message, 'success');
                     $('#combinedFinancialModal').modal('hide');
-                    window.refreshPageContent(); 
+                    window.refreshPageContent(true); // Visual Refresh on Success
                 } else {
                     Swal.fire('Error', res.message || 'Update failed.', 'error');
                 }
@@ -356,7 +359,7 @@ $(document).ready(function() {
         });
     });
     
-    // --- 5. Reset Form on Modal Close ---
+    // --- 3.6 Reset Form on Modal Close ---
     $('#combinedFinancialModal').on('hidden.bs.modal', function() {
         // Reset the form values
         $('#adjustmentForm')[0].reset();
@@ -364,6 +367,12 @@ $(document).ready(function() {
         $('#filter_category').val('All');
         // Reset the history table display
         $('#ledgerTableBody').html('<tr><td colspan="7" class="text-center py-4 text-muted">Select an employee to view history.</td></tr>');
+    });
+
+    // --- 3.7 Manual Refresh Button Listener ---
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault();
+        window.refreshPageContent(true);
     });
 });
 </script>

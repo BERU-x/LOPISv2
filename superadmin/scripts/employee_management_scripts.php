@@ -1,43 +1,45 @@
 <script>
 // ==============================================================================
-// 1. GLOBAL STATE & HELPER FUNCTIONS
+// 1. GLOBAL STATE & UI HELPERS
 // ==============================================================================
 var employeeTable;
-let spinnerStartTime = 0; 
-let currentUserId = null;
 
-// 1.1 Helper: Updates the final timestamp text
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
-    $('#last-updated-time').text(timeString);
-}
+/**
+ * Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 1.2 Helper: Stops the spinner safely
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 500; 
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
+    $dot.removeClass('text-success text-warning text-danger');
 
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime(); 
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-// 1.3 MASTER REFRESHER HOOK
-window.refreshPageContent = function() {
-    spinnerStartTime = new Date().getTime(); 
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    
+// 1.2 MASTER REFRESHER HOOK
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
     if (employeeTable) {
+        // If Manual Click -> Spin Icon & Show 'Syncing...'
+        if(isManual) {
+            $('#refreshIcon').addClass('fa-spin');
+            updateSyncStatus('loading');
+        }
+        
+        // Reload DataTable (false = keep paging)
         employeeTable.ajax.reload(null, false);
     }
 };
@@ -48,18 +50,15 @@ window.refreshPageContent = function() {
 
 // 2.1 Open Modal (Add or Edit)
 function openModal(id = null) {
-    currentUserId = id;
-    
-    // Reset Form & UI
     $('#employeeForm')[0].reset();
     $('#user_id').val('');
     $('#modalTitle').text(id ? 'Edit Account' : 'Add New Account');
     
-    // Password Hint Logic
+    // Password Hint & ID Readonly Logic
     if(id) {
         $('#password_hint').removeClass('d-none');
         $('#password').removeAttr('required').attr('placeholder', 'Leave blank to keep current');
-        $('#employee_id').attr('readonly', true); // Prevent changing ID on edit to avoid mismatches
+        $('#employee_id').attr('readonly', true);
     } else {
         $('#password_hint').addClass('d-none');
         $('#password').attr('required', 'required').attr('placeholder', 'Default: employee123');
@@ -67,11 +66,10 @@ function openModal(id = null) {
     }
 
     if (id) {
-        // EDIT MODE: Fetch details via AJAX
         Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
         
         $.ajax({
-            url: 'api/user_action.php', // Note path adjustment
+            url: 'api/user_action.php',
             type: 'POST',
             data: { action: 'get_details', id: id },
             dataType: 'json',
@@ -93,7 +91,6 @@ function openModal(id = null) {
             }
         });
     } else {
-        // ADD MODE
         $('#employeeModal').modal('show');
     }
 }
@@ -110,14 +107,14 @@ function deleteAccount(id) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '../api/user_action.php',
+                url: 'api/user_action.php',
                 type: 'POST',
                 data: { action: 'delete', id: id },
                 dataType: 'json',
                 success: function(res) {
                     if (res.status === 'success') {
                         Swal.fire('Deleted!', res.message, 'success');
-                        window.refreshPageContent();
+                        window.refreshPageContent(true); // Trigger Manual Refresh Style
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }
@@ -142,20 +139,16 @@ $(document).ready(function() {
         ordering: true, 
         dom: 'rtip', 
         ajax: {
-            url: "api/user_action.php", // Points to the generic User API
+            url: "api/user_action.php", 
             type: "POST",
-            data: { action: 'fetch' } // The API defaults to usertype=2 if not specified, or we handle it there
+            data: { action: 'fetch' } 
         },
+        // AUTOMATIC UI UPDATES ON DRAW
         drawCallback: function(settings) {
-            const icon = $('#refresh-spinner');
-            if (icon.hasClass('fa-spin')) {
-                stopSpinnerSafely();
-            } else {
-                updateLastSyncTime(); 
-            }
+            updateSyncStatus('success');
+            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
         },
         columns: [
-            // Col 1: Emp ID
             { 
                 data: 'employee_id', 
                 className: "align-middle fw-bold",
@@ -163,9 +156,7 @@ $(document).ready(function() {
                     return '<span class="badge bg-soft-info text-info border border-info px-2">' + data + '</span>'; 
                 } 
             },
-            // Col 2: Email
             { data: 'email', className: "align-middle" },
-            // Col 3: Status
             { 
                 data: 'status', 
                 className: "text-center align-middle",
@@ -174,7 +165,6 @@ $(document).ready(function() {
                     return '<span class="badge bg-soft-secondary text-secondary border border-secondary px-3 shadow-sm rounded-pill"><i class="fa-solid fa-ban me-1"></i> Inactive</span>';
                 }
             },
-            // Col 4: Created At
             { 
                 data: 'created_at', 
                 className: "align-middle text-muted small",
@@ -183,17 +173,16 @@ $(document).ready(function() {
                     return new Date(data).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                 }
             },
-            // Col 5: Actions
             { 
                 data: 'id', 
                 orderable: false, 
                 className: "text-center align-middle text-nowrap",
                 render: function(data) {
                     return `
-                        <button class="btn btn-sm btn-outline-primary shadow-sm me-1" onclick="openModal(${data})" title="Edit">
+                        <button class="btn btn-sm btn-outline-secondary shadow-sm me-1" onclick="openModal(${data})" title="Edit">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteAccount(${data})" title="Delete">
+                        <button class="btn btn-sm btn-outline-secondary shadow-sm" onclick="deleteAccount(${data})" title="Delete">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     `;
@@ -203,10 +192,18 @@ $(document).ready(function() {
         language: { emptyTable: "No employee accounts found." }
     });
 
-    // 3.2 Handle Form Submission
+    // 3.2 DETECT LOADING STATE
+    $('#employeeTable').on('processing.dt', function (e, settings, processing) {
+        if (processing) {
+            if(!$('#refreshIcon').hasClass('fa-spin')) {
+                updateSyncStatus('loading');
+            }
+        }
+    });
+
+    // 3.3 Handle Form Submission
     $('#employeeForm').on('submit', function(e) {
         e.preventDefault();
-        
         const action = $('#user_id').val() ? 'update' : 'create';
         const formData = $(this).serialize() + '&action=' + action;
 
@@ -228,7 +225,7 @@ $(document).ready(function() {
                         timer: 1500,
                         showConfirmButton: false
                     });
-                    window.refreshPageContent();
+                    window.refreshPageContent(true); // Manual refresh style on success
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }
@@ -239,7 +236,10 @@ $(document).ready(function() {
         });
     });
 
-    // Initial time update
-    updateLastSyncTime();
+    // 3.4 Manual Refresh Button Listener
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault();
+        window.refreshPageContent(true);
+    });
 });
 </script>

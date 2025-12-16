@@ -19,7 +19,7 @@ require 'template/topbar.php';
         <div class="col-xl-4 col-lg-5">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Company Logo</h6>
+                    <h6 class="m-0 font-weight-bold text-label">Company Logo</h6>
                 </div>
                 <div class="card-body text-center">
                     <div class="mb-4">
@@ -31,7 +31,7 @@ require 'template/topbar.php';
                     
                     <p class="small text-muted mb-3">Preferred Size: 500x500px (Square)</p>
                     
-                    <button class="btn btn-primary btn-sm" onclick="$('#logoInput').click()">
+                    <button class="btn btn-teal btn-sm" onclick="$('#logoInput').click()">
                         <i class="fas fa-upload me-1"></i> Change Logo
                     </button>
                     <input type="file" id="logoInput" name="logo" class="d-none" accept="image/*">
@@ -42,7 +42,7 @@ require 'template/topbar.php';
         <div class="col-xl-8 col-lg-7">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">General Information</h6>
+                    <h6 class="m-0 font-weight-bold text-label">General Information</h6>
                     <span id="last-updated-text" class="small text-muted"></span>
                 </div>
                 <div class="card-body">
@@ -78,7 +78,7 @@ require 'template/topbar.php';
 
                         <hr>
                         
-                        <button class="btn btn-primary" type="submit" id="saveBtn">
+                        <button class="btn btn-teal" type="submit" id="saveBtn">
                             <i class="fas fa-save me-1"></i> Save Changes
                         </button>
                     </form>

@@ -5,58 +5,51 @@
 var caTable;
 var currentCAId;
 
-// 1.1 Global variable to track when the spin started
-let spinnerStartTime = 0; 
+/**
+ * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * @param {string} state - 'loading', 'success', or 'error'
+ */
+function updateSyncStatus(state) {
+    const $dot = $('.live-dot');
+    const $text = $('#last-updated-time');
+    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-// 1.2 HELPER FUNCTION: Updates the final timestamp text
-function updateLastSyncTime() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    $('#last-updated-time').text(timeString);
-}
+    $dot.removeClass('text-success text-warning text-danger');
 
-// 1.3 HELPER FUNCTION: Stops the spinner safely (waits for minDisplayTime = 1000ms)
-function stopSpinnerSafely() {
-    const icon = $('#refresh-spinner');
-    const minDisplayTime = 1000; 
-    const timeElapsed = new Date().getTime() - spinnerStartTime;
-
-    const finalizeStop = () => {
-        icon.removeClass('fa-spin text-teal');
-        updateLastSyncTime(); 
-    };
-
-    if (timeElapsed < minDisplayTime) {
-        setTimeout(finalizeStop, minDisplayTime - timeElapsed);
-    } else {
-        finalizeStop();
+    if (state === 'loading') {
+        $text.text('Syncing...');
+        $dot.addClass('text-warning'); // Yellow
+    } 
+    else if (state === 'success') {
+        $text.text(`Synced: ${time}`);
+        $dot.addClass('text-success'); // Green
+    } 
+    else {
+        $text.text(`Failed: ${time}`);
+        $dot.addClass('text-danger');  // Red
     }
 }
 
-// 1.4 MASTER REFRESHER HOOK (Must be global)
-window.refreshPageContent = function() {
-    // 1. Record Start Time
-    spinnerStartTime = new Date().getTime(); 
-    
-    // 2. Start Visual feedback & Text
-    $('#refresh-spinner').addClass('fa-spin text-teal');
-    $('#last-updated-time').text('Syncing...');
-    
-    // 3. Reload Table
+// 1.2 MASTER REFRESHER TRIGGER
+// isManual = true (Spin Icon) | isManual = false (Silent)
+window.refreshPageContent = function(isManual = false) {
     if (caTable) {
+        // 1. Visual Feedback for Manual Actions
+        if(isManual) {
+            $('#refreshIcon').addClass('fa-spin');
+            updateSyncStatus('loading');
+        }
+        
+        // 2. Reload DataTable (false = keep paging)
         caTable.ajax.reload(null, false);
     }
 };
 
 // ==============================================================================
-// 2. MODAL LOGIC FUNCTIONS (Global for onclick binding)
+// 2. MODAL LOGIC FUNCTIONS
 // ==============================================================================
 
-// Function to render the static HTML structure of the modal body (required for viewCA function)
+// 2.1 Helper to render Modal Body HTML
 function renderCAModalBody(data, statusHtml, amountFormatted) {
     const photo = (data.photo && data.photo.trim() !== '') ? '../assets/images/'+data.photo : '../assets/images/default.png';
     const requestedAmount = parseFloat(data.amount || 0);
@@ -65,19 +58,19 @@ function renderCAModalBody(data, statusHtml, amountFormatted) {
     let approvedInputHtml = '';
     
     if(isPending) {
-        // Input field for pending status, pre-filled with requested amount
+        // Input field for pending status
         approvedInputHtml = `
             <input type="number" step="0.01" id="modal_approved_input" 
-                class="form-control form-control-sm w-75 d-inline" 
+                class="form-control form-control-sm w-75 d-inline fw-bold text-center" 
                 value="${requestedAmount.toFixed(2)}" />
-            <span id="modal_approved_display" class="fw-bold text-success d-none"></span>
         `;
     } else {
-        // Display only for approved/paid/rejected status
+        // Display only for finalized status
         const approvedDisplay = data.status === 'Cancelled' ? 'N/A' : amountFormatted;
         
+        // Hidden input to prevent JS errors if referenced, plus visible text
         approvedInputHtml = `
-            <input type="number" step="0.01" id="modal_approved_input" class="form-control form-control-sm w-75 d-inline d-none" />
+            <input type="hidden" id="modal_approved_input" value="${requestedAmount}" />
             <span id="modal_approved_display" class="fw-bold text-success">${approvedDisplay}</span>
         `;
     }
@@ -85,7 +78,7 @@ function renderCAModalBody(data, statusHtml, amountFormatted) {
     return `
         <div class="row">
             <div class="col-md-5 text-center border-end">
-                <img id="modal_emp_photo" src="${photo}" class="rounded-circle border shadow-sm mb-3" style="width: 100px; height: 100px; object-fit: cover;">
+                <img id="modal_emp_photo" src="${photo}" class="rounded-circle border shadow-sm mb-3" style="width: 100px; height: 100px; object-fit: cover;" onerror="this.src='../assets/images/default.png'">
                 <h5 class="fw-bold" id="modal_emp_name">${data.firstname} ${data.lastname}</h5>
                 <p class="text-muted small" id="modal_emp_dept">${data.department || 'Employee'}</p>
             </div>
@@ -97,10 +90,8 @@ function renderCAModalBody(data, statusHtml, amountFormatted) {
                     <tr><td class="fw-bold">Requested Amount:</td><td class="fw-bold text-teal">${amountFormatted}</td></tr>
                     
                     <tr class="align-items-center">
-                        <td class="fw-bold">Approved Amount:</td>
-                        <td>
-                            ${approvedInputHtml}
-                        </td>
+                        <td class="fw-bold align-middle">Approved Amount:</td>
+                        <td>${approvedInputHtml}</td>
                     </tr>
                 </table>
             </div>
@@ -111,15 +102,15 @@ function renderCAModalBody(data, statusHtml, amountFormatted) {
     `;
 }
 
-// --- VIEW DETAILS LOGIC ---
+// 2.2 VIEW DETAILS LOGIC
 function viewCA(id) {
     currentCAId = id;
     const modalBody = $('#viewCAModal .modal-body');
     const modalActions = $('#modal-actions');
     
-    // Reset Modal UI and show loader in main modal body
+    // Show Loader
     modalBody.html('<div class="text-center py-5"><div class="spinner-border text-teal" role="status"></div><p class="mt-2 text-muted">Loading details...</p></div>');
-    modalActions.empty(); // Clear old buttons
+    modalActions.empty(); 
     
     $.ajax({
         url: 'api/cash_advance_action.php?action=get_details',
@@ -137,18 +128,17 @@ function viewCA(id) {
             const data = res.details;
             const amountFormatted = '₱ ' + parseFloat(data.amount || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
             
-            // Status Badge HTML
+            // Status Badge
             var statusHtml = '<span class="badge bg-warning text-dark">Pending</span>';
             if(data.status === 'Paid') statusHtml = '<span class="badge bg-secondary">Paid</span>';
             if(data.status === 'Deducted') statusHtml = '<span class="badge bg-success">Approved</span>';
             if(data.status === 'Cancelled') statusHtml = '<span class="badge bg-danger">Rejected</span>';
 
-            // Re-render detailed content with all data populated directly
+            // Render Body
             modalBody.html(renderCAModalBody(data, statusHtml, amountFormatted)); 
             
-            // Conditional Logic & Action Buttons
+            // Action Buttons (Only for Pending)
             if(data.status === 'Pending') {
-                // Add Approve/Reject Buttons to the footer
                 modalActions.append(`
                     <button type="button" class="btn btn-danger fw-bold shadow-sm" onclick="processCA('reject')">Reject</button>
                     <button type="button" class="btn btn-teal fw-bold shadow-sm ms-2" onclick="processCA('approve')">Approve</button>
@@ -158,15 +148,14 @@ function viewCA(id) {
             $('#viewCAModal').modal('show');
         },
         error: function() {
-            modalBody.html('<div class="text-center py-5"><p class="text-danger">Server connection failed. Could not load details.</p></div>');
+            modalBody.html('<div class="text-center py-5"><p class="text-danger">Server connection failed.</p></div>');
             $('#viewCAModal').modal('show');
         }
     });
 }
 
-// --- APPROVE/REJECT LOGIC ---
+// 2.3 APPROVE/REJECT LOGIC
 function processCA(type) {
-    // Scope the lookup to the modal body now that the input is rendered directly.
     var amount = $('#viewCAModal').find('#modal_approved_input').val();
 
     if(type === 'approve' && (amount === '' || parseFloat(amount) <= 0)) {
@@ -183,6 +172,8 @@ function processCA(type) {
         confirmButtonText: 'Yes, Confirm'
     }).then((result) => {
         if(result.isConfirmed) {
+            Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
             $.ajax({
                 url: 'api/cash_advance_action.php?action=process',
                 type: 'POST',
@@ -193,10 +184,11 @@ function processCA(type) {
                 },
                 dataType: 'json',
                 success: function(res) {
+                    Swal.close();
                     if(res.status === 'success') {
                         Swal.fire('Success', res.message, 'success');
                         $('#viewCAModal').modal('hide');
-                        window.refreshPageContent();
+                        window.refreshPageContent(true); // Visual Refresh
                     } else {
                         Swal.fire('Error', res.message, 'error');
                     }
@@ -210,11 +202,11 @@ function processCA(type) {
 }
 
 // ==============================================================================
-// 3. DOCUMENT READY (Initialization)
+// 3. INITIALIZATION
 // ==============================================================================
 $(document).ready(function() {
     
-    // 2. INITIALIZE DATATABLE
+    // 3.1 INITIALIZE DATATABLE
     caTable = $('#caTable').DataTable({
         processing: true,
         serverSide: true,
@@ -228,14 +220,11 @@ $(document).ready(function() {
                 d.end_date = $('#filter_end_date').val();
             }
         },
-
+        
+        // DRAW CALLBACK: Standardized UI updates
         drawCallback: function(settings) {
-            const icon = $('#refresh-spinner');
-            if (icon.hasClass('fa-spin')) {
-                stopSpinnerSafely();
-            } else {
-                updateLastSyncTime(); 
-            }
+            updateSyncStatus('success');
+            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
         },
 
         columns: [
@@ -247,7 +236,7 @@ $(document).ready(function() {
                     var imgPath = (row.photo && row.photo.trim() !== '') ? '../assets/images/' + row.photo : '../assets/images/default.png';
                     return `
                         <div class="d-flex align-items-center">
-                            <img src="${imgPath}" class="rounded-circle me-3 border shadow-sm" style="width: 35px; height: 35px; object-fit: cover;">
+                            <img src="${imgPath}" class="rounded-circle me-3 border shadow-sm" style="width: 35px; height: 35px; object-fit: cover;" onerror="this.src='../assets/images/default.png'">
                             <div>
                                 <div class="fw-bold text-dark text-sm">${row.firstname} ${row.lastname}</div>
                                 <div class="text-xs text-muted">${row.department || 'Employee'}</div>
@@ -276,7 +265,7 @@ $(document).ready(function() {
                     return `<span class="badge bg-secondary">${data}</span>`;
                 }
             },
-            // Col 4: Actions (View Button - FA6 Update)
+            // Col 4: Actions
             { 
                 data: 'id', 
                 orderable: false,
@@ -288,7 +277,14 @@ $(document).ready(function() {
         ]
     });
 
-    // --- Search & Filters ---
+    // 3.2 DETECT LOADING STATE
+    $('#caTable').on('processing.dt', function (e, settings, processing) {
+        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
+            updateSyncStatus('loading');
+        }
+    });
+
+    // 3.3 Search & Filters
     var searchTimeout;
     $('#customSearch').on('keyup', function() {
         clearTimeout(searchTimeout);
@@ -297,13 +293,19 @@ $(document).ready(function() {
     });
     
     $('#applyFilterBtn').click(function() { 
-        window.refreshPageContent(); 
+        window.refreshPageContent(true); 
     });
     
     $('#clearFilterBtn').click(function() {
         $('#filter_start_date, #filter_end_date, #customSearch').val(''); 
         caTable.search('').draw(); 
-        window.refreshPageContent();
+        window.refreshPageContent(true);
+    });
+
+    // 3.4 Manual Refresh Button Listener
+    $('#btn-refresh').on('click', function(e) {
+        e.preventDefault();
+        window.refreshPageContent(true);
     });
 });
 </script>

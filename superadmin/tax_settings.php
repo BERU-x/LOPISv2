@@ -12,7 +12,7 @@ require 'template/topbar.php';
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800">Income Tax Configuration</h1>
-        <button class="btn btn-primary shadow-sm" onclick="openModal()">
+        <button class="btn btn-teal shadow-sm" onclick="openModal()">
             <i class="fa-solid fa-plus fa-sm text-white-50 me-2"></i>Add Tax Slab
         </button>
     </div>
@@ -21,7 +21,7 @@ require 'template/topbar.php';
         <div class="col-lg-12">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-primary">Withholding Tax Table (Semi-Monthly)</h6>
+                    <h6 class="m-0 font-weight-bold text-label">Withholding Tax Table (Semi-Monthly)</h6>
                     <button class="btn btn-link btn-sm text-decoration-none" onclick="window.refreshPageContent()">
                         <i id="refresh-spinner" class="fas fa-sync-alt fa-sm fa-fw text-gray-400"></i> Refresh
                     </button>
@@ -107,7 +107,7 @@ require 'template/topbar.php';
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="submit" class="btn btn-teal">Save Changes</button>
                 </div>
             </form>
         </div>
