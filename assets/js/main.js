@@ -241,3 +241,121 @@ $(document).ready(function(){
     maintenanceIntervalId = setInterval(masterAutoRefresher, 30000); 
 
 });
+
+/**
+ * main.js
+ * Contains core front-end functionality, including notification fetching.
+ */
+
+$(document).ready(function() {
+    
+    // --- 1. CONFIGURATION ---
+    const NOTIFICATION_API_URL = 'api/notifications_api.php';
+    const NOTIFICATION_POLL_INTERVAL = 30000; // Poll every 30 seconds
+
+    // --- 2. NOTIFICATION FETCH & RENDER FUNCTION ---
+    function fetchNotifications() {
+        $.ajax({
+            url: NOTIFICATION_API_URL,
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.status === 'success') {
+                    renderNotifications(response.notifications, response.count);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("Failed to fetch notifications:", error);
+                // Optionally log error to console, but don't bother the user
+            }
+        });
+    }
+
+    // --- 3. UI RENDERING ---
+    function renderNotifications(notifications, count) {
+        const listContainer = $('#notification-list');
+        const countBadge = $('#notification-count');
+        let html = '';
+
+        // Update count badge
+        if (count > 0) {
+            countBadge.text(count).addClass('badge-danger').removeClass('d-none');
+        } else {
+            countBadge.text('').removeClass('badge-danger').addClass('d-none');
+        }
+
+        // Build dropdown list items
+        if (notifications.length > 0) {
+            notifications.forEach(notif => {
+                const is_read_class = notif.is_read == 0 ? 'bg-light-unread' : ''; // You'll need to define this CSS class
+                const time_ago = timeAgo(notif.created_at); // Uses the timeAgo helper below
+                
+                html += `
+                    <a class="dropdown-item d-flex align-items-center ${is_read_class}" href="${notif.link}" data-id="${notif.id}">
+                        <div class="me-3">
+                            <div class="icon-circle bg-primary">
+                                <i class="fas fa-file-alt text-white"></i> 
+                            </div>
+                        </div>
+                        <div>
+                            <div class="small text-gray-500">${time_ago}</div>
+                            <span class="${notif.is_read == 0 ? 'fw-bold text-dark' : 'text-gray-700'}">${notif.message}</span>
+                            <div class="small text-muted fst-italic">Sent by: ${notif.sender_name}</div>
+                        </div>
+                    </a>
+                `;
+            });
+            // Add the 'Show All' link at the bottom
+            html += '<a class="dropdown-item text-center small text-gray-500" href="notifications.php">Show All Notifications</a>';
+
+        } else {
+            html += '<a class="dropdown-item text-center small text-gray-500">No new notifications.</a>';
+        }
+
+        listContainer.html(html);
+    }
+
+    // --- 4. MARK ALL READ HANDLER ---
+    $('#mark-all-read-btn').on('click', function(e) {
+        e.preventDefault();
+        
+        $.ajax({
+            url: 'api/notifications_api.php',
+            type: 'POST',
+            data: { action: 'mark_all_read' },
+            success: function() {
+                // Instantly update the UI without waiting for the next poll
+                $('#notification-count').text('').removeClass('badge-danger').addClass('d-none');
+                $('.bg-light-unread').removeClass('bg-light-unread');
+            },
+            error: function(xhr, status, error) {
+                console.error("Failed to mark all read:", error);
+            }
+        });
+    });
+
+    // --- 5. TIME HELPER FUNCTION (mimicking PHP logic) ---
+    // NOTE: This is a simplified client-side implementation.
+    function timeAgo(dateString) {
+        const now = new Date();
+        const past = new Date(dateString);
+        const diffInSeconds = Math.floor((now - past) / 1000);
+        
+        if (diffInSeconds < 60) {
+            return 'just now';
+        } else if (diffInSeconds < 3600) {
+            return Math.floor(diffInSeconds / 60) + ' minutes ago';
+        } else if (diffInSeconds < 86400) {
+            return Math.floor(diffInSeconds / 3600) + ' hours ago';
+        } else {
+            // For older items, return simple date
+            return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+    }
+
+
+    // --- 6. INITIAL CALL AND POLLING SETUP ---
+    fetchNotifications(); // Initial load
+    setInterval(fetchNotifications, NOTIFICATION_POLL_INTERVAL); // Start polling
+
+});

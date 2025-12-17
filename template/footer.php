@@ -1,8 +1,11 @@
 <?php
-// admin/template/footer.php
+// template/footer.php
+// Renders the closing HTML elements, modals, footer, and includes global scripts.
+// Assumes this file is placed in a common template directory and is included relative to a page like /app/pages/audit_logs.php.
 ?>
-    </div>
+
 </div>
+    </div>
 <a class="scroll-to-top rounded" href="#page-top">
     <i class="fas fa-angle-up"></i>
 </a>
@@ -39,16 +42,19 @@
     </div>
     </div>
 </footer>
-<script src="../assets/js/jquery-3.7.1.min.js"></script> 
-<script src="../assets/vendor/bs5/js/bootstrap.bundle.min.js"></script>
+
+</div>
+
+<script src="../../assets/js/jquery-3.7.1.min.js"></script> 
+<script src="../../assets/vendor/bs5/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-<script src="../assets/js/dataTables.min.js"></script>
-<script src="../assets/js/dataTables.bootstrap5.min.js"></script>
+<script src="../../assets/js/dataTables.min.js"></script>
+<script src="../../assets/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Dropify/0.2.2/js/dropify.min.js"></script> 
 
-<script src="../assets/js/main.js"></script> 
+<script src="../../assets/js/main.js"></script> 
 
 </body>
 </html>

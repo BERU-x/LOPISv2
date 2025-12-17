@@ -25,8 +25,15 @@ function isActive($page_name, $current_page) {
             <i class="fa-solid fa-fw fa-gauge-high"></i>
             <span>Dashboard</span>
         </a>
+    </li>
+
+    <li class="nav-item <?php echo isActive('pending_emails', $current_page); ?>">
+        <a class="nav-link" href="pending_emails.php">
+            <i class="fa-solid fa-fw fa-envelope"></i>
+            <span>Pending Emails</span>
+        </a>
     </li> 
-        
+
     <hr class="sidebar-divider">
 
     <div class="sidebar-heading">
