@@ -1,18 +1,17 @@
 <?php
+// login_process.php
 session_start();
 
-// --- DATABASE CONNECTION & USER MODEL ---
-require __DIR__ . '/../db_connection.php'; // Your DB connection file
+// --- 1. DATABASE CONNECTION & HELPERS ---
+require __DIR__ . '/../db_connection.php'; 
+require __DIR__ . '/../helpers/audit_helper.php'; // --- Path to your audit helper ---
 
-// Set response header to JSON
 header('Content-Type: application/json');
 
-// Get POST data (renamed from 'email' to 'login_id' in index.php)
-$login_id = $_POST['login_id'] ?? ''; // Expects email or employee_id
+$login_id = $_POST['login_id'] ?? ''; 
 $password = $_POST['password'] ?? '';
 $remember_me = isset($_POST['remember']);
 
-// Basic validation
 if (empty($login_id) || empty($password)) {
     http_response_code(400); 
     echo json_encode(['status' => 'error', 'message' => 'Login ID and password are required.']);
@@ -20,29 +19,20 @@ if (empty($login_id) || empty($password)) {
 }
 
 try {
-    // --- 0a. FETCH GENERAL SETTINGS (MAINTENANCE MODE) ---
+    // --- 2. SYSTEM SETTINGS FETCH ---
     $stmt_settings = $pdo->query("SELECT maintenance_mode FROM tbl_general_settings WHERE id = 1");
     $settings = $stmt_settings->fetch(PDO::FETCH_ASSOC);
     $maintenance_mode = $settings['maintenance_mode'] ?? 0;
 
-    // --- 0b. FETCH SECURITY SETTINGS (PASSWORD EXPIRY) ---
     $stmt_sec = $pdo->query("SELECT password_expiry_days FROM tbl_security_settings WHERE id = 1");
     $sec_settings = $stmt_sec->fetch(PDO::FETCH_ASSOC);
-    $password_expiry_days = $sec_settings['password_expiry_days'] ?? 0; // Default 0 means no expiry check
+    $password_expiry_days = $sec_settings['password_expiry_days'] ?? 0;
 
-    // 1. DETERMINE LOGIN FIELD
-    if (preg_match('/^[0-9]{3}$/', $login_id)) { 
-        $login_field = 'u.employee_id';
-    } else {
-        $login_field = 'u.email';
-    }
+    // --- 3. DETERMINE LOGIN FIELD ---
+    $login_field = (preg_match('/^[0-9]{3}$/', $login_id)) ? 'u.employee_id' : 'u.email';
 
-    // 2. FETCH USER DATA (Flexible Query)
-    // IMPORTANT: Assuming a column 'u.password_updated_at' exists in tbl_users for expiry check
-    $sql = "SELECT 
-                u.*, 
-                u.updated_at AS password_updated_at, -- Assuming 'updated_at' can track password change
-                CONCAT(e.firstname, ' ', e.lastname) AS fullname 
+    // --- 4. FETCH USER DATA ---
+    $sql = "SELECT u.*, u.updated_at AS password_updated_at, CONCAT(e.firstname, ' ', e.lastname) AS fullname 
             FROM tbl_users u
             LEFT JOIN tbl_employees e ON u.employee_id = e.employee_id
             WHERE {$login_field} = ?";
@@ -51,42 +41,44 @@ try {
     $stmt->execute([$login_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Check password
     $is_password_correct = $user && password_verify($password, $user['password']);
 
-    // 3. Verify user exists and password is correct
+    // =========================================================================
+    // 5. AUTHENTICATION LOGIC
+    // =========================================================================
+    
     if ($is_password_correct) {
         
-        // --- CRITICAL MAINTENANCE MODE CHECK ---
+        // --- CASE: MAINTENANCE MODE ---
         if ($maintenance_mode == 1 && $user['usertype'] != 0) {
-            http_response_code(503); // Service Unavailable
-            echo json_encode(['status' => 'error', 'message' => 'The system is currently undergoing maintenance. Please try again later.']);
+            // Log the blocked attempt
+            logAudit($pdo, $user['id'], $user['usertype'], 'LOGIN_BLOCKED', 'User blocked by Maintenance Mode');
+            
+            http_response_code(503);
+            echo json_encode(['status' => 'error', 'message' => 'System under maintenance.']);
             exit;
         }
         
-        // Check if account is active
+        // --- CASE: INACTIVE ACCOUNT ---
         if ($user['status'] != 1) {
-            http_response_code(403); // Forbidden
-            echo json_encode(['status' => 'error', 'message' => 'Your account is inactive. Please contact the administrator.']);
+            logAudit($pdo, $user['id'], $user['usertype'], 'LOGIN_DISABLED', 'Attempted login to inactive account');
+            
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'Account is inactive.']);
             exit;
         }
 
-        // --- NEW: PASSWORD EXPIRY CHECK (Forced Reset) ---
+        // --- PASSWORD EXPIRY CHECK ---
         $force_password_reset = false;
         if ($password_expiry_days > 0) {
-            // Use password_updated_at if available, otherwise fallback to the row's general updated_at
             $last_update_date = $user['password_updated_at'] ?? $user['updated_at'];
             $expiry_timestamp = strtotime($last_update_date . " +{$password_expiry_days} days");
-
-            if ($expiry_timestamp < time()) {
-                $force_password_reset = true;
-            }
+            if ($expiry_timestamp < time()) { $force_password_reset = true; }
         }
-        // --- END PASSWORD EXPIRY CHECK ---
 
-        // --- Login Successful ---
+        // --- SUCCESSFUL LOGIN SETUP ---
         session_regenerate_id(true);
-
-        // Store user data in session
         $_SESSION['logged_in'] = true;
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['employee_id'] = $user['employee_id'];
@@ -94,74 +86,47 @@ try {
         $_SESSION['fullname'] = $user['fullname'] ?? $user['employee_id'];
         $_SESSION['usertype'] = $user['usertype'];
         $_SESSION['show_loader'] = true;
-        
-        // Store expiry status in session
         $_SESSION['force_password_reset'] = $force_password_reset;
         
-        // --- "Keep me Signed In" Logic (Unchanged) ---
+        // ⭐ AUDIT LOG: SUCCESSFUL LOGIN ⭐
+        $log_msg = $force_password_reset ? "Login Success (Password Expired)" : "Login Success";
+        logAudit($pdo, $user['id'], $user['usertype'], 'LOGIN_SUCCESS', $log_msg);
+
+        // --- REMEMBER ME LOGIC ---
         if ($remember_me) {
-            // ... (Cookie generation and DB insertion logic remains here) ...
-            // Generate secure tokens
             $selector = bin2hex(random_bytes(16));
             $token = bin2hex(random_bytes(32));
             $expires_at = date('Y-m-d H:i:s', time() + (86400 * 30)); 
-            $hashed_token = hash('sha256', $token);
             
-            try {
-                $stmt_token = $pdo->prepare(
-                    "INSERT INTO tbl_auth_tokens (selector, hashed_token, employee_id, expires_at) 
-                    VALUES (?, ?, ?, ?)"
-                );
-                $stmt_token->execute([$selector, $hashed_token, $user['employee_id'], $expires_at]);
-                
-                $cookie_options = [
-                    'expires' => time() + (86400 * 30),
-                    'path' => '/',
-                    'secure' => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on', 
-                    'httponly' => true,
-                    'samesite' => 'Lax'
-                ];
-                
-                setcookie('remember_selector', $selector, $cookie_options);
-                setcookie('remember_token', $token, $cookie_options);
-            } catch (PDOException $e) {
-                error_log('Remember Me cookie token insert failed: ' . $e->getMessage());
-            }
-        }
-        // --- End of "Keep me Signed In" Logic ---
-
-        // Determine redirect URL
-        // If password expired, redirect to forced reset page instead of dashboard
-        if ($force_password_reset) {
-            $redirect_url = 'process/force_password_reset.php'; 
-            $message = 'Your password has expired. You must update it now.';
-        } else {
-            $redirect_url = 'user/dashboard.php'; // Default for user (2)
-            if ($user['usertype'] == 0) {
-                $redirect_url = 'superadmin/dashboard.php';
-            } elseif ($user['usertype'] == 1) {
-                $redirect_url = 'admin/dashboard.php';
-            }
-            $message = 'Login successful! Redirecting...';
+            $stmt_token = $pdo->prepare("INSERT INTO tbl_auth_tokens (selector, hashed_token, employee_id, expires_at) VALUES (?, ?, ?, ?)");
+            $stmt_token->execute([$selector, hash('sha256', $token), $user['employee_id'], $expires_at]);
+            
+            setcookie('remember_selector', $selector, ['expires' => time() + (86400 * 30), 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+            setcookie('remember_token', $token, ['expires' => time() + (86400 * 30), 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
         }
 
+        // Determine Redirect
+        $redirect_url = $force_password_reset ? 'process/force_password_reset.php' : match((int)$user['usertype']) {
+            0 => 'superadmin/dashboard.php',
+            1 => 'admin/dashboard.php',
+            default => 'user/dashboard.php'
+        };
 
-        // Send success response
-        echo json_encode([
-            'status' => 'success',
-            'message' => $message,
-            'redirect' => $redirect_url
-        ]);
+        echo json_encode(['status' => 'success', 'message' => 'Login successful!', 'redirect' => $redirect_url]);
 
     } else {
-        // Invalid credentials
-        http_response_code(401); // Unauthorized
+        // ⭐ AUDIT LOG: FAILED LOGIN ⭐
+        // We log the attempt with the user_id if we found the account, otherwise NULL
+        $target_id = $user['id'] ?? null;
+        $target_type = $user['usertype'] ?? null;
+        logAudit($pdo, $target_id, $target_type, 'LOGIN_FAILED', "Failed attempt for ID: $login_id");
+
+        http_response_code(401);
         echo json_encode(['status' => 'error', 'message' => 'Invalid Login ID or password.']);
     }
 
 } catch (PDOException $e) {
-    http_response_code(500); // Internal Server Error
+    http_response_code(500);
     error_log('Database error: ' . $e->getMessage()); 
     echo json_encode(['status' => 'error', 'message' => 'A database error occurred.']);
 }
-?>
