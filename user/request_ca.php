@@ -2,9 +2,10 @@
 // user/request_ca.php
 $page_title = 'Request Cash Advance';
 $current_page = 'request_ca'; 
-require 'template/header.php'; 
-require 'template/sidebar.php'; 
-require 'template/topbar.php';
+
+require '../template/header.php'; 
+require '../template/sidebar.php'; 
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -91,5 +92,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/cash_advance_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/user_cash_advance.js"></script>

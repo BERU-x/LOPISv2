@@ -3,9 +3,9 @@
 $page_title = 'Policy Settings - LOPISv2';
 $current_page = 'policy_settings';
 
-require 'template/header.php';
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php';
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -116,5 +116,5 @@ require 'template/topbar.php';
 
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/policy_settings_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/superadmin_policy_settings.js"></script>

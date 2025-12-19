@@ -3,9 +3,9 @@
 $page_title = 'Pay Components - LOPISv2';
 $current_page = 'pay_components';
 
-require 'template/header.php';
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php';
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -127,5 +127,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/pay_components_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/superadmin_pay_components.js"></script>

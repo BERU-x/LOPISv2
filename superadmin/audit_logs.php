@@ -3,9 +3,9 @@
 $page_title = 'System Audit Logs - LOPISv2';
 $current_page = 'audit_logs';
 
-require 'template/header.php';
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php';
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -76,5 +76,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/audit_logs_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/superadmin_audit_logs.js"></script>

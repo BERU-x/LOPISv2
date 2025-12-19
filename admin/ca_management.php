@@ -6,9 +6,9 @@ date_default_timezone_set('Asia/Manila');
 $page_title = 'Cash Advance Management';
 $current_page = 'ca_management'; 
 
-require 'template/header.php'; 
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php'; 
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -129,5 +129,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/ca_management_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/admin_cash_advance_management.js"></script>

@@ -1,85 +1,66 @@
 <?php
 // app/models/global_app_model.php
-// Centralized model file for all user roles (Super Admin, Admin, Employee).
 
-// --- PATH ADJUSTMENTS ---
-// Assuming this file is placed in a structure like /app/models/
-require_once __DIR__ . '/../../db_connection.php'; 
-require_once __DIR__ . '/../../email_handler.php'; // <-- INCLUDED: The robust email handler
+date_default_timezone_set('Asia/Manila');
 
-// --- DYNAMIC TIMEZONE FETCH ---
-try {
-    $stmt_tz = $pdo->query("SELECT system_timezone FROM tbl_general_settings WHERE id = 1");
-    $timezone = $stmt_tz->fetchColumn() ?? 'Asia/Manila';
-    date_default_timezone_set($timezone); 
-} catch (PDOException $e) {
-    date_default_timezone_set('Asia/Manila');
-}
-// -----------------------------
+// 1. DATABASE CONNECTION
+require_once __DIR__ . '/../../db_connection.php';
+
+// 2. EMAIL HANDLER (Now integrated)
+// Adjust path if email_handler.php is in a different location relative to app/models/
+require_once __DIR__ . '/../../helpers/email_handler.php'; 
 
 // --------------------------------------------------------------------------
-// --- 1. AUTHENTICATION & SESSION HELPERS ---
+// --- HELPER: SEND EMAIL ALERT (Wrapper for your handler) ---
 // --------------------------------------------------------------------------
-
-/**
- * Checks if a user is logged in and belongs to an authorized role.
- * @param array $allowed_usertypes Array of allowed roles.
- * @return bool True if authorized, False otherwise.
- */
-function is_user_authorized($allowed_usertypes = [0, 1, 2]) {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    
-    if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+function send_email_alert($pdo, $to_email, $subject, $html_body) {
+    if (empty($to_email)) {
         return false;
     }
-
-    $usertype = $_SESSION['usertype'] ?? 99;
     
-    return in_array($usertype, $allowed_usertypes);
+    // Convert HTML body to plain text for the non-HTML fallback
+    $plain_body = strip_tags($html_body);
+
+    // Call your centralized email_handler function
+    // send_email($pdo, $recipient, $subject, $plain_body, $html_body)
+    $status = send_email($pdo, $to_email, $subject, $plain_body, $html_body);
+    
+    // Return true only if actually sent
+    return ($status === 'sent');
 }
 
-/**
- * Redirects unauthorized users to the login page.
- */
-function require_authorization($allowed_usertypes = [0, 1, 2], $redirect_path = '/index.php') {
-    if (!is_user_authorized($allowed_usertypes)) {
-        header("Location: " . $redirect_path);
-        exit;
-    }
-}
-
-
 // --------------------------------------------------------------------------
-// --- 2. NOTIFICATION CORE FUNCTIONS ---
+// --- 1. SEND NOTIFICATION (Global Logic) ---
 // --------------------------------------------------------------------------
-
-// send_email_alert is now deprecated/removed as send_email is used directly.
-
-
 /**
- * Inserts a new notification into the database and attempts to send an email alert.
- * (UPDATED to use send_email())
+ * Inserts a notification into DB and triggers an email alert via PHPMailer.
+ * * @param PDO $pdo Database connection
+ * @param int|null $target_user_id The 'employee_id' (optional if broadcasting to role)
+ * @param int $target_role 0=Superadmin, 1=Admin, 2=Employee
+ * @param string $type Notification type (e.g., 'Leave Request', 'System')
+ * @param string $message Short message
+ * @param string $link URL relative to site root
+ * @param string|null $sender_name Override sender name
  */
 function send_notification($pdo, $target_user_id, $target_role, $type, $message, $link = '#', $sender_name = null) {
-    
-    // Ensure the global email function exists
-    if (!function_exists('send_email')) {
-        error_log("FATAL: send_email function is missing. Check email_handler.php path.");
-        return false;
-    }
     
     $db_insert_success = false;
     
     try {
-        // --- 1. SENDER NAME DETECTION (Placeholder) ---
+        // --- A. DETECT SENDER NAME ---
         if ($sender_name === null || $sender_name === '') {
-            // NOTE: Insert your full sender name logic here if needed.
-            $sender_name = 'System'; 
+            if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+            if (isset($_SESSION['fullname'])) {
+                $sender_name = $_SESSION['fullname'];
+            } elseif (isset($_SESSION['employee_id'])) {
+                $sender_name = "Employee " . $_SESSION['employee_id'];
+            } else {
+                $sender_name = "System";
+            }
         }
 
-        // --- 2. DATABASE INSERTION ---
+        // --- B. INSERT INTO DATABASE ---
         $sql = "INSERT INTO tbl_notifications 
                 (target_user_id, target_role, type, message, link, sender_name, created_at) 
                 VALUES (:uid, :role, :type, :msg, :link, :sender, NOW())";
@@ -87,60 +68,57 @@ function send_notification($pdo, $target_user_id, $target_role, $type, $message,
         $stmt = $pdo->prepare($sql);
         $db_insert_success = $stmt->execute([
             ':uid'    => $target_user_id, 
-            ':role'   => $target_role,     
-            ':type'   => $type,            
+            ':role'   => $target_role,    
+            ':type'   => $type,           
             ':msg'    => $message,
             ':link'   => $link,
             ':sender' => $sender_name
         ]);
         
-        // --- 3. EMAIL SENDING LOGIC ---
+        // --- C. SEND EMAIL VIA HANDLER ---
         if ($db_insert_success) {
-            $recipient_email_string = null;
-            $recipient_name = 'User';
-
-            // A. EMPLOYEE LOGIC
-            if ($target_role == 'Employee' && $target_user_id) {
-                $stmt_email = $pdo->prepare("
-                    SELECT t1.email, t2.firstname 
-                    FROM tbl_users t1
-                    JOIN tbl_employees t2 ON t1.employee_id = t2.employee_id
-                    WHERE t1.employee_id = ?");
-                $stmt_email->execute([$target_user_id]);
-                $emp_data = $stmt_email->fetch(PDO::FETCH_ASSOC);
-                
-                if ($emp_data && !empty($emp_data['email'])) {
-                    $recipient_email_string = $emp_data['email'];
-                    $recipient_name = $emp_data['firstname'];
-                }
-            } 
-            // B. ADMIN LOGIC 
-            elseif ($target_role == 'Admin') {
-                // Fetch emails of all users designated as admin (usertype 0 or 1)
-                $stmt_emails = $pdo->query("SELECT GROUP_CONCAT(email) FROM tbl_users WHERE usertype IN (0, 1) AND email IS NOT NULL AND email != ''");
-                $recipient_email_string = $stmt_emails->fetchColumn(); 
-                $recipient_name = 'Administrator';
-            }
+            $recipient_emails = [];
             
-            // SEND EMAIL
-            if ($recipient_email_string) {
-                $subject = "LOPISv2 ALERT: {$type} Notification Received";
+            // 1. Target Specific Employee (by Employee ID)
+            if (!empty($target_user_id)) {
+                $stmt_email = $pdo->prepare("
+                    SELECT t1.email 
+                    FROM tbl_users t1
+                    WHERE t1.employee_id = ? AND t1.status = 1
+                ");
+                $stmt_email->execute([$target_user_id]);
+                $user_email = $stmt_email->fetchColumn();
+                if ($user_email) $recipient_emails[] = $user_email;
+            } 
+            // 2. Target Role (Broadcast)
+            elseif ($target_role === 0 || $target_role === 1) {
+                // Get all active users of that role
+                $stmt_admins = $pdo->prepare("SELECT email FROM tbl_users WHERE usertype = ? AND status = 1");
+                $stmt_admins->execute([$target_role]);
+                $recipient_emails = $stmt_admins->fetchAll(PDO::FETCH_COLUMN);
+            }
+
+            // Execute Send
+            if (!empty($recipient_emails)) {
+                // Send individually to ensure privacy (BCC effect) or loop through them
+                // For simple notifications, comma-separated string in 'To' field works if list is small,
+                // but looping is safer for PHPMailer to handle 'To' addresses correctly without exposing everyone.
                 
-                $html_body = "Hello {$recipient_name},<br><br>"
-                             . "You have a new <strong>{$type}</strong> notification from {$sender_name}:<br>"
-                             . "<strong>{$message}</strong><br><br>"
-                             . "Please log in to the portal to view details:<br>"
-                             . "<a href='http://lendell.ph/LOPISv2/{$link}'>View Notification</a>";
-                
-                // Plain text fallback
-                $text_body = strip_tags(str_replace('<br>', "\n", $html_body));
-                
-                // CRITICAL CHANGE: Use the robust PHPMailer function
-                $mail_status = send_email($pdo, $recipient_email_string, $subject, $text_body, $html_body);
-                
-                // Optional logging of mail_status:
-                if ($mail_status != 'sent') {
-                    error_log("Notification Email Status: {$mail_status} for {$recipient_email_string}");
+                $subject = "LOPISv2 Alert: {$type}";
+                $email_html = "
+                    <div style='font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;'>
+                        <h3 style='color: #4e73df;'>New Notification from {$sender_name}</h3>
+                        <p><strong>Type:</strong> {$type}</p>
+                        <p><strong>Message:</strong> {$message}</p>
+                        <hr>
+                        <p><a href='http://localhost/LOPISv2/{$link}' style='background-color: #4e73df; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;'>View Details</a></p>
+                        <p style='font-size: 12px; color: #888;'>This is an automated message. Please do not reply.</p>
+                    </div>
+                ";
+
+                foreach ($recipient_emails as $email) {
+                    // Call the helper which calls your email_handler.php
+                    send_email_alert($pdo, $email, $subject, $email_html);
                 }
             }
         }
@@ -153,26 +131,29 @@ function send_notification($pdo, $target_user_id, $target_role, $type, $message,
     }
 }
 
-/**
- * Fetches unread notifications for the current user/role.
- */
-function get_my_notifications($pdo, $my_role, $limit = 5, $target_id_override = null) {
+// --------------------------------------------------------------------------
+// --- 2. FETCH NOTIFICATIONS (Global) ---
+// --------------------------------------------------------------------------
+function get_my_notifications($pdo, $my_role, $limit = 5, $target_id = null) {
     try {
-        $my_id = $target_id_override ?? ($_SESSION['user_id'] ?? 0);
+        // Use passed target_id (Employee ID) or fallback to session
+        $search_id = $target_id ?? ($_SESSION['employee_id'] ?? 0);
+
+        if (empty($search_id) && $my_role == 2) return [];
 
         $sql = "SELECT * FROM tbl_notifications 
                 WHERE is_read = 0 
                 AND (
-                    (target_role = 'Admin' AND (:my_role_param IN ('Admin', 'Super Admin'))) 
+                    (target_user_id = :search_id) 
                     OR 
-                    (target_role = 'Employee' AND target_user_id = :my_id)
+                    (target_role = :my_role)
                 )
                 ORDER BY created_at DESC 
                 LIMIT :limit";
 
         $stmt = $pdo->prepare($sql);
-        $stmt->bindValue(':my_id', $my_id);
-        $stmt->bindValue(':my_role_param', $my_role);
+        $stmt->bindValue(':search_id', $search_id);
+        $stmt->bindValue(':my_role', $my_role, PDO::PARAM_INT);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
         
@@ -184,25 +165,41 @@ function get_my_notifications($pdo, $my_role, $limit = 5, $target_id_override = 
     }
 }
 
-/**
- * Marks one or all notifications as read for the current user/role.
- */
-function mark_notification_read($pdo, $id = null, $user_id = null, $user_role = null) {
+// --------------------------------------------------------------------------
+// --- 3. TIME HELPER ---
+// --------------------------------------------------------------------------
+function time_elapsed_string($datetime, $full = false) {
+    date_default_timezone_set('Asia/Manila');
+    $now = new DateTime;
+    $ago = new DateTime($datetime);
+    $diff = $now->diff($ago);
+
+    $diff->w = floor($diff->d / 7);
+    $diff->d -= $diff->w * 7;
+
+    $string = array('y' => 'year', 'm' => 'month', 'w' => 'week', 'd' => 'day', 'h' => 'hour', 'i' => 'minute', 's' => 'second');
+    foreach ($string as $k => &$v) {
+        if ($diff->$k) {
+            $v = $diff->$k . ' ' . $v . ($diff->$k > 1 ? 's' : '');
+        } else {
+            unset($string[$k]);
+        }
+    }
+
+    if (!$full) $string = array_slice($string, 0, 1);
+    return $string ? implode(', ', $string) . ' ago' : 'just now';
+}
+
+// --------------------------------------------------------------------------
+// --- 4. MARK READ ---
+// --------------------------------------------------------------------------
+function mark_notification_read($pdo, $id = null, $user_role = null) {
     try {
-        if ($id === 'all') {
-            if ($user_role === 'Admin' || $user_role === 'Super Admin') {
-                $sql = "UPDATE tbl_notifications SET is_read = 1 WHERE is_read = 0 AND target_role = :role";
-                $stmt = $pdo->prepare($sql);
-                $stmt->bindValue(':role', 'Admin');
-            } elseif ($user_role === 'Employee' && $user_id !== null) {
-                $sql = "UPDATE tbl_notifications SET is_read = 1 WHERE is_read = 0 AND target_user_id = :user_id";
-                $stmt = $pdo->prepare($sql);
-                $stmt->bindValue(':user_id', $user_id);
-            } else {
-                return false;
-            }
+        if ($id === 'all' && $user_role !== null) {
+            $sql = "UPDATE tbl_notifications SET is_read = 1 WHERE is_read = 0 AND target_role = :role";
+            $stmt = $pdo->prepare($sql);
+            $stmt->bindValue(':role', $user_role, PDO::PARAM_INT);
             return $stmt->execute();
-            
         } else {
             $sql = "UPDATE tbl_notifications SET is_read = 1 WHERE id = :id";
             $stmt = $pdo->prepare($sql);
@@ -210,42 +207,7 @@ function mark_notification_read($pdo, $id = null, $user_id = null, $user_role = 
             return $stmt->execute();
         }
     } catch (PDOException $e) {
-        error_log("Notification Mark Read Error: " . $e->getMessage());
         return false;
     }
-}
-
-
-// --------------------------------------------------------------------------
-// --- 3. TIME HELPER ---
-// --------------------------------------------------------------------------
-
-/**
- * Converts a datetime string to a human-readable "time ago" string.
- */
-function time_elapsed_string($datetime, $full = false) {
-    $now = new DateTime;
-    $ago = new DateTime($datetime);
-    $diff = $now->diff($ago);
-
-    $weeks = floor($diff->d / 7);
-    $days = $diff->d - ($weeks * 7);
-
-    $string = array('y' => 'year', 'm' => 'month', 'w' => $weeks, 'd' => $days, 'h' => 'hour', 'i' => 'minute', 's' => 'second');
-    $labels = array('y' => 'year', 'm' => 'month', 'w' => 'week', 'd' => 'day', 'h' => 'hour', 'i' => 'minute', 's' => 'second');
-    
-    $result = array();
-    foreach ($string as $k => $v) {
-        if (in_array($k, ['w', 'd']) || $diff->$k) {
-            $label = $labels[$k];
-            $count = in_array($k, ['w', 'd']) ? $v : $diff->$k;
-            if ($count > 0) {
-                $result[] = $count . ' ' . $label . ($count > 1 ? 's' : '');
-            }
-        }
-    }
-
-    if (!$full) $result = array_slice($result, 0, 1);
-    return $result ? implode(', ', $result) . ' ago' : 'just now';
 }
 ?>

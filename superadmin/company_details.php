@@ -3,9 +3,9 @@
 $page_title = 'Company Settings - LOPISv2';
 $current_page = 'company_details';
 
-require 'template/header.php';
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php';
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -91,5 +91,5 @@ require 'template/topbar.php';
 
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/company_details_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/superadmin_company_settings.js"></script>

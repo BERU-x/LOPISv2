@@ -2,9 +2,9 @@
 // file_overtime.php
 $page_title = 'File Overtime';
 $current_page = 'file_overtime'; 
-require 'template/header.php'; 
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php'; 
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -57,6 +57,7 @@ require 'template/topbar.php';
                     <thead class="bg-light text-uppercase text-label text-xs font-weight-bold">
                         <tr>
                             <th class="border-0">Date</th>
+                            <th class="border-0 text-center">Hours Requested</th>
                             <th class="border-0 text-center">Status</th>
                             <th class="border-0 text-center" style="width: 150px;">Action</th>
                         </tr>
@@ -68,5 +69,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/overtime_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/user_overtime.js"></script>

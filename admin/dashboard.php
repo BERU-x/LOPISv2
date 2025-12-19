@@ -3,9 +3,9 @@
 $page_title = 'Dashboard - LOPISv2';
 $current_page = 'dashboard';
 
-require 'template/header.php';
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php';
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -161,5 +161,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/dashboard_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/admin_dashboard.js"></script>

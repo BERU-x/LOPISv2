@@ -1,53 +1,53 @@
 <?php
 // superadmin/dashboard.php
+session_start();
+
+// --- SECURITY GATE: SUPER ADMIN ONLY (Role 0) ---
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || $_SESSION['usertype'] != 0) {
+    header("Location: ../index.php");
+    exit;
+}
+
 $page_title = 'Super Admin Dashboard - LOPISv2';
 $current_page = 'dashboard';
 
-require 'template/header.php';
-require 'template/sidebar.php';
-require 'template/topbar.php';
+// --- INCLUDE GLOBAL TEMPLATES ---
+require_once '../template/header.php';
+require_once '../template/sidebar.php';
+require_once '../template/topbar.php';
 ?>
+
 <style>
 /* Custom CSS for the dynamically generated Chart.js Legend */
-
-/* Target the container you created in the HTML (e.g., #role-chart-legend) */
 #role-chart-legend {
-    /* Center the block element */
     text-align: center; 
 }
-
-/* Style the <ul> element that Chart.js generates */
 #role-chart-legend ul {
-    /* Remove default list styling */
     list-style: none;
     padding: 0;
     margin: 0;
-    /* Display horizontally and center */
     display: flex;
     justify-content: center;
-    flex-wrap: wrap; /* Allows wrap if necessary */
+    flex-wrap: wrap; 
 }
-
-/* Style each list item (<li>) */
 #role-chart-legend li {
-    cursor: default; /* Items are informational, not interactive */
-    display: inline-flex; /* Use inline-flex for vertical alignment */
+    cursor: default; 
+    display: inline-flex; 
     align-items: center;
     margin: 0 10px;
     font-size: 0.8rem;
     color: #858796;
-    margin-top: 5px; /* Add vertical spacing */
+    margin-top: 5px; 
 }
-
-/* Style the color box (<span>) that Chart.js generates */
 #role-chart-legend span {
     display: inline-block;
-    width: 12px; /* Set desired size for the color circle */
+    width: 12px; 
     height: 12px;
     border-radius: 50%;
     margin-right: 6px;
 }
 </style>
+
 <div class="container-fluid">
     
     <div class="welcome-banner shadow mb-4">
@@ -68,7 +68,7 @@ require 'template/topbar.php';
                         <div class="icon-box bg-soft-teal me-3"><i class="fa-solid fa-user-shield"></i></div>
                         <div>
                             <div class="text-label text-uppercase text-xs font-weight-bold text-gray-600">System Admins</div>
-                            <div class="text-value h5 mb-0 font-weight-bold text-gray-800" id="val-total-admins"></div>
+                            <div class="text-value h5 mb-0 font-weight-bold text-gray-800" id="val-total-admins">...</div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -85,8 +85,7 @@ require 'template/topbar.php';
                         <div class="icon-box bg-soft-teal me-3"><i class="fa-solid fa-users"></i></div>
                         <div>
                             <div class="text-label text-uppercase text-xs font-weight-bold text-gray-600">Total Employees</div>
-                            <div class="text-value h5 mb-0 font-weight-bold text-gray-800" id="val-total-employees">
-                            </div>
+                            <div class="text-value h5 mb-0 font-weight-bold text-gray-800" id="val-total-employees">...</div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -103,8 +102,7 @@ require 'template/topbar.php';
                         <div class="icon-box bg-soft-teal me-3"><i class="fa-solid fa-user-clock"></i></div>
                         <div>
                             <div class="text-label text-uppercase text-xs font-weight-bold text-gray-600">Pending Approvals</div>
-                            <div class="text-value h5 mb-0 font-weight-bold text-gray-800" id="val-pending-users">
-                            </div>
+                            <div class="text-value h5 mb-0 font-weight-bold text-gray-800" id="val-pending-users">...</div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -121,8 +119,7 @@ require 'template/topbar.php';
                         <div class="icon-box bg-soft-teal me-3"><i class="fa-solid fa-chart-line"></i></div>
                         <div>
                             <div class="text-label text-uppercase text-xs font-weight-bold text-gray-600">Active Today</div>
-                            <div class="text-value h5 mb-0 font-weight-bold text-gray-800" id="val-active-today">
-                            </div>
+                            <div class="text-value h5 mb-0 font-weight-bold text-gray-800" id="val-active-today">...</div>
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
@@ -196,6 +193,8 @@ require 'template/topbar.php';
 </div>
 
 <?php 
-require 'template/footer.php';
-require 'scripts/dashboard_scripts.php'; 
+// --- INCLUDE FOOTER ---
+require_once '../template/footer.php'; 
 ?>
+
+<script src="../assets/js/pages/superadmin_dashboard.js"></script>

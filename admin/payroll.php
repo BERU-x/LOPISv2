@@ -3,9 +3,9 @@
 $page_title = 'Payroll Processing';
 $current_page = 'payroll'; 
 
-require 'template/header.php'; 
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php'; 
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -182,5 +182,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/payroll_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/admin_payroll_management.js"></script>

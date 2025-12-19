@@ -3,9 +3,9 @@
 $page_title = 'Today\'s Attendance';
 $current_page = 'today_attendance'; 
 
-require 'template/header.php'; 
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php'; 
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -102,5 +102,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/today_attendance_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/admin_attendance_live.js"></script>

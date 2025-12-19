@@ -3,9 +3,9 @@
 $page_title = 'Manage Holidays';
 $current_page = 'holidays'; 
 
-require 'template/header.php'; 
-require 'template/sidebar.php';
-require 'template/topbar.php';
+require '../template/header.php'; 
+require '../template/sidebar.php';
+require '../template/topbar.php';
 ?>
 
 <div class="container-fluid">
@@ -91,5 +91,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/holiday_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/admin_holiday_management.js"></script>

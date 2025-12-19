@@ -8,32 +8,28 @@ error_reporting(E_ALL);
 
 session_start();
 
-// --- DATABASE CONNECTION & EMAIL HANDLER ---
-// Path is relative to process/forgot_password.php
-require __DIR__ .'/../db_connection.php'; 
-// Include the centralized email file (assuming it's one level up)
-require __DIR__ .'/../email_handler.php'; 
+// --- 1. DATABASE, EMAIL, & AUDIT SETUP ---
+require_once __DIR__ . '/../db_connection.php'; 
+require_once __DIR__ . '/../helpers/email_handler.php'; 
+require_once __DIR__ . '/../helpers/audit_helper.php'; 
 
-// --- DYNAMIC TIMEZONE FETCH ---
+// --- 2. TIMEZONE ---
 try {
-    global $pdo; // Ensure $pdo is visible if accessed outside the main block
     $stmt_tz = $pdo->query("SELECT system_timezone FROM tbl_general_settings WHERE id = 1");
     $timezone = $stmt_tz->fetchColumn() ?? 'Asia/Manila';
     date_default_timezone_set($timezone); 
 } catch (PDOException $e) {
     date_default_timezone_set('Asia/Manila');
 }
-// -----------------------------
 
-// If the user is already logged in, redirect them away
+// Redirect if logged in
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true) {
     header("Location: ../index.php"); 
     exit;
 }
 
-
 // =================================================================================
-// AJAX SUBMISSION HANDLER
+// AJAX HANDLER
 // =================================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -47,32 +43,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
-        // 1. DETERMINE LOGIN FIELD
+        // 1. DETERMINE ID TYPE
         $login_field_db = (preg_match('/^[0-9]{3}$/', $login_id)) ? 'employee_id' : 'email';
 
-        // 2. FETCH USER DATA & EMAIL
+        // 2. FETCH USER
         $sql = "SELECT id, usertype, email, status FROM tbl_users WHERE {$login_field_db} = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$login_id]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // --- Handle user not found/inactive (Log the attempt, but return generic message) ---
-        if (!$user || $user['status'] != 1) {
+        // --- EXPLICIT CHECK: USER DOES NOT EXIST ---
+        if (!$user) {
+            // Audit Log for security monitoring
+            logAudit($pdo, null, null, 'RESET_FAILED_UNKNOWN', "Reset attempted for non-existent ID: " . $login_id);
             
-            // Log the failed request attempt (Anonymous User)
-            $log_details = "Failed reset request attempt for ID/Email: " . $login_id;
-            $pdo->prepare("INSERT INTO tbl_audit_logs (user_id, usertype, action, details, ip_address, user_agent) VALUES (?, ?, 'PASSWORD_RESET', ?, ?, ?)")
-                ->execute([
-                    null, 
-                    null, // user_id and usertype are NULL since the user is not authenticated/valid
-                    $log_details, 
-                    $_SERVER['REMOTE_ADDR'], 
-                    $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
-                ]);
+            http_response_code(404); // Not Found
+            echo json_encode([
+                'status' => 'error', 
+                'message' => 'We could not find an account with that Email or Employee ID.'
+            ]);
+            exit;
+        }
+
+        // --- EXPLICIT CHECK: ACCOUNT INACTIVE ---
+        if ($user['status'] != 1) {
+            logAudit($pdo, $user['id'], $user['usertype'], 'RESET_FAILED_INACTIVE', "Reset attempted on inactive account.");
             
-            // SECURITY NOTE: Return a generic success message to prevent user enumeration.
-            http_response_code(200); 
-            echo json_encode(['status' => 'success', 'message' => 'If an account matching the provided information was found, a password reset link has been sent.']);
+            http_response_code(403); // Forbidden
+            echo json_encode([
+                'status' => 'error', 
+                'message' => 'This account is currently inactive. Please contact HR or IT Support.'
+            ]);
             exit;
         }
 
@@ -80,148 +81,129 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user_usertype = $user['usertype'];
         $user_email = $user['email'];
 
-        // 3. GENERATE & STORE RESET TOKEN (Valid for 1 hour)
-        $token = bin2hex(random_bytes(32)); 
-        $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
+        // 3. GENERATE 6-DIGIT CODE (OTP)
+        $reset_code = sprintf("%06d", random_int(0, 999999)); 
+        $expires_at = date('Y-m-d H:i:s', strtotime('+15 minutes')); 
 
+        // Clean old codes
         $pdo->prepare("DELETE FROM tbl_password_resets WHERE user_id = ?")->execute([$user_id]);
 
+        // Store Code
         $stmt_insert = $pdo->prepare("INSERT INTO tbl_password_resets (user_id, token, expires_at) VALUES (?, ?, ?)");
-        $stmt_insert->execute([$user_id, $token, $expires_at]);
+        $stmt_insert->execute([$user_id, $reset_code, $expires_at]);
 
-        // 4. CONSTRUCT EMAIL CONTENT
-        $reset_link = "http://localhost/LOPISv2/process/reset_password.php?token={$token}";
-        $subject = "Password Reset Request";
-        $body = "You have requested a password reset for your account. Click the link below to reset your password. This link will expire in 1 hour: \n\n" . $reset_link;
+        // 4. CONSTRUCT EMAIL
+        $subject = "Password Reset Code - LOPISv2";
+        $body = "
+            <h3>Password Reset Request</h3>
+            <p>You requested to reset your password. Use the code below to proceed:</p>
+            <h1 style='background-color: #f3f3f3; padding: 10px; display: inline-block; letter-spacing: 5px; font-family: monospace;'>{$reset_code}</h1>
+            <p>This code will expire in 15 minutes.</p>
+            <p>If you did not request this, please ignore this email.</p>
+        ";
         
-        // 5. SEND EMAIL and get status
-        $email_status = send_email($pdo, $user_email, $subject, $body);
+        // 5. SEND EMAIL
+        $email_status = send_email($pdo, $user_email, $subject, $body, $body);
 
-        // 6. Set message based on email status AND LOG TO PENDING TABLE IF NECESSARY
+        // 6. PROCESS RESULT
+        $pending_action = false;
         if ($email_status === 'sent') {
-            $message = "A password reset link has been successfully sent to your email.";
-            $log_message = "Password reset token generated and email SENT to " . $user_email;
-            $pending_action = false;
+            $message = "A verification code has been sent to " . $user_email; // Helpful to show part of email
+            $action_label = 'RESET_CODE_SENT';
+            $log_detail = "OTP sent to " . $user_email;
         } elseif ($email_status === 'disabled') {
-            $message = "The password reset process has been queued, but email notifications are currently disabled by the system administrator. Please contact IT support for assistance.";
-            $log_message = "Password reset token generated. Email SKIPPED (notifications disabled) for " . $user_email;
+            $message = "User found, but email notifications are disabled. Contact Admin.";
+            $action_label = 'RESET_CODE_QUEUED';
+            $log_detail = "OTP Skipped (Disabled) for " . $user_email;
             $pending_action = true;
-        } else { // 'failed'
-            $message = "The password reset process has been queued, but the system encountered an error while sending the email. Please contact IT support.";
-            $log_message = "Password reset token generated. Email FAILED to send to " . $user_email;
+        } else {
+            $message = "User found, but the system failed to send the email. Contact IT.";
+            $action_label = 'RESET_CODE_ERROR';
+            $log_detail = "OTP SMTP Failure for " . $user_email;
             $pending_action = true;
         }
 
-        // --- LOGGING TO PENDING TABLE (for manual retry) ---
+        // Pending Log
         if ($pending_action) {
-            // Insert into the new pending table
             $pdo->prepare("INSERT INTO tbl_pending_emails (user_id, token, reason) VALUES (?, ?, ?)")
-                ->execute([$user_id, $token, strtoupper($email_status)]);
+                ->execute([$user_id, $reset_code, strtoupper($email_status)]);
         }
-        // --- END LOGGING TO PENDING TABLE ---
         
-        // 7. LOG THE SUCCESSFUL TOKEN GENERATION AND DELIVERY STATUS (Valid User)
-        $pdo->prepare("INSERT INTO tbl_audit_logs (user_id, usertype, action, details, ip_address, user_agent) VALUES (?, ?, 'PASSWORD_RESET', ?, ?, ?)")
-            ->execute([
-                $user_id, 
-                $user_usertype, 
-                $log_message, 
-                $_SERVER['REMOTE_ADDR'], 
-                $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'
-            ]);
+        // Audit Log
+        logAudit($pdo, $user_id, $user_usertype, $action_label, $log_detail);
 
-        // Final response is always 'success' (for security) with a tailored message
         http_response_code(200);
-        echo json_encode(['status' => 'success', 'message' => $message]);
+        echo json_encode(['status' => 'success', 'message' => $message, 'redirect' => 'process/verify_code.php']);
 
     } catch (PDOException $e) {
         http_response_code(500);
-        error_log('Database error during forgot password: ' . $e->getMessage()); 
-        echo json_encode(['status' => 'error', 'message' => 'A server error occurred. Please try again.']);
+        error_log('Forgot Password Error: ' . $e->getMessage()); 
+        echo json_encode(['status' => 'error', 'message' => 'Server error occurred.']);
     }
     exit;
 }
-// =================================================================================
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password</title>
+    <title>Forgot Password | LOPISv2</title>
     <link rel="icon" href="../assets/images/favicon.ico" type="image/ico">
     <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet"> 
-    <link rel="stylesheet" href="../assets/vendor/fa6/css/all.min.css" />  
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">   
+    <link rel="stylesheet" href="../assets/vendor/fa6/css/all.min.css" />   
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">   
     <link rel="stylesheet" href="../assets/css/login_styles.css">
-    <style>
-        body { background-color: #f0f2f5; }
-        .card { max-width: 450px; }
-    </style>
 </head>
-<body>
+<body class="bg-light">
 
     <div class="container vh-100 d-flex justify-content-center align-items-center">
-        <div class="card shadow-lg border-0">
+        <div class="card shadow-lg border-0" style="max-width: 450px; width: 100%;">
             <div class="card-body p-5">
                 
                 <div class="text-center mb-4">
-                    <img src="../assets/images/LOPISv2.png" alt="LOPISv2 Logo" class="img-fluid mb-3" style="max-height: 150px;">
-                    <h5 class="text-dark fw-bold">Reset Your Password</h5>
-                    <p class="text-muted small">Enter your Employee ID or Email address below to receive a password reset link.</p>
+                    <img src="../assets/images/LOPISv2.png" alt="Logo" class="img-fluid mb-3" style="max-height: 100px;">
+                    <h5 class="fw-bold text-dark">Password Recovery</h5>
+                    <p class="text-muted small">Enter your Employee ID or Email to receive a verification code.</p>
                 </div>
 
                 <form id="forgot-password-form">
-                    
                     <div class="mb-4">
                         <div class="input-group">
-                            <span class="input-group-text"><i class="fas fa-user-circle"></i></span>
+                            <span class="input-group-text bg-white"><i class="fas fa-user-circle text-secondary"></i></span>
                             <input type="text" class="form-control" id="login_id" name="login_id" placeholder="Employee ID or Email" required>
                         </div>
                     </div>
 
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary btn-lg" id="btn-submit">
-                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                            <i class="fa fa-envelope me-2"></i>
-                            Send Reset Link
+                            <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                            <i class="fa fa-paper-plane me-2"></i>Send Code
                         </button>
-                        <a href="../index.php" class="btn btn-link text-secondary">Back to Login</a>
+                        <a href="../index.php" class="btn btn-link text-decoration-none text-secondary small">Back to Login</a>
                     </div>
-
                 </form>
             </div>
         </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="../assets/vendor/bs5/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script>
         $(document).ready(function() {
-            // --- DEFINE TOAST MIXIN ---
-            const Toast = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 4000, 
-                timerProgressBar: true
-            });
-
-            // --- FORM SUBMISSION ---
-            $('#forgot-password-form').submit(function(e) {
+            $('#forgot-password-form').on('submit', function(e) {
                 e.preventDefault(); 
 
-                var formData = $(this).serialize();
-                var submitButton = $('#btn-submit');
-                var spinner = submitButton.find('.spinner-border');
-                var icon = submitButton.find('.fa-envelope');
+                const submitButton = $('#btn-submit');
+                const spinner = submitButton.find('.spinner-border');
+                const icon = submitButton.find('.fa-paper-plane');
+                const loginId = $('#login_id').val(); 
 
                 $.ajax({
                     type: 'POST',
-                    url: 'forgot_password.php', // Submit to the same file
-                    data: formData,
+                    url: 'forgot_password.php',
+                    data: $(this).serialize(),
                     dataType: 'json',
                     beforeSend: function() {
                         submitButton.prop('disabled', true);
@@ -232,34 +214,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (response.status === 'success') {
                             Swal.fire({
                                 icon: 'success',
-                                title: 'Request Processed',
+                                title: 'Code Sent',
                                 text: response.message,
-                                confirmButtonText: 'OK'
-                            });
-                        } else {
-                            // Only trigger toast for specific internal errors
-                            Toast.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: response.message
+                                confirmButtonColor: '#0d6efd'
+                            }).then(() => {
+                                if(response.redirect) {
+                                    sessionStorage.setItem('reset_email', loginId);
+                                    window.location.href = response.redirect;
+                                }
                             });
                         }
                     },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        let errorMessage = 'A network error occurred. Please try again later.';
-                        if (jqXHR.responseJSON && jqXHR.responseJSON.message) {
-                            errorMessage = jqXHR.responseJSON.message;
-                        } else if (jqXHR.status == 500) {
-                            errorMessage = 'Internal Server Error. Check server logs.';
+                    error: function(xhr) {
+                        let msg = 'An unexpected error occurred.';
+                        
+                        // Capture specific error messages (404 Not Found, 403 Forbidden)
+                        if(xhr.responseJSON && xhr.responseJSON.message) {
+                            msg = xhr.responseJSON.message;
                         }
 
-                        Toast.fire({
-                            icon: 'error',
-                            title: 'Failed',
-                            text: errorMessage
+                        Swal.fire({ 
+                            icon: 'error', 
+                            title: 'Failed', 
+                            text: msg 
                         });
-                    },
-                    complete: function() {
+                        
                         submitButton.prop('disabled', false);
                         spinner.addClass('d-none');
                         icon.removeClass('d-none');

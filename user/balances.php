@@ -3,9 +3,9 @@
 $page_title = 'Financial Balances';
 $current_page = 'balances'; 
 
-require 'template/header.php'; 
-require 'template/sidebar.php';
-require 'template/topbar.php'; 
+require '../template/header.php'; 
+require '../template/sidebar.php';
+require '../template/topbar.php'; 
 ?>
 
 <div class="container-fluid">
@@ -158,5 +158,5 @@ require 'template/topbar.php';
     </div>
 </div>
 
-<?php require 'template/footer.php'; ?>
-<?php require 'scripts/balance_scripts.php'; ?>
+<?php require '../template/footer.php'; ?>
+<script src="../assets/js/pages/user_financials.js"></script>
