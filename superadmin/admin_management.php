@@ -42,37 +42,88 @@ require '../template/topbar.php';
 
 </div>
 
-<div class="modal fade" id="adminModal" tabindex="-1" data-bs-backdrop="static">
+<!-- Add Admin Modal -->
+<div class="modal fade" id="addAdminModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="adminForm">
+            <form id="addAdminForm">  <!-- Separate form ID -->
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold" id="modalTitle">Add New Admin</h5>
+                    <h5 class="modal-title fw-bold" id="addAdminModalTitle">Add New Admin</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" id="admin_id" name="id">
-                    
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Employee ID</label>
-                        <input type="text" class="form-control" id="employee_id" name="employee_id" required placeholder="e.g. 101">
+                        <select class="form-select" id="add_employee_id" name="employee_id" required>
+                            <option value="">Select Employee</option>
+                        </select>
                         <small class="text-muted">Must match an existing Employee ID.</small>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Email Address</label>
-                        <input type="email" class="form-control" id="email" name="email" required placeholder="admin@example.com">
+                        <input type="email" class="form-control" id="add_email" name="email" required
+                            placeholder="admin@example.com">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" placeholder="Leave blank to keep current password">
-                        <small class="text-muted d-none" id="password_hint">Only fill this if you want to change the password.</small>
+                        <input type="password" class="form-control" id="add_password" name="password" required
+                            placeholder="Enter password">
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold small">Status</label>
-                        <select class="form-select" id="status" name="status">
+                        <select class="form-select" id="add_status" name="status">
+                            <option value="1">Active</option>
+                            <option value="0">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-teal">Add Admin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Admin Modal -->
+<div class="modal fade" id="editAdminModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="editAdminForm">  <!-- Separate form ID -->
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="editAdminModalTitle">Edit Admin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit_admin_id" name="id">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Employee ID</label>
+                        <input type="text" class="form-control" id="edit_employee_id" name="employee_id" readonly>
+                        <small class="text-muted">Cannot be changed.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Email Address</label>
+                        <input type="email" class="form-control" id="edit_email" name="email" required
+                            placeholder="admin@example.com">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Password</label>
+                        <input type="password" class="form-control" id="edit_password" name="password"
+                            placeholder="Leave blank to keep current password">
+                        <small class="text-muted" id="password_hint">Only fill this if you want to change the
+                            password.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Status</label>
+                        <select class="form-select" id="edit_status" name="status">
                             <option value="1">Active</option>
                             <option value="0">Inactive</option>
                         </select>

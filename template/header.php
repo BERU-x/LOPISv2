@@ -1,33 +1,30 @@
 <?php
 // template/header.php
-// This Global Header handles session checks, asset loading, and data fetching for ALL user types.
+// Handles session checks, asset loading, and data fetching.
 
 // --- 1. START BUFFERING ---
-ob_start(); 
+if (ob_get_level() == 0) ob_start();
 
 // --- 2. SESSION & CHECKING ---
-// Adjust path: Assuming 'checking.php' is in the root directory (../checking.php from template/)
+// This handles Security, Auto-Login, Timezone, and Session Start
 require_once __DIR__ . '/../checking.php';
+require_once __DIR__ . '/../helpers/link_setup.php';
 
-// --- 3. TIMEZONE ---
-date_default_timezone_set('Asia/Manila');
-
-// --- 4. AUTHENTICATION CHECK ---
-// If checking.php didn't log them in, kick them out.
+// --- 3. AUTHENTICATION CHECK ---
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header("Location: ../index.php"); 
     exit;
 }
 
-// --- 5. GET USER DATA ---
-$user_id       = $_SESSION['user_id'] ?? 0;
-$user_type     = $_SESSION['usertype'] ?? 99; // 0=SA, 1=Admin, 2=Emp
-$employee_id   = $_SESSION['employee_id'] ?? null;
-$fullname      = $_SESSION['fullname'] ?? 'User';
-$email         = $_SESSION['email'] ?? '';
+// --- 4. GET USER DATA ---
+$user_id         = $_SESSION['user_id'] ?? 0;
+$user_type       = $_SESSION['usertype'] ?? 99; // 0=SA, 1=Admin, 2=Emp
+$employee_id     = $_SESSION['employee_id'] ?? null;
+$fullname        = $_SESSION['fullname'] ?? 'User';
+$email           = $_SESSION['email'] ?? '';
 $profile_picture = $_SESSION['profile_picture'] ?? 'default.png';
 
-// Define User Type Label for display
+// Define User Type Label
 $usertype_name = '';
 switch ($user_type) {
     case 0: $usertype_name = 'Super Admin'; break;
@@ -36,42 +33,36 @@ switch ($user_type) {
     default: $usertype_name = 'Guest'; break;
 }
 
-// --- 6. LOADER LOGIC ---
+// --- 5. LOADER LOGIC ---
 $show_loader = false; 
 if (isset($_SESSION['show_loader']) && $_SESSION['show_loader'] === true) {
     $show_loader = true;
     unset($_SESSION['show_loader']); 
-    session_write_close();
-    session_start();
 }
 
-// --- 7. NOTIFICATIONS (GLOBALIZED) ---
+// --- 6. NOTIFICATIONS ---
 $notifications = [];
 $notif_count = 0;
 
-// Path to the new Global App Model
-$global_model_path = __DIR__ . '/../app/models/global_app_model.php';
+// Path to the notification model
+$notif_model_path = __DIR__ . '/../app/models/notification_model.php';
 
-if (file_exists($global_model_path) && isset($pdo)) {
-    require_once $global_model_path;
+if (file_exists($notif_model_path) && isset($pdo)) {
+    require_once $notif_model_path;
     
     if (function_exists('get_my_notifications')) {
-        // Determine Target ID: Employees use EmployeeID, Admins use UserID (or null if role-based)
-        $target_id = ($user_type == 2) ? $employee_id : $user_id;
-
-        // Fetch using the Integer User Type (0, 1, 2)
-        $notifications = get_my_notifications($pdo, $user_type, 10, $target_id);
+        // Fetch notifications for current user/role
+        $notifications = get_my_notifications($pdo, $user_type, 10, $employee_id);
         
-        // Manual count of unread items
+        // Count unread
         foreach ($notifications as $n) {
             if ($n['is_read'] == 0) $notif_count++;
         }
     }
 }
 
-// --- 8. PAGE TITLE & BUFFER CLEAN ---
+// --- 7. PAGE TITLE DEFAULT ---
 $page_title ??= 'LOPISv2 Portal';
-ob_clean(); 
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -89,6 +80,7 @@ ob_clean();
     <link href="../assets/css/dataTables.min.css" rel="stylesheet"> 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Dropify/0.2.2/css/dropify.min.css">
+    
     <link href="../assets/css/portal_styles.css" rel="stylesheet">
     <link href="../assets/css/loader_styles.css" rel="stylesheet">
 </head>

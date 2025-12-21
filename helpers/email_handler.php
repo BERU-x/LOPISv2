@@ -12,6 +12,28 @@ use PHPMailer\PHPMailer\Exception;
 // NOTE: TEMPORARY EMAIL BYPASS FLAG HAS BEEN REMOVED FOR PRODUCTION READINESS.
 // =================================================================================
 
+/**
+ * Adds an email to the pending email queue.
+ *
+ * @param PDO $pdo Database connection object.
+ * @param int $user_id The ID of the user to send the email to.
+ * @param string $token A unique token associated with the email (e.g., for password reset, email verification).
+ * @param string $reason A short description of why the email is being sent (e.g., "password_reset", "email_verification").
+ * @return bool True on success, false on failure.
+ */
+function addPendingEmail(PDO $pdo, int $user_id, string $token, string $reason): bool
+{
+    $sql = "INSERT INTO tbl_pending_emails (user_id, token, reason) VALUES (?, ?, ?)";
+    try {
+        $stmt = $pdo->prepare($sql);
+        $result = $stmt->execute([$user_id, $token, $reason]);
+        return $result;
+    } catch (PDOException $e) {
+        error_log("PENDING EMAIL ERROR: Failed to add pending email: " . $e->getMessage());
+        return false;
+    }
+}
+
 
 /**
  * Sends a structured email using PHPMailer and dynamic database settings.
@@ -68,7 +90,7 @@ function send_email($pdo, $recipient_email, $subject, $body, $html_body = null) 
         // Server settings
         $mail->isSMTP();
         $mail->Host       = $settings['smtp_host'];
-        $mail->SMTPAuth   = true;
+        $mail->SMTPAuth   = false;
         $mail->Username   = $smtp_user; // Use the sanitized variable
         $mail->Password   = $settings['smtp_password'];
         $mail->Port       = $settings['smtp_port'];
@@ -97,7 +119,8 @@ function send_email($pdo, $recipient_email, $subject, $body, $html_body = null) 
         $mail->send();
         return 'sent'; // <-- Success
     } catch (Exception $e) {
-        error_log("EMAIL FAILED: Mailer Error to {$recipient_email}: {$mail->ErrorInfo}");
+        $error_message = $mail->ErrorInfo;  // Get the detailed error message
+        error_log("EMAIL FAILED: Mailer Error to {$recipient_email}: {$error_message}. PHPMailer Exception: " . $e->getMessage());
         return 'failed'; // <-- SMTP Failure
     }
 }

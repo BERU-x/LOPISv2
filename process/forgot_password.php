@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logAudit($pdo, $user_id, $user_usertype, $action_label, $log_detail);
 
         http_response_code(200);
-        echo json_encode(['status' => 'success', 'message' => $message, 'redirect' => 'process/verify_code.php']);
+        echo json_encode(['status' => 'success', 'message' => $message, 'redirect' => 'verify_code.php']);
 
     } catch (PDOException $e) {
         http_response_code(500);

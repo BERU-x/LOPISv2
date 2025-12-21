@@ -76,9 +76,11 @@ body {
 
 .form-control {
     border: 1px solid var(--border-light);
-    border-left: none;
+    /* border-left: none; */
     border-top-right-radius: 0.75rem; /* Match input group text curve */
+    border-top-left-radius: 0.75rem; /* Match input group text curve */
     border-bottom-right-radius: 0.75rem;
+    border-bottom-left-radius: 0.75rem;
     padding: 0.8rem 1rem;
     height: auto; /* Allow padding to control height */
     font-size: 1rem;

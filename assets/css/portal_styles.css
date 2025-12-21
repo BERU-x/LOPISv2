@@ -681,34 +681,82 @@ div.dataTables_wrapper div.dataTables_filter input:focus {
     background-color: #eaecf4 !important;
 }
 
-/* --- Animations --- */
+/* =========================================
+   ANIMATIONS & SYNC STATUS
+   ========================================= */
+
+/* 1. Red Pulse (Error) */
 @keyframes pulse-red {
-    0% {
-        box-shadow: 0 0 0 0 rgba(231, 74, 59, 0.7);
-    }
-    70% {
-        box-shadow: 0 0 0 6px rgba(231, 74, 59, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(231, 74, 59, 0);
-    }
+    0% { box-shadow: 0 0 0 0 rgba(231, 74, 59, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(231, 74, 59, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(231, 74, 59, 0); }
 }
 
-/* 1. Green Dot Pulse Animation */
-    @keyframes pulse-green {
-        0% { box-shadow: 0 0 0 0 rgba(28, 200, 138, 0.7); }
-        70% { box-shadow: 0 0 0 5px rgba(28, 200, 138, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(28, 200, 138, 0); }
-    }
-    .live-dot {
-        animation: pulse-green 2s infinite;
-        border-radius: 50%;
-    }
-    
-    /* 2. Smooth Spinner Transition */
-    #refresh-spinner {
-        transition: transform 0.3s ease-in-out, color 0.3s;
-    }
+/* 2. Green Pulse (Success/Live) */
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(28, 200, 138, 0.7); }
+    70% { box-shadow: 0 0 0 5px rgba(28, 200, 138, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(28, 200, 138, 0); }
+}
+
+/* 3. Yellow Pulse (Syncing/Loading) */
+@keyframes pulse-yellow {
+    0% { box-shadow: 0 0 0 0 rgba(246, 194, 62, 0.7); }
+    70% { box-shadow: 0 0 0 5px rgba(246, 194, 62, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(246, 194, 62, 0); }
+}
+
+/* --- Dynamic Dot Logic --- */
+.live-dot {
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* If the dot has text-success class (Live), pulse Green */
+.live-dot.text-success {
+    animation: pulse-green 2s infinite;
+}
+
+/* If the dot has text-warning class (Syncing), pulse Yellow (Faster) */
+.live-dot.text-warning {
+    animation: pulse-yellow 1.5s infinite;
+}
+
+/* If the dot has text-danger class (Error), pulse Red */
+.live-dot.text-danger {
+    animation: pulse-red 2s infinite;
+}
+
+/* --- Refresh Icon Transition --- */
+/* Works for both IDs depending on what you named it in HTML */
+#refreshIcon {
+    transition: transform 0.3s ease-in-out, color 0.3s;
+}
+
+/* When spinning, make it rotate smoothly */
+.fa-sync-alt {
+    animation: fa-spin 1s linear;
+}
+
+/* =========================================
+   TEXT ANIMATIONS
+   ========================================= */
+
+/* 1. Define the Fading Animation */
+@keyframes text-fade {
+    0% { opacity: 1; }       /* Fully visible */
+    50% { opacity: 0.4; }    /* Dimmed */
+    100% { opacity: 1; }     /* Fully visible */
+}
+
+/* 2. Apply it ONLY when syncing (Yellow text) */
+.sync-status-text.text-warning {
+    /* 1.5s = Speed (Change to 0.5s for fast, 3s for slow)
+       infinite = Loops forever
+       ease-in-out = Smooth transition
+    */
+    animation: text-fade 3s infinite ease-in-out;
+}
 
 .page-link {
     color: #0CC0DF !important;

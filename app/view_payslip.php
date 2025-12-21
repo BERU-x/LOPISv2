@@ -5,9 +5,9 @@
 $page_title = 'View Payslip';
 $current_page = 'payroll'; 
 
-require '../template/header.php'; 
-require '../template/sidebar.php'; 
-require '../template/topbar.php';
+require __DIR__ . '/../template/header.php'; 
+require __DIR__ . '/../template/sidebar.php'; 
+require __DIR__ . '/../template/topbar.php';
 
 // --- SESSION CHECK (Ensure variables exist) ---
 // Adjust 'user_type' and 'user_id' to match your actual $_SESSION key names
@@ -460,7 +460,7 @@ $readonly_attr = $is_editable ? '' : 'readonly';
     <div class="mb-5"></div>
 </div>
 
-<?php require '../template/footer.php'; ?>
+<?php require __DIR__ . '/../template/footer.php'; ?>
 
 <script>
 $(document).ready(function() {

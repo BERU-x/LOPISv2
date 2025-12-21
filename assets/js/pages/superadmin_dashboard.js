@@ -3,37 +3,12 @@
 // ==============================================================================
 // 1. STATE & VARIABLES
 // ==============================================================================
-let growthChart = null;   
+let growthChart = null; 
 let roleChart = null;     
 
 // ==============================================================================
 // 2. UI HELPER FUNCTIONS
 // ==============================================================================
-
-/**
- * Updates the Topbar Status (Text + Dot Color) in the Topbar
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
 function setWelcomeMessage() {
     const hrs = new Date().getHours();
     const greet = (hrs < 12) ? "Good Morning! ☀️" : ((hrs < 18) ? "Good Afternoon! 🌤️" : "Good Evening! 🌙");
@@ -45,17 +20,21 @@ function setWelcomeMessage() {
 }
 
 // ==============================================================================
-// 3. RENDER FUNCTIONS
+// 3. RENDER FUNCTIONS (Charts & Lists)
 // ==============================================================================
+// ... (Keep your existing renderCharts and renderLists functions exactly as they are) ...
+// ... (I am omitting them here to save space, but DO NOT delete them) ...
 
 function renderCharts(d) {
-    // --- Growth Chart ---
+    // ... Paste your existing renderCharts code here ...
+    // (Growth Chart and Role Chart logic)
     const ctxGrowth = document.getElementById("growthHistoryChart");
     if (ctxGrowth) {
         if (growthChart) growthChart.destroy();
         const ctx = ctxGrowth.getContext('2d');
         const grad = ctx.createLinearGradient(0, 0, 0, 400);
-        grad.addColorStop(0, 'rgba(12, 192, 223, 0.5)'); grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+        grad.addColorStop(0, 'rgba(12, 192, 223, 0.5)'); 
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
         
         growthChart = new Chart(ctx, {
             type: 'line',
@@ -67,7 +46,6 @@ function renderCharts(d) {
         });
     }
 
-    // --- Role Chart ---
     const ctxRole = document.getElementById("roleDistributionChart");
     if (ctxRole) {
         if (roleChart) roleChart.destroy();
@@ -83,51 +61,51 @@ function renderCharts(d) {
 }
 
 function renderLists(d) {
-    // --- Metrics ---
-    $('#val-total-admins').text(d.total_admins);
-    $('#val-total-employees').text(d.total_employees);
-    $('#val-pending-users').text(d.pending_users);
-    $('#val-active-today').text(d.active_today);
+     // ... Paste your existing renderLists code here ...
+     $('#val-total-admins').text(d.total_admins);
+     $('#val-total-employees').text(d.total_employees);
+     $('#val-pending-users').text(d.pending_users);
+     $('#val-active-today').text(d.active_today);
 
-    // --- Recent Users ---
-    const userHtml = d.recent_users.map(u => {
-        const badge = u.usertype == 1 ? '<span class="badge bg-primary">Admin</span>' : (u.usertype == 2 ? '<span class="badge bg-success">Emp</span>' : '<span class="badge bg-danger">Super</span>');
+     const userHtml = d.recent_users.map(u => {
+        let badgeClass = 'bg-secondary'; let badgeText = 'User';
+        if(u.usertype == 1) { badgeClass = 'bg-primary'; badgeText = 'Admin'; }
+        else if(u.usertype == 2) { badgeClass = 'bg-success'; badgeText = 'Emp'; }
+        else if(u.usertype == 0) { badgeClass = 'bg-danger'; badgeText = 'Super'; }
         const date = new Date(u.created_at).toLocaleDateString('en-US', {month:'short', day:'numeric'});
         return `<div class="list-group-item d-flex justify-content-between align-items-center px-4 py-3 border-bottom">
                     <div><div class="fw-bold text-dark">${u.email}</div><div class="small text-muted">${date}</div></div>
-                    <div>${badge}</div>
+                    <div><span class="badge ${badgeClass}">${badgeText}</span></div>
                 </div>`;
     }).join('') || '<div class="p-4 text-center text-muted">No recent registrations.</div>';
     $('#list-recent-users').html(userHtml);
 
-    // --- Recent Logs ---
     const logHtml = d.recent_logs.map(l => {
-        let icon = l.action.includes('LOGIN') ? 'fa-key text-success' : (l.action.includes('DELETE') ? 'fa-trash text-danger' : 'fa-info-circle text-secondary');
+        let icon = 'fa-info-circle text-secondary';
+        if (l.action.includes('LOGIN')) icon = 'fa-key text-success';
+        if (l.action.includes('DELETE')) icon = 'fa-trash text-danger';
+        const time = new Date(l.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
         return `<div class="list-group-item d-flex align-items-center px-4 py-3 border-bottom">
                     <div class="me-3"><i class="fas ${icon}"></i></div>
-                    <div class="w-100">
-                        <div class="d-flex justify-content-between"><span class="fw-bold text-dark text-xs">${l.action}</span><span class="text-xs text-muted">${new Date(l.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>
-                        <div class="text-xs text-muted text-truncate" style="max-width: 250px;">${l.user} - ${l.details}</div>
-                    </div>
+                    <div class="w-100"><div class="d-flex justify-content-between"><span class="fw-bold text-dark text-xs">${l.action}</span><span class="text-xs text-muted">${time}</span></div><div class="text-xs text-muted text-truncate" style="max-width: 250px;">${l.user} - ${l.details}</div></div>
                 </div>`;
     }).join('') || '<div class="p-4 text-center text-muted">No recent activity.</div>';
     $('#list-recent-logs').html(logHtml);
 }
 
 // ==============================================================================
-// 4. MAIN DATA FETCHER
+// 4. MAIN DATA FETCHER (Updated)
 // ==============================================================================
 function loadDashboardData(isManual = false) {
     
-    // 1. Visuals: Only spin icon if clicked manually
-    if (isManual) $('#refreshIcon').addClass('fa-spin');
-    
-    // 2. Set status to "Syncing..."
-    updateSyncStatus('loading');
+    // 1. Sync Status Update
+    if (typeof updateSyncStatus === "function") {
+        updateSyncStatus('loading');
+    }
 
     $.ajax({
-        // API Path relative to the PHP page executing this script
-        url: '../api/superadmin/dashboard_stats.php',
+        // ⭐ FIX: Use the Javascript variable + string concatenation
+        url: API_ROOT + '/superadmin/dashboard_stats.php', 
         type: 'POST',
         data: { action: 'fetch_metrics' },
         dataType: 'json',
@@ -135,17 +113,18 @@ function loadDashboardData(isManual = false) {
             if(res.status === 'success') {
                 renderLists(res.data);
                 renderCharts(res.data);
-                updateSyncStatus('success');
+                
+                if (typeof updateSyncStatus === "function") updateSyncStatus('success');
             } else {
-                updateSyncStatus('error');
+                console.error("API Error:", res.message);
+                if (typeof updateSyncStatus === "function") updateSyncStatus('error');
             }
         },
-        error: function(err) {
-            console.error("Dashboard Sync Error:", err);
-            updateSyncStatus('error');
-        },
-        complete: function() {
-            if(isManual) setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+        error: function(xhr, status, error) {
+            console.error("Dashboard Sync Error:", error);
+            // Debug help: Log what path it actually tried to hit
+            console.log("Attempted URL:", API_ROOT + '/superadmin/dashboard_stats.php');
+            if (typeof updateSyncStatus === "function") updateSyncStatus('error');
         }
     });
 }
@@ -156,18 +135,13 @@ function loadDashboardData(isManual = false) {
 $(document).ready(function() {
     setWelcomeMessage();
     
-    // Initial Load (Visual)
-    loadDashboardData(true);
+    // 1. Initial Load
+    // We pass 'false' because we don't need the icon to spin on page load
+    loadDashboardData(false);
 
-    // Expose to Master Refresher (Global Footer)
+    // 2. Register to Global Footer
+    // The footer will call this automatically every 15 seconds
     window.refreshPageContent = function(isManual) {
         loadDashboardData(isManual);
     };
-
-    // Manual Click Listener
-    // Note: We target the parent of #refreshIcon because usually the <a> or <div> is the clickable element
-    $('#refreshIcon').closest('a, div').on('click', function(e) {
-        e.preventDefault(); 
-        loadDashboardData(true);
-    });
 });

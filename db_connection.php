@@ -13,4 +13,6 @@ try {
 } catch(PDOException $e) {
     die("ERROR: Could not connect. " . $e->getMessage());
 }
+
+define('BASE_URL', 'http://localhost/LOPISv2/');
 ?>

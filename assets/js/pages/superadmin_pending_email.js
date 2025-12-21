@@ -1,53 +1,30 @@
 $(document).ready(function() {
 
     // ==========================================================================
-    // 1. UI HELPER: UPDATE SYNC STATUS (Topbar)
-    // ==========================================================================
-    function updateSyncStatus(state) {
-        const $dot = $('.live-dot');
-        const $text = $('#last-updated-time');
-        const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    
-        $dot.removeClass('text-success text-warning text-danger');
-    
-        if (state === 'loading') {
-            $text.text('Syncing...');
-            $dot.addClass('text-warning'); 
-        } 
-        else if (state === 'success') {
-            $text.text(`Synced: ${time}`);
-            $dot.addClass('text-success'); 
-        } 
-        else {
-            $text.text(`Failed: ${time}`);
-            $dot.addClass('text-danger');  
-        }
-    }
-
-    // ==========================================================================
-    // 2. INITIALIZE DATA TABLE
+    // 1. INITIALIZE DATA TABLE
     // ==========================================================================
     var pendingEmailTable = $('#pendingEmailTable').DataTable({
         "processing": true,
         "serverSide": false, 
         "ajax": {
-            "url": "../api/superadmin/pending_emails_action.php?action=fetch_pending",
+            url: API_ROOT + "/superadmin/pending_emails_action.php?action=fetch_pending",
             "type": "GET", 
             "dataSrc": "data",
-            // ⭐ HOOK: Update Sync Status on every request start/end
+            
+            // ⭐ HOOK: Use the GLOBAL updateSyncStatus (from footer.php)
             "beforeSend": function() {
-                updateSyncStatus('loading');
+                if (typeof updateSyncStatus === "function") updateSyncStatus('loading');
             },
             "complete": function(xhr, status) {
                 if (status === 'success') {
-                    updateSyncStatus('success');
+                    if (typeof updateSyncStatus === "function") updateSyncStatus('success');
                 } else {
-                    updateSyncStatus('error');
+                    if (typeof updateSyncStatus === "function") updateSyncStatus('error');
                 }
             },
             "error": function (xhr, error, code) {
                 console.error("DataTables Error: ", error);
-                updateSyncStatus('error');
+                if (typeof updateSyncStatus === "function") updateSyncStatus('error');
             }
         },
         "columns": [
@@ -97,24 +74,20 @@ $(document).ready(function() {
     });
 
     // ==========================================================================
-    // 3. MASTER REFRESHER HOOK
+    // 2. MASTER REFRESHER HOOK
     // ==========================================================================
+    // This function is called automatically by footer.php every 15 seconds
+    // or when the user clicks the refresh icon.
     window.refreshPageContent = function(isManual) {
-        if (isManual) {
-            $('#refreshIcon').addClass('fa-spin');
-        }
-
-        // We don't need to call updateSyncStatus here manually because
-        // pendingEmailTable.ajax.reload() triggers the 'beforeSend' hook above automatically.
-        pendingEmailTable.ajax.reload(function() {
-            if (isManual) {
-                $('#refreshIcon').removeClass('fa-spin');
-            }
-        }, false);
+        
+        // We simply reload the table. 
+        // The 'beforeSend' hook above handles the "Syncing..." text.
+        // The Footer handles the Spinning Icon.
+        pendingEmailTable.ajax.reload(null, false);
     };
 
     // ==========================================================================
-    // 4. RESEND BUTTON HANDLER
+    // 3. RESEND BUTTON HANDLER
     // ==========================================================================
     $('#pendingEmailTable tbody').on('click', '.btn-resend', function () {
         var button = $(this);
@@ -132,7 +105,7 @@ $(document).ready(function() {
         }).then((result) => {
             if (result.isConfirmed) {
                 // Manually trigger loading state for this specific action
-                updateSyncStatus('loading');
+                if (typeof updateSyncStatus === "function") updateSyncStatus('loading');
                 
                 $.ajax({
                     url: '../api/superadmin/pending_emails_action.php',
@@ -146,23 +119,23 @@ $(document).ready(function() {
                         if (response.status === 'success') {
                             Swal.fire('Sent!', response.message, 'success');
                             pendingEmailTable.ajax.reload(null, false); 
-                            updateSyncStatus('success');
+                            if (typeof updateSyncStatus === "function") updateSyncStatus('success');
                         } else if (response.status === 'info') {
                             Swal.fire('Check Settings', response.message, 'info');
                             pendingEmailTable.ajax.reload(null, false); 
-                            updateSyncStatus('success');
+                            if (typeof updateSyncStatus === "function") updateSyncStatus('success');
                         } else if (response.status === 'warning') {
                             Swal.fire('Expired', response.message, 'warning');
                             pendingEmailTable.ajax.reload(null, false); 
-                            updateSyncStatus('success');
+                            if (typeof updateSyncStatus === "function") updateSyncStatus('success');
                         } else {
                             Swal.fire('Failed', response.message, 'error');
-                            updateSyncStatus('error');
+                            if (typeof updateSyncStatus === "function") updateSyncStatus('error');
                         }
                     },
                     error: function() {
                         Swal.fire('Error', 'A network error occurred during resend.', 'error');
-                        updateSyncStatus('error');
+                        if (typeof updateSyncStatus === "function") updateSyncStatus('error');
                     },
                     complete: function() {
                         if(button.length) {

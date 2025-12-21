@@ -3,64 +3,49 @@
 header('Content-Type: application/json');
 session_start();
 
-// --- 1. PATH ADJUSTMENTS ---
-// We now point to the new GLOBAL APP MODEL location
-require_once __DIR__ . '/../app/models/global_app_model.php'; 
-require_once __DIR__ . '/../db_connection.php'; 
+// 1. DEPENDENCIES
+require_once __DIR__ . '/../db_connection.php';
+// We use the new model name we agreed upon
+require_once __DIR__ . '/../app/models/notification_model.php';
 
-// --- 2. AUTHENTICATION CHECK ---
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401); 
-    echo json_encode(['status' => 'error', 'message' => 'Authentication required.']);
+// 2. AUTHENTICATION CHECK
+// We check for 'logged_in' which checking.php sets to true
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
     exit;
 }
 
-$user_id = $_SESSION['user_id'];
-// Default to 99 (Guest) if not set, preventing errors
-$user_usertype = isset($_SESSION['usertype']) ? (int)$_SESSION['usertype'] : 99; 
-$action = $_REQUEST['action'] ?? '';
-
-// --- 3. ROLE MAPPING (INTEGERS) ---
-// The Global Model now expects Integers (0, 1, 2), not Strings ('Admin').
-// We pass the raw usertype directly because it matches our DB schema.
-// 0 = Superadmin, 1 = Admin, 2 = Employee
-$my_role = $user_usertype; 
+// 3. GET USER CONTEXT
+// We use the standard session variables set by checking.php
+$my_id   = $_SESSION['employee_id'] ?? 0;
+$my_role = $_SESSION['usertype'] ?? 2; // 0=SA, 1=Admin, 2=Emp
+$action  = $_REQUEST['action'] ?? '';
 
 try {
     // =========================================================
-    // ACTION 1: FETCH NOTIFICATIONS
+    // ACTION 1: FETCH NOTIFICATIONS (For Polling)
     // =========================================================
     if ($action === 'fetch') {
-
-        // Determine the target ID (Employee ID vs User ID)
-        $target_id_for_model = null;
-
-        // If user is an Employee (2), we MUST find their employee_id
-        if ($my_role === 2) {
-            if (isset($_SESSION['employee_id'])) {
-                $target_id_for_model = $_SESSION['employee_id'];
-            } else {
-                // Fallback DB lookup if session is missing it
-                $stmt = $pdo->prepare("SELECT employee_id FROM tbl_users WHERE id = ?");
-                $stmt->execute([$user_id]);
-                $target_id_for_model = $stmt->fetchColumn();
-            }
-        } 
-        // If Admin/Superadmin, we generally don't filter by target_user_id unless they have one
-        else {
-             $target_id_for_model = $_SESSION['employee_id'] ?? null;
-        }
-
-        // Call Model Function
-        $notifications = get_my_notifications($pdo, $my_role, 10, $target_id_for_model);
         
-        // Count Unread
-        $unread_count = 0;
-        foreach ($notifications as $notif) {
-            if ($notif['is_read'] == 0) {
-                $unread_count++;
-            }
+        // A. Fetch the actual list (Limit 10 for dropdown)
+        $notifications = [];
+        if (function_exists('get_my_notifications')) {
+            $notifications = get_my_notifications($pdo, $my_role, 10, $my_id);
         }
+
+        // B. Get the precise "Unread Count" badge number
+        // We do a separate lightweight count query for accuracy
+        $allowed_roles = [$my_role];
+        if ($my_role == 0) $allowed_roles = [0, 1]; // SA sees Admin alerts too
+        $roles_str = implode(',', $allowed_roles);
+
+        $sql_count = "SELECT COUNT(*) FROM tbl_notifications 
+                      WHERE is_read = 0 
+                      AND ((target_user_id = ?) OR (target_role IN ($roles_str)))";
+        $stmt = $pdo->prepare($sql_count);
+        $stmt->execute([$my_id]);
+        $unread_count = $stmt->fetchColumn();
 
         echo json_encode([
             'status' => 'success',
@@ -74,12 +59,25 @@ try {
     // ACTION 2: MARK ALL READ
     // =========================================================
     if ($action === 'mark_all_read') {
-        // Pass 'all' as ID, and the current user's role integer
-        if (mark_notification_read($pdo, 'all', $my_role)) {
+        
+        // Define hierarchy again for security
+        $allowed_roles = [$my_role];
+        if ($my_role == 0) $allowed_roles = [0, 1];
+        $roles_str = implode(',', $allowed_roles);
+
+        // Update all unread matching this user
+        $sql = "UPDATE tbl_notifications 
+                SET is_read = 1 
+                WHERE is_read = 0 
+                AND ((target_user_id = :uid) OR (target_role IN ($roles_str)))";
+        
+        $stmt = $pdo->prepare($sql);
+        $result = $stmt->execute([':uid' => $my_id]);
+
+        if ($result) {
             echo json_encode(['status' => 'success', 'message' => 'All notifications marked as read.']);
         } else {
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Failed to update database.']);
+            throw new Exception("Database update failed.");
         }
         exit;
     }
@@ -89,28 +87,27 @@ try {
     // =========================================================
     if ($action === 'mark_single_read') {
         $id = $_POST['id'] ?? null;
+        
         if (!$id) {
-            http_response_code(400);
-            echo json_encode(['status' => 'error', 'message' => 'Missing notification ID.']);
+            echo json_encode(['status' => 'error', 'message' => 'Missing ID']);
             exit;
         }
 
-        if (mark_notification_read($pdo, $id)) {
-            echo json_encode(['status' => 'success', 'message' => 'Notification marked as read.']);
-        } else {
-            http_response_code(500);
-            echo json_encode(['status' => 'error', 'message' => 'Failed to mark as read.']);
-        }
+        // We don't need complex role checks here; if they click it, they can read it.
+        $sql = "UPDATE tbl_notifications SET is_read = 1 WHERE id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':id' => $id]);
+
+        echo json_encode(['status' => 'success']);
         exit;
     }
 
-    // Invalid Action Fallback
-    http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Invalid action specified.']);
+    // Fallback
+    echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
 
 } catch (Exception $e) {
-    error_log("Global Notification API Error: " . $e->getMessage());
+    error_log("API Error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'Server error.']);
+    echo json_encode(['status' => 'error', 'message' => 'Server error']);
 }
 ?>

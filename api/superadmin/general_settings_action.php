@@ -82,14 +82,13 @@ try {
         $stmt = $pdo->prepare($sql);
         
         if ($stmt->execute($params)) {
-            // ⭐ LOG AUDIT TRAIL
-            logAudit(
-                $pdo, 
-                $_SESSION['user_id'], 
-                $_SESSION['usertype'], 
-                'UPDATE_GENERAL_SETTINGS', 
-                "Updated system configurations (SMTP, Session, or Maintenance mode)."
-            );
+        // 1. LOG AUDIT TRAIL
+            logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'UPDATE_SETTINGS', "Updated system config.");
+
+            // 2. [NEW] CLEAR CACHED SESSION DATA
+            // This forces checking.php to re-fetch the new Timezone & Timeout on the next page load.
+            unset($_SESSION['system_timezone']);
+            unset($_SESSION['session_timeout']); // We will use this in checking.php next
 
             echo json_encode(['status' => 'success', 'message' => 'System configuration updated successfully.']);
         } else {
