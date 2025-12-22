@@ -1,9 +1,12 @@
 <?php
 // superadmin/pending_emails.php
-$page_title = 'Pending Emails - LOPISv2';
+// PAGE: Global Email Queue Monitor
+// DESCRIPTION: Displays list of emails waiting to be sent or failed.
+//              Table data is loaded via AJAX by assets/js/pages/superadmin_email_queue.js
+
+$page_title = 'Global Email Queue - LOPISv2';
 $current_page = 'pending_emails'; 
 
-// Include your template files (adjust paths as necessary)
 require '../template/header.php';
 require '../template/sidebar.php';
 require '../template/topbar.php';
@@ -12,29 +15,25 @@ require '../template/topbar.php';
 <div class="container-fluid">
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Pending Password Reset Emails</h1>
-    </div>
-    
-    <div class="alert alert-info shadow-sm small">
-        <i class="fas fa-exclamation-circle me-2"></i>
-        This list contains password reset emails that failed to send due to SMTP errors or because the system's email notifications were disabled at the time of the request. The token itself may still be valid if not expired.
+        <h1 class="h3 mb-0 text-gray-800">Global Email Queue</h1>
     </div>
 
     <div class="card shadow mb-4">
-        <div class="card-header py-3 border-left-warning">
-            <h6 class="m-0 font-weight-bold text-label">
-                <i class="fas fa-paper-plane me-2"></i>Emails Requiring Manual Intervention
+        <div class="card-header py-3 border-left-warning d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-envelope-open-text me-2"></i>Pending & Failed Communications
             </h6>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered" id="pendingEmailTable" width="100%" cellspacing="0">
-                    <thead>
+                <table class="table table-striped table-hover align-middle" id="pendingEmailTable" width="100%" cellspacing="0">
+                    <thead class="bg-light text-uppercase text-gray-600 text-xs font-weight-bold">
                         <tr>
-                            <th>User (Email/ID)</th>
-                            <th>Reason</th>
-                            <th>Attempted At</th>
-                            <th>Action</th>
+                            <th class="border-0">Recipient Info</th>
+                            <th class="border-0">Subject & Type</th>
+                            <th class="border-0">Status / Error</th>
+                            <th class="border-0">Queued At</th>
+                            <th class="border-0 text-center" style="width: 120px;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -43,8 +42,9 @@ require '../template/topbar.php';
             </div>
         </div>
     </div>
+
 </div>
 
 <?php require '../template/footer.php'; ?>
 
-<script src="../assets/js/pages/superadmin_pending_email.js"></script>
+<script src="../assets/js/pages/superadmin_email_queue.js"></script>

@@ -1,38 +1,19 @@
-// assets/js/pages/company_settings.js
+/**
+ * Company Settings Controller
+ * Handles fetching and updating general company information and branding.
+ * Integrated with Global AppUtility for Topbar syncing.
+ */
 
 $(document).ready(function() {
 
     // ==============================================================================
-    // 1. UI HELPERS
-    // ==============================================================================
-    function updateSyncStatus(state) {
-        const $dot = $('.live-dot');
-        const $text = $('#last-updated-time');
-        const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-        $dot.removeClass('text-success text-warning text-danger');
-
-        if (state === 'loading') {
-            $text.text('Syncing...');
-            $dot.addClass('text-warning'); 
-        } 
-        else if (state === 'success') {
-            $text.text(`Synced: ${time}`);
-            $dot.addClass('text-success'); 
-        } 
-        else {
-            $text.text(`Failed: ${time}`);
-            $dot.addClass('text-danger');  
-        }
-    }
-
-    // ==============================================================================
-    // 2. FETCH CURRENT DATA ON LOAD
+    // 1. DATA FETCHER
     // ==============================================================================
     function loadDetails() {
-        updateSyncStatus('loading');
+        // Trigger visual loading via Global Utility
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
 
-        $.post('../api/superadmin/company_settings_action.php', { action: 'get_details' }, function(res) {
+        $.post(API_ROOT + '/superadmin/company_settings_action.php', { action: 'get_details' }, function(res) {
             if(res.status === 'success') {
                 let d = res.data;
                 $('#company_name').val(d.company_name);
@@ -43,6 +24,7 @@ $(document).ready(function() {
                 
                 // Update Logo Preview with Cache Busting
                 if(d.logo_path) {
+                    // Assuming logo is stored in assets/images relative to web_root
                     $('#logoPreview').attr('src', '../assets/images/' + d.logo_path + '?t=' + new Date().getTime());
                 }
 
@@ -51,34 +33,40 @@ $(document).ready(function() {
                         year: 'numeric', month: 'long', day: 'numeric'
                     }));
                 }
-                updateSyncStatus('success');
+                
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
             } else {
-                updateSyncStatus('error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             }
         }, 'json').fail(function() {
-            updateSyncStatus('error');
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
         });
     }
 
     // Initial Load
     loadDetails();
 
-    // Hook for Master Refresher
+    // ==============================================================================
+    // 2. MASTER REFRESHER HOOK
+    // ==============================================================================
     window.refreshPageContent = function(isManual = false) {
-        if(isManual) $('#refreshIcon').addClass('fa-spin');
+        // AppUtility handles the loading state; loadDetails handles the success/error
         loadDetails();
-        if(isManual) setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
     };
 
     // ==============================================================================
-    // 3. IMAGE PREVIEW HANDLER (Local)
+    // 3. IMAGE PREVIEW HANDLER
     // ==============================================================================
     $('#logoInput').change(function() {
         const file = this.files[0];
         if (file) {
             // Validation: Max 2MB
             if (file.size > 2 * 1024 * 1024) {
-                Swal.fire('File Too Large', 'Please select a logo smaller than 2MB.', 'warning');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'File Too Large',
+                    text: 'Please select a logo smaller than 2MB.'
+                });
                 $(this).val('');
                 return;
             }
@@ -109,8 +97,10 @@ $(document).ready(function() {
         let btn = $('#saveBtn');
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Saving...');
 
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+
         $.ajax({
-            url: '../api/superadmin/company_settings_action.php',
+            url: API_ROOT + '/superadmin/company_settings_action.php',
             type: 'POST',
             data: formData,
             contentType: false, 
@@ -128,10 +118,12 @@ $(document).ready(function() {
                     loadDetails(); // Refresh to update preview and timestamp
                 } else {
                     Swal.fire('Error', res.message, 'error');
+                    if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             },
             error: function() {
                 Swal.fire('Error', 'An unexpected error occurred. Please try again.', 'error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             },
             complete: function() {
                 btn.prop('disabled', false).html('<i class="fas fa-save me-1"></i> Save Changes');

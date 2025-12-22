@@ -1,18 +1,19 @@
-// assets/js/pages/superadmin_admin_management.js
+/**
+ * Super Admin - Admin Management Controller
+ * Handles DataTables, Modal CRUD operations, and Real-time Syncing.
+ */
 
 // ==============================================================================
 // 1. GLOBAL STATE
 // ==============================================================================
 var adminTable;
 
-// Note: updateSyncStatus() is inherited globally from footer.php
-
 // 1.1 MASTER REFRESHER HOOK
-// Called automatically by footer.php every 15s or on manual click
 window.refreshPageContent = function(isManual = false) {
     if (adminTable) {
-        // Just reload the table.
-        // The 'processing' event below will handle the "Syncing..." text.
+        if (isManual && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
+        }
         adminTable.ajax.reload(null, false);
     }
 };
@@ -25,18 +26,11 @@ window.refreshPageContent = function(isManual = false) {
 function openModal(id = null) {
     if (id) {
         // --- EDIT MODE ---
-        $('#editAdminForm')[0].reset(); // Reset the edit form
+        $('#editAdminForm')[0].reset(); 
 
-        Swal.fire({
-            title: 'Loading...',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
-            // ⭐ FIX: Use Global API_ROOT
             url: API_ROOT + '/superadmin/admin_management_action.php',
             type: 'POST',
             data: { action: 'get_details', id: id },
@@ -49,34 +43,24 @@ function openModal(id = null) {
                     $('#edit_employee_id').val(d.employee_id);
                     $('#edit_email').val(d.email);
                     $('#edit_status').val(d.status);
-                    $('#editAdminModal').modal('show'); // Show the edit modal
+                    $('#editAdminModal').modal('show'); 
                 } else {
                     Swal.fire('Error', res.message || 'Could not fetch details.', 'error');
                 }
             },
-            error: function(jqXHR, textStatus, errorThrown) {
-                Swal.fire('Error', 'Server request failed: ' + textStatus + ' - ' + errorThrown, 'error');
-                console.error("AJAX Error:", textStatus, errorThrown, jqXHR);
+            error: function(xhr, status, error) {
+                Swal.close();
+                handleAjaxError(xhr, status, error);
             }
         });
     } else {
         // --- ADD NEW MODE ---
-        $('#addAdminForm')[0].reset(); // Reset the add form
+        $('#addAdminForm')[0].reset();
+        $('#add_password').val('losi@123'); // Default password
 
-        // **NEW: Set the default password**
-        $('#add_password').val('losi@123'); // Set the default password here
-
-        // Load available employees for new admin creation
-        Swal.fire({
-            title: 'Loading...',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        Swal.fire({ title: 'Loading Employees...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
-            // ⭐ FIX: Use Global API_ROOT
             url: API_ROOT + '/superadmin/admin_management_action.php',
             type: 'POST',
             data: { action: 'get_available_employees' },
@@ -85,33 +69,27 @@ function openModal(id = null) {
                 Swal.close();
                 if (res.status === 'success' && res.employees) {
                     const employees = res.employees;
-                    const employeeIdField = $('#add_employee_id'); // Target the add modal's select
-
-                    employeeIdField.empty(); // Clear previous options
+                    const employeeIdField = $('#add_employee_id'); 
+                    employeeIdField.empty(); 
 
                     if (employees.length > 0) {
-                        // Populate the select dropdown
-                        employees.forEach(employee => {
+                        employees.forEach(emp => {
                             employeeIdField.append($('<option>', {
-                                value: employee.employee_id,
-                                text: employee.employee_id + ' - ' + employee.name
+                                value: emp.employee_id,
+                                text: emp.employee_id + ' - ' + emp.name
                             }));
                         });
                     } else {
-                        employeeIdField.append($('<option>', {
-                            value: '',
-                            text: 'No available employees'
-                        }));
+                        employeeIdField.append($('<option>', { value: '', text: 'No available employees found' }));
                     }
-
-                    $('#addAdminModal').modal('show'); // Show the add modal
+                    $('#addAdminModal').modal('show'); 
                 } else {
                     Swal.fire('Error', res.message || 'Could not fetch available employees.', 'error');
                 }
             },
-            error: function(jqXHR, textStatus, errorThrown) {
-                Swal.fire('Error', 'Server request failed: ' + textStatus + ' - ' + errorThrown, 'error');
-                console.error("AJAX Error:", textStatus, errorThrown, jqXHR);
+            error: function(xhr, status, error) {
+                Swal.close();
+                handleAjaxError(xhr, status, error);
             }
         });
     }
@@ -120,31 +98,35 @@ function openModal(id = null) {
 // 2.2 Delete Admin
 function deleteAdmin(id) {
     Swal.fire({
-        title: 'Are you sure?',
-        text: "You won't be able to revert this!",
+        title: 'Revoke Admin Access?',
+        text: "This user will be downgraded to a standard employee.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it!'
+        cancelButtonColor: '#858796',
+        confirmButtonText: 'Yes, Revoke Access'
     }).then((result) => {
         if (result.isConfirmed) {
+            
+            if(window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+
             $.ajax({
-                // ⭐ FIX: Use Global API_ROOT
                 url: API_ROOT + '/superadmin/admin_management_action.php',
                 type: 'POST',
                 data: { action: 'delete', id: id },
                 dataType: 'json',
                 success: function(res) {
                     if (res.status === 'success') {
-                        Swal.fire('Deleted!', res.message, 'success');
-                        // Reload table to show changes
+                        Swal.fire('Revoked!', res.message, 'success');
                         adminTable.ajax.reload(null, false);
                     } else {
                         Swal.fire('Error', res.message, 'error');
+                        if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
                     }
                 },
-                error: function() {
-                    Swal.fire('Error', 'Server connection failed.', 'error');
+                error: function(xhr, status, error) {
+                    handleAjaxError(xhr, status, error);
+                    if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             });
         }
@@ -161,28 +143,39 @@ $(document).ready(function() {
         processing: true,
         serverSide: true,
         ordering: true,
-        dom: 'rtip',
+        dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+             "<'row'<'col-sm-12'tr>>" +
+             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         ajax: {
-            // ⭐ FIX: Use Global API_ROOT
             url: API_ROOT + "/superadmin/admin_management_action.php",
             type: "POST",
-            data: { action: 'fetch' }
+            data: { action: 'fetch' },
+            error: function (xhr, error, code) {
+                // Ignore user-cancelled requests
+                if (error === 'abort') return;
+
+                // ⭐ DEBUGGING: Log the crash report to console
+                console.error("DataTable Fatal Error:", xhr.responseText);
+                
+                // Show user friendly error, but with a hint to check console
+                if(xhr.status === 200 && xhr.responseText.startsWith('<')) {
+                     // This means PHP outputted HTML (Fatal Error) instead of JSON
+                     if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
+                     return; // DataTables will show its own error alert usually, or we can suppress it
+                }
+                
+                if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
+            }
         },
-        // ⭐ HOOK: Update Sync Status when table finishes drawing
-        drawCallback: function(settings) {
-            if (typeof updateSyncStatus === "function") updateSyncStatus('success');
-        },
-        columns: [{
+        columns: [
+            {
                 data: 'employee_id',
                 className: "align-middle fw-bold",
                 render: function(data) {
                     return '<span class="badge bg-soft-teal text-primary border border-teal px-2">' + data + '</span>';
                 }
             },
-            {
-                data: 'email',
-                className: "align-middle"
-            },
+            { data: 'email', className: "align-middle" },
             {
                 data: 'status',
                 className: "text-center align-middle",
@@ -196,11 +189,7 @@ $(document).ready(function() {
                 className: "align-middle text-muted small",
                 render: function(data) {
                     if (!data) return '';
-                    return new Date(data).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
+                    return new Date(data).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
                 }
             },
             {
@@ -209,10 +198,10 @@ $(document).ready(function() {
                 className: "text-center align-middle text-nowrap",
                 render: function(data) {
                     return `
-                        <button class="btn btn-sm btn-outline-secondary shadow-sm me-1" onclick="openModal(${data})" title="Edit">
+                        <button class="btn btn-sm btn-outline-primary shadow-sm me-1" onclick="openModal(${data})" title="Edit Admin">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary shadow-sm" onclick="deleteAdmin(${data})" title="Delete">
+                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteAdmin(${data})" title="Revoke Admin">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     `;
@@ -220,72 +209,25 @@ $(document).ready(function() {
             }
         ],
         language: {
-            emptyTable: "No administrators found."
+            emptyTable: "<div class='py-4 text-center text-muted'>No administrators found.</div>",
+            processing: "<div class='spinner-border text-primary spinner-border-sm'></div> Loading..."
         }
     });
 
-    // 3.2 DETECT LOADING STATE
-    // This connects the DataTable loading event to our Global Sync Status text
+    // 3.2 Loading States
     $('#adminTable').on('processing.dt', function(e, settings, processing) {
-        if (processing) {
-            if (typeof updateSyncStatus === "function") updateSyncStatus('loading');
-        }
+        if (window.AppUtility && processing) window.AppUtility.updateSyncStatus('loading');
+    });
+    $('#adminTable').on('draw.dt', function() {
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
     });
 
-    // 3.3 Handle Form Submission
-    // $('#adminForm').on('submit', function(e) {  // REMOVE THIS
-    //     e.preventDefault();
-    //     const action = $('#admin_id').val() ? 'update' : 'create';
-    //     const formData = $(this).serialize() + '&action=' + action;
-
-    //     Swal.fire({
-    //         title: 'Saving...',
-    //         allowOutsideClick: false,
-    //         didOpen: () => {
-    //             Swal.showLoading();
-    //         }
-    //     });
-
-    //     $.ajax({
-    //         // ⭐ FIX: Use Global API_ROOT
-    //         url: API_ROOT + '/superadmin/admin_management_action.php',
-    //         type: 'POST',
-    //         data: formData,
-    //         dataType: 'json',
-    //         success: function(res) {
-    //             Swal.close();
-    //             if (res.status === 'success') {
-    //                 $('#adminModal').modal('hide');
-    //                 Swal.fire({
-    //                     icon: 'success',
-    //                     title: 'Success',
-    //                     text: res.message,
-    //                     timer: 1500,
-    //                     showConfirmButton: false
-    //                 });
-    //             // Reload table
-    //             adminTable.ajax.reload(null, false);
-    //         } else {
-    //             Swal.fire('Error', res.message, 'error');
-    //         }
-    //     },
-    //     error: function() {
-    //         Swal.fire('Error', 'Server connection failed.', 'error');
-    //     }
-    // });
-
-    // 3.4 Handle Add Admin Form Submission
+    // 3.3 Add Admin Form
     $('#addAdminForm').on('submit', function(e) {
         e.preventDefault();
-        const formData = $(this).serialize() + '&action=create'; // Action is always 'create'
+        const formData = $(this).serialize() + '&action=create'; 
 
-        Swal.fire({
-            title: 'Saving...',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        Swal.fire({ title: 'Creating...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
             url: API_ROOT + '/superadmin/admin_management_action.php',
@@ -293,40 +235,28 @@ $(document).ready(function() {
             data: formData,
             dataType: 'json',
             success: function(res) {
-                Swal.close();
                 if (res.status === 'success') {
                     $('#addAdminModal').modal('hide');
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success',
-                        text: res.message,
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                    Swal.fire({ icon: 'success', title: 'Success', text: res.message, timer: 1500, showConfirmButton: false });
                     adminTable.ajax.reload(null, false);
                 } else {
+                    Swal.close();
                     Swal.fire('Error', res.message, 'error');
                 }
             },
-             error: function(jqXHR, textStatus, errorThrown) {
-                Swal.fire('Error', 'Server request failed: ' + textStatus + ' - ' + errorThrown, 'error');
-                console.error("AJAX Error:", textStatus, errorThrown, jqXHR);
+            error: function(xhr, status, error) {
+                Swal.close();
+                handleAjaxError(xhr, status, error);
             }
         });
     });
 
-    // 3.5 Handle Edit Admin Form Submission
+    // 3.4 Edit Admin Form
     $('#editAdminForm').on('submit', function(e) {
         e.preventDefault();
-        const formData = $(this).serialize() + '&action=update'; // Action is always 'update'
+        const formData = $(this).serialize() + '&action=update'; 
 
-        Swal.fire({
-            title: 'Saving...',
-            allowOutsideClick: false,
-            didOpen: () => {
-                Swal.showLoading();
-            }
-        });
+        Swal.fire({ title: 'Updating...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
             url: API_ROOT + '/superadmin/admin_management_action.php',
@@ -334,25 +264,39 @@ $(document).ready(function() {
             data: formData,
             dataType: 'json',
             success: function(res) {
-                Swal.close();
                 if (res.status === 'success') {
                     $('#editAdminModal').modal('hide');
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success',
-                        text: res.message,
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                    Swal.fire({ icon: 'success', title: 'Updated', text: res.message, timer: 1500, showConfirmButton: false });
                     adminTable.ajax.reload(null, false);
                 } else {
+                    Swal.close();
                     Swal.fire('Error', res.message, 'error');
                 }
             },
-             error: function(jqXHR, textStatus, errorThrown) {
-                Swal.fire('Error', 'Server request failed: ' + textStatus + ' - ' + errorThrown, 'error');
-                console.error("AJAX Error:", textStatus, errorThrown, jqXHR);
+            error: function(xhr, status, error) {
+                Swal.close();
+                handleAjaxError(xhr, status, error);
             }
         });
     });
 });
+
+// ==============================================================================
+// 4. HELPER: GLOBAL AJAX ERROR HANDLER
+// ==============================================================================
+function handleAjaxError(xhr, status, error) {
+    if (status === 'parsererror') {
+        console.error("PHP PARSE ERROR:", xhr.responseText);
+        Swal.fire({
+            icon: 'error',
+            title: 'Server Error (PHP)',
+            html: `The server returned a crash report instead of JSON.<br>
+                   <div class="text-start mt-2 p-2 bg-light border text-danger small font-monospace" style="max-height: 150px; overflow-y:auto;">
+                     ${xhr.responseText.substring(0, 300)}...
+                   </div>
+                   <br>Check the browser console (F12) for the full report.`
+        });
+    } else {
+        Swal.fire('Network Error', 'The request failed. Please check your connection.', 'error');
+    }
+}

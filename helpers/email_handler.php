@@ -1,126 +1,137 @@
 <?php
-// email_handler.php
-// Centralized file for all SMTP configuration and email sending logic.
+/**
+ * helpers/email_handler.php
+ * Centralized logic for the Global Email Queue.
+ */
 
-// Assuming PHPMailer is installed via Composer in the root directory
-require __DIR__ . '/../vendor/autoload.php';
+// 1. Load Composer (Ensure path is correct)
+require_once __DIR__ . '/../vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-// =================================================================================
-// NOTE: TEMPORARY EMAIL BYPASS FLAG HAS BEEN REMOVED FOR PRODUCTION READINESS.
-// =================================================================================
-
 /**
- * Adds an email to the pending email queue.
- *
- * @param PDO $pdo Database connection object.
- * @param int $user_id The ID of the user to send the email to.
- * @param string $token A unique token associated with the email (e.g., for password reset, email verification).
- * @param string $reason A short description of why the email is being sent (e.g., "password_reset", "email_verification").
- * @return bool True on success, false on failure.
+ * 1. QUEUE LOGIC: Adds an email to the database queue.
  */
-function addPendingEmail(PDO $pdo, int $user_id, string $token, string $reason): bool
+function queueEmail(PDO $pdo, int $user_id, string $recipient_email, string $subject, string $body, string $type = 'GENERAL', string $token = null): bool
 {
-    $sql = "INSERT INTO tbl_pending_emails (user_id, token, reason) VALUES (?, ?, ?)";
+    $sql = "INSERT INTO tbl_pending_emails (user_id, recipient_email, subject, body, email_type, token, is_sent, attempted_at) 
+            VALUES (?, ?, ?, ?, ?, ?, 0, NOW())";
     try {
         $stmt = $pdo->prepare($sql);
-        $result = $stmt->execute([$user_id, $token, $reason]);
-        return $result;
+        return $stmt->execute([$user_id, $recipient_email, $subject, $body, $type, $token]);
     } catch (PDOException $e) {
-        error_log("PENDING EMAIL ERROR: Failed to add pending email: " . $e->getMessage());
+        error_log("EMAIL QUEUE ERROR: " . $e->getMessage());
         return false;
     }
 }
 
+/**
+ * 2. BATCH PROCESSOR: Sends pending emails from the queue.
+ */
+function processEmailQueue(PDO $pdo, int $limit = 5) {
+    $settings = getSMTPSettings($pdo);
+    if (!$settings || $settings['enable_email_notifications'] != 1) return 'disabled';
+
+    // LIMIT requires explicit integer binding in PDO
+    $sql = "SELECT * FROM tbl_pending_emails WHERE is_sent = 0 ORDER BY attempted_at ASC LIMIT :limit";
+    $stmt = $pdo->prepare($sql);
+    $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+    $stmt->execute();
+    $queue = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (empty($queue)) return 'empty';
+
+    $mail = new PHPMailer(true);
+    try {
+        configureSMTP($mail, $settings);
+    } catch (Exception $e) {
+        return 'error';
+    }
+
+    foreach ($queue as $email) {
+        // FIXED: Only pass 2 arguments to match definition below
+        if (sendSingleEmail($mail, $email)) {
+            $pdo->prepare("UPDATE tbl_pending_emails SET is_sent = 1, error_message = NULL, last_attempt = NOW() WHERE id = ?")
+                ->execute([$email['id']]);
+        } else {
+            $pdo->prepare("UPDATE tbl_pending_emails SET is_sent = 2, error_message = ?, last_attempt = NOW() WHERE id = ?")
+                ->execute([$mail->ErrorInfo, $email['id']]);
+        }
+        usleep(200000); 
+    }
+
+    return 'processed';
+}
 
 /**
- * Sends a structured email using PHPMailer and dynamic database settings.
- *
- * @param object $pdo PDO database connection object.
- * @param string $recipient_email The email address of the recipient.
- * @param string $subject The subject line of the email.
- * @param string $body The plain text content of the email.
- * @param string|null $html_body Optional HTML content (defaults to plain text if null).
- * @return string 'sent', 'disabled', or 'failed'.
+ * 3. IMMEDIATE SENDER: Forces a specific email to send NOW.
  */
-function send_email($pdo, $recipient_email, $subject, $body, $html_body = null) {
-    
-    // --- 1. FETCH EMAIL SETTINGS ---
-    $settings = [];
-    try {
-        $stmt_settings = $pdo->query("
-            SELECT smtp_host, smtp_port, smtp_username, smtp_password, email_sender_name, enable_email_notifications
-            FROM tbl_general_settings 
-            WHERE id = 1
-        ");
-        $settings = $stmt_settings->fetch(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("EMAIL ERROR: Failed to fetch SMTP settings: " . $e->getMessage());
-        return 'failed'; // Database error
-    }
+function sendImmediateEmail(PDO $pdo, int $queue_id): string {
+    $stmt = $pdo->prepare("SELECT * FROM tbl_pending_emails WHERE id = ?");
+    $stmt->execute([$queue_id]);
+    $email = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // --- 2. CHECK STATUS ---
-    
-    // ⭐ DISABLED CHECK - Returns specific code 'disabled' ⭐
-    if (!isset($settings['enable_email_notifications']) || $settings['enable_email_notifications'] != 1) {
-        error_log("EMAIL: Notifications are disabled in settings. Email skipped.");
-        return 'disabled';
-    }
+    if (!$email) return 'not_found';
 
-    if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
-        error_log("EMAIL FATAL: PHPMailer class not found. Check autoloader/composer.");
-        return 'failed';
-    }
-    
-    // --- Defense against empty sender (as seen in previous debugging) ---
-    $smtp_user = $settings['smtp_username'] ?? '';
-    $sender_name = $settings['email_sender_name'] ?? 'System Notifications'; 
-    if (empty($smtp_user)) {
-        error_log("EMAIL FAILED: Cannot set sender address. smtp_username is empty in settings.");
-        return 'failed';
-    }
+    $settings = getSMTPSettings($pdo);
+    if (!$settings || $settings['enable_email_notifications'] != 1) return 'disabled';
 
-
-    // --- 3. CONFIGURE AND SEND EMAIL ---
     $mail = new PHPMailer(true);
-    
     try {
-        // Server settings
-        $mail->isSMTP();
-        $mail->Host       = $settings['smtp_host'];
-        $mail->SMTPAuth   = false;
-        $mail->Username   = $smtp_user; // Use the sanitized variable
-        $mail->Password   = $settings['smtp_password'];
-        $mail->Port       = $settings['smtp_port'];
-
-        // Dynamic encryption based on Port
-        if ($settings['smtp_port'] == 465) {
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        } elseif ($settings['smtp_port'] == 587) {
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        configureSMTP($mail, $settings);
+        // FIXED: Only pass 2 arguments
+        if (sendSingleEmail($mail, $email)) {
+            $pdo->prepare("UPDATE tbl_pending_emails SET is_sent = 1, error_message = NULL, last_attempt = NOW() WHERE id = ?")
+                ->execute([$queue_id]);
+            return 'sent';
         } else {
-            $mail->SMTPSecure = false;
-            $mail->SMTPAutoTLS = false;
+            $pdo->prepare("UPDATE tbl_pending_emails SET is_sent = 2, error_message = ?, last_attempt = NOW() WHERE id = ?")
+                ->execute([$mail->ErrorInfo, $queue_id]);
+            return 'failed';
         }
-
-        // Recipients
-        // Uses the sanitized variable $smtp_user
-        $mail->setFrom($smtp_user, $sender_name); 
-        $mail->addAddress($recipient_email);
-
-        // Content
-        $mail->isHTML($html_body !== null); 
-        $mail->Subject = $subject;
-        $mail->Body    = $html_body ?? $body;
-        $mail->AltBody = $body; 
-
-        $mail->send();
-        return 'sent'; // <-- Success
     } catch (Exception $e) {
-        $error_message = $mail->ErrorInfo;  // Get the detailed error message
-        error_log("EMAIL FAILED: Mailer Error to {$recipient_email}: {$error_message}. PHPMailer Exception: " . $e->getMessage());
-        return 'failed'; // <-- SMTP Failure
+        return 'failed';
     }
 }
+
+// --- INTERNAL HELPERS ---
+
+function getSMTPSettings(PDO $pdo) {
+    $stmt = $pdo->query("SELECT * FROM tbl_general_settings WHERE id = 1");
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+function configureSMTP(PHPMailer $mail, array $settings) {
+    $mail->isSMTP();
+    $mail->Host       = $settings['smtp_host'];
+    $mail->SMTPAuth   = true;
+    $mail->Username   = $settings['smtp_username'];
+    $mail->Password   = $settings['smtp_password'];
+    $mail->Port       = $settings['smtp_port'];
+    $mail->setFrom($settings['smtp_username'], $settings['email_sender_name'] ?? 'System');
+    $mail->Timeout    = 10; 
+
+    if ($settings['smtp_port'] == 465) {
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+    } elseif ($settings['smtp_port'] == 587) {
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    }
+}
+
+// FIXED: Definition now matches the calls above
+function sendSingleEmail(PHPMailer $mail, array $emailData): bool {
+    try {
+        $mail->clearAddresses();
+        $mail->addAddress($emailData['recipient_email']);
+        $mail->Subject = $emailData['subject'];
+        $mail->isHTML(true);
+        $mail->Body    = $emailData['body'];
+        $mail->AltBody = strip_tags($emailData['body']);
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+?>

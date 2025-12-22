@@ -10,7 +10,7 @@ session_start();
 
 // --- DATABASE CONNECTION & HELPERS ---
 require __DIR__ .'/../db_connection.php'; 
-require __DIR__ .'/../helpers/audit_helper.php'; // --- INTEGRATED: Audit Helper ---
+require __DIR__ .'/../helpers/audit_helper.php'; 
 
 // --- DYNAMIC TIMEZONE FETCH ---
 try {
@@ -23,11 +23,8 @@ try {
 
 header('Content-Type: application/json');
 
-// --- AUTO-CREATE MISSING TABLES (Omitted for brevity, keep your original logic here) ---
-
 $login_id = $_POST['login_id'] ?? ''; 
 $password = $_POST['password'] ?? '';
-$remember_me = isset($_POST['remember']);
 
 if (empty($login_id) || empty($password)) {
     http_response_code(400); 
@@ -43,9 +40,9 @@ try {
 
     $stmt_sec = $pdo->query("SELECT password_expiry_days, max_login_attempts, lockout_duration_mins FROM tbl_security_settings WHERE id = 1");
     $sec_settings = $stmt_sec->fetch(PDO::FETCH_ASSOC);
-    $password_expiry_days = $sec_settings['password_expiry_days'] ?? 0;
     $max_login_attempts = $sec_settings['max_login_attempts'] ?? 5;
     $lockout_duration_mins = $sec_settings['lockout_duration_mins'] ?? 15;
+    $password_expiry_days = $sec_settings['password_expiry_days'] ?? 0;
 
     // 1. DETERMINE LOGIN FIELD
     $login_field_db = (preg_match('/^[0-9]{3}$/', $login_id)) ? 'u.employee_id' : 'u.email';
@@ -56,9 +53,7 @@ try {
     $lockout_record = $stmt_lockout->fetch(PDO::FETCH_ASSOC);
     
     if (isset($lockout_record['lockout_until']) && strtotime($lockout_record['lockout_until']) > time()) {
-        // ⭐ AUDIT LOG: LOCKOUT BLOCK
         logAudit($pdo, null, null, 'LOGIN_LOCKED', "Blocked attempt for locked account: $login_id");
-
         $remaining_time = strtotime($lockout_record['lockout_until']) - time();
         $minutes = floor($remaining_time / 60);
         http_response_code(403);
@@ -81,9 +76,7 @@ try {
         
         // a. MAINTENANCE MODE CHECK
         if ($maintenance_mode == 1 && $user['usertype'] != 0) {
-            // ⭐ AUDIT LOG: MAINTENANCE BLOCK
             logAudit($pdo, $user['id'], $user['usertype'], 'LOGIN_BLOCKED', 'System in Maintenance Mode');
-            
             http_response_code(503);
             echo json_encode(['status' => 'error', 'message' => 'System under maintenance.']);
             exit;
@@ -91,18 +84,16 @@ try {
         
         // b. ACCOUNT STATUS CHECK
         if ($user['status'] != 1) {
-            // ⭐ AUDIT LOG: INACTIVE BLOCK
             logAudit($pdo, $user['id'], $user['usertype'], 'LOGIN_INACTIVE', 'Attempt to login to disabled account');
-            
             http_response_code(403); 
             echo json_encode(['status' => 'error', 'message' => 'Your account is inactive.']);
             exit;
         }
 
-        // c. CLEAR ATTEMPTS & LOG SUCCESS
+        // c. CLEAR ATTEMPTS
         $pdo->prepare("DELETE FROM tbl_login_attempts WHERE login_id = ?")->execute([$login_id]);
 
-        // d. PASSWORD EXPIRY
+        // d. PASSWORD EXPIRY CHECK
         $force_password_reset = false;
         if ($password_expiry_days > 0) {
             $last_update_date = $user['password_updated_at'] ?? $user['updated_at'];
@@ -111,8 +102,16 @@ try {
             }
         }
 
-        // e. SESSION
-        session_regenerate_id(true);
+        // e. SESSION INITIALIZATION
+        session_regenerate_id(true); // Prevent session fixation
+        $new_session_id = session_id();
+
+        // ⭐ SINGLE SESSION POLICY: Store the new session ID in the database
+        // This effectively invalidates any other active session for this user.
+        $update_sess = $pdo->prepare("UPDATE tbl_users SET current_session_id = ? WHERE id = ?");
+        $update_sess->execute([$new_session_id, $user['id']]);
+        
+        $_SESSION['current_session_id'] = $new_session_id; // Store for comparison
         $_SESSION['logged_in'] = true;
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['employee_id'] = $user['employee_id'];
@@ -120,11 +119,11 @@ try {
         $_SESSION['usertype'] = $user['usertype'];
         $_SESSION['show_loader'] = true;
         
-        // ⭐ AUDIT LOG: SUCCESS
+        // f. AUDIT LOG: SUCCESS
         $log_msg = $force_password_reset ? "Login Successful (Forced Reset Required)" : "Login Successful";
         logAudit($pdo, $user['id'], $user['usertype'], 'LOGIN_SUCCESS', $log_msg);
 
-        // f. REDIRECT
+        // g. REDIRECT
         $redirect_url = $force_password_reset ? 'process/force_password_reset.php' : match((int)$user['usertype']) {
             0 => 'superadmin/dashboard.php',
             1 => 'admin/dashboard.php',
@@ -136,7 +135,6 @@ try {
     } else {
         // --- FAILED LOGIN LOGIC ---
         if ($user) { 
-            // INCREMENT ATTEMPTS
             $attempts_sql = "INSERT INTO tbl_login_attempts (login_id, attempts, last_attempt_at, lockout_until)
                              VALUES (:login_id, 1, NOW(), NULL)
                              ON DUPLICATE KEY UPDATE 
@@ -148,11 +146,8 @@ try {
                 ':max_attempts' => $max_login_attempts,
                 ':duration' => $lockout_duration_mins
             ]);
-
-            // ⭐ AUDIT LOG: FAILED ATTEMPT
             logAudit($pdo, $user['id'], $user['usertype'], 'LOGIN_FAILED', "Wrong password attempt for: $login_id");
         } else {
-            // ⭐ AUDIT LOG: UNKNOWN USER ATTEMPT
             logAudit($pdo, null, null, 'LOGIN_FAILED', "Login attempt for non-existent user: $login_id");
         }
 

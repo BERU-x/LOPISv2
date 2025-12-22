@@ -1,4 +1,8 @@
-// assets/js/pages/general_settings.js
+/**
+ * General Settings Controller
+ * Handles System Parameters (Timezone, Timeout) and SMTP/Email configurations.
+ * Integrated with Global AppUtility for Topbar syncing.
+ */
 
 // Toggle Password Visibility (Global scope for button onclick)
 function togglePass() {
@@ -16,29 +20,9 @@ function togglePass() {
 $(document).ready(function() {
 
     // ==============================================================================
-    // 1. UI HELPERS & SYNC STATUS
+    // 1. UI HELPERS
     // ==============================================================================
-    function updateSyncStatus(state) {
-        const $dot = $('.live-dot');
-        const $text = $('#last-updated-time');
-        const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-        $dot.removeClass('text-success text-warning text-danger');
-
-        if (state === 'loading') {
-            $text.text('Syncing...');
-            $dot.addClass('text-warning'); 
-        } 
-        else if (state === 'success') {
-            $text.text(`Synced: ${time}`);
-            $dot.addClass('text-success'); 
-        } 
-        else {
-            $text.text(`Failed: ${time}`);
-            $dot.addClass('text-danger');  
-        }
-    }
-
+    
     // Helper: Enable/Disable SMTP fields based on master toggle
     function toggleSmtpInputs(isEnabled) {
         $('#smtp_settings_wrapper input').prop('disabled', !isEnabled);
@@ -58,9 +42,10 @@ $(document).ready(function() {
     // 2. LOAD SYSTEM SETTINGS
     // ==============================================================================
     function loadSettings() {
-        updateSyncStatus('loading');
+        // Trigger visual loading via Global Utility
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
 
-        $.post('../api/superadmin/general_settings_action.php', { action: 'get_details' }, function(res) {
+        $.post(API_ROOT + '/superadmin/general_settings_action.php', { action: 'get_details' }, function(res) {
             if(res.status === 'success') {
                 let d = res.data;
                 
@@ -86,12 +71,14 @@ $(document).ready(function() {
                 if(d.updated_at) {
                     $('#last-updated-text').text('Last Updated: ' + new Date(d.updated_at).toLocaleString());
                 }
-                updateSyncStatus('success');
+
+                // Notify Global AppUtility of success
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
             } else {
-                updateSyncStatus('error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             }
         }, 'json').fail(function() {
-            updateSyncStatus('error');
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
         });
     }
 
@@ -100,9 +87,8 @@ $(document).ready(function() {
 
     // Hook for Master Refresher (Topbar Sync Icon)
     window.refreshPageContent = function(isManual = false) {
-        if(isManual) $('#refreshIcon').addClass('fa-spin');
+        // AppUtility handles the loading state; loadSettings handles success/error
         loadSettings();
-        if(isManual) setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
     };
 
     // ==============================================================================
@@ -120,8 +106,6 @@ $(document).ready(function() {
             if(!$(`#${id}`).is(':checked')) {
                 formData.push({name: id, value: 0});
             } else {
-                // If it IS checked, it might already be in serializeArray, 
-                // but we push 1 to be explicitly safe.
                 formData = formData.filter(item => item.name !== id);
                 formData.push({name: id, value: 1});
             }
@@ -130,8 +114,11 @@ $(document).ready(function() {
         let btn = $('#saveBtn');
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> Saving...');
 
+        // Notify Topbar of activity
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+
         $.ajax({
-            url: '../api/superadmin/general_settings_action.php',
+            url: API_ROOT + '/superadmin/general_settings_action.php',
             type: 'POST',
             data: formData,
             dataType: 'json',
@@ -144,13 +131,15 @@ $(document).ready(function() {
                         timer: 1500,
                         showConfirmButton: false
                     });
-                    loadSettings();
+                    loadSettings(); // Refresh to update timestamps and topbar
                 } else {
                     Swal.fire('Error', res.message, 'error');
+                    if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             },
             error: function() {
                 Swal.fire('Error', 'Server connection failed.', 'error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             },
             complete: function() {
                 btn.prop('disabled', false).html('<i class="fas fa-save me-2"></i> Save Configuration');

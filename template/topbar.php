@@ -21,14 +21,17 @@
 
                 <li class="nav-item d-none d-sm-flex align-items-center me-3">
                     <div class="d-flex flex-column text-end lh-1">
-                        <div class="mb-1 d-flex align-items-center justify-content-end">
-                            <i class="fas fa-sync-alt me-1 text-secondary" id="refreshIcon" style="font-size: 0.75rem; cursor: pointer;"></i>
+                        
+                        <div class="mb-1 d-flex align-items-center justify-content-end btn-refresh-trigger" style="cursor: pointer;" title="Click to Sync">
+                            <i class="fas fa-sync-alt me-1 text-secondary" id="refresh-spinner" style="font-size: 0.75rem;"></i>
                             <span class="small fw-bold text-secondary text-uppercase">SYNC STATUS</span>
                         </div>
+                        
                         <div class="d-flex align-items-center justify-content-end">
                             <i class="fas fa-circle text-warning live-dot me-2" style="font-size: 8px;"></i>
-                            <span class="sync-status-text small fw-bold text-dark">Syncing...</span>
+                            <span id="last-updated-time" class="small fw-bold text-dark">Syncing...</span>
                         </div>
+
                     </div>
                 </li>
 

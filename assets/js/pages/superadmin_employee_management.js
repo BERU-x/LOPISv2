@@ -1,129 +1,197 @@
-// assets/js/pages/employee_management.js
+/**
+ * Employee Account Management Controller
+ * Handles Add/Edit Modals, DataTables, and Global Syncing.
+ */
 
-// ==============================================================================
-// 1. GLOBAL STATE & UI HELPERS
-// ==============================================================================
 var employeeTable;
 
-/**
- * Updates the Topbar Status (Text + Dot Color)
- * @param {string} state - 'loading', 'success', or 'error'
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); // Yellow
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); // Green
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  // Red
-    }
-}
-
-// 1.2 MASTER REFRESHER HOOK
-// isManual = true (Spin Icon) | isManual = false (Silent)
+// ==============================================================================
+// 1. MASTER REFRESHER HOOK
+// ==============================================================================
 window.refreshPageContent = function(isManual = false) {
     if (employeeTable) {
-        // If Manual Click -> Spin Icon & Show 'Syncing...'
-        if(isManual) {
-            $('#refreshIcon').addClass('fa-spin');
-            updateSyncStatus('loading');
+        if(isManual && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
-        
-        // Reload DataTable (false = keep paging)
         employeeTable.ajax.reload(null, false);
     }
 };
 
 // ==============================================================================
-// 2. MODAL & CRUD LOGIC
+// 2. ADD MODAL LOGIC
 // ==============================================================================
+function openAddModal() {
+    $('#addEmployeeForm')[0].reset();
+    $('#add_password').val('losi123'); // Reset to default
 
-// 2.1 Open Modal (Add or Edit)
-function openModal(id = null) {
-    $('#employeeForm')[0].reset();
-    $('#user_id').val('');
-    $('#modalTitle').text(id ? 'Edit Account' : 'Add New Account');
-    
-    // Password Hint & ID Readonly Logic
-    if(id) {
-        $('#password_hint').removeClass('d-none');
-        $('#password').removeAttr('required').attr('placeholder', 'Leave blank to keep current');
-        $('#employee_id').attr('readonly', true);
-    } else {
-        $('#password_hint').addClass('d-none');
-        $('#password').attr('required', 'required').attr('placeholder', 'Default: Employee@123');
-        $('#employee_id').attr('readonly', false);
-    }
+    // Load available employees for the dropdown
+    // This prevents creating duplicate accounts for the same person
+    const $select = $('#add_employee_id');
+    $select.html('<option value="">Loading...</option>');
 
-    if (id) {
-        Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-        
-        $.ajax({
-            // ⭐ UPDATED PATH
-            url: '../api/superadmin/employee_account_action.php',
-            type: 'POST',
-            data: { action: 'get_details', id: id },
-            dataType: 'json',
-            success: function(res) {
-                Swal.close();
-                if (res.status === 'success' && res.details) {
-                    const d = res.details;
-                    $('#user_id').val(d.id);
-                    $('#employee_id').val(d.employee_id);
-                    $('#email').val(d.email);
-                    $('#status').val(d.status);
-                    $('#employeeModal').modal('show');
-                } else {
-                    Swal.fire('Error', res.message || 'Could not fetch details.', 'error');
-                }
-            },
-            error: function() {
-                Swal.fire('Error', 'Server request failed.', 'error');
+    $.ajax({
+        url: API_ROOT + '/superadmin/employee_account_action.php',
+        type: 'POST',
+        data: { action: 'get_available_employees' },
+        dataType: 'json',
+        success: function(res) {
+            $select.empty();
+            
+            if (res.status === 'success' && res.employees.length > 0) {
+                // Populate dropdown
+                res.employees.forEach(emp => {
+                    $select.append(`<option value="${emp.employee_id}">${emp.employee_id} - ${emp.name}</option>`);
+                });
+            } else {
+                $select.append('<option value="">No employees available (All have accounts)</option>');
             }
-        });
-    } else {
-        $('#employeeModal').modal('show');
-    }
+            
+            $('#addEmployeeModal').modal('show');
+        },
+        error: function() {
+            $select.html('<option value="">Error loading list</option>');
+            Swal.fire('Error', 'Could not fetch employee list.', 'error');
+        }
+    });
 }
 
-// 2.2 Delete Account
+// Handle Add Form Submission
+$('#addEmployeeForm').on('submit', function(e) {
+    e.preventDefault();
+    const formData = $(this).serialize() + '&action=create';
+
+    Swal.fire({ title: 'Creating Account...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    $.ajax({
+        url: API_ROOT + '/superadmin/employee_account_action.php',
+        type: 'POST',
+        data: formData,
+        dataType: 'json',
+        success: function(res) {
+            Swal.close();
+            if (res.status === 'success') {
+                $('#addEmployeeModal').modal('hide');
+                Swal.fire({ 
+                    icon: 'success', title: 'Success', 
+                    text: res.message, timer: 1500, showConfirmButton: false 
+                });
+                if(window.AppUtility) window.AppUtility.updateSyncStatus('success');
+                employeeTable.ajax.reload(null, false);
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function(xhr) {
+            Swal.close();
+            console.error(xhr.responseText);
+            Swal.fire('Error', 'Server request failed.', 'error');
+        }
+    });
+});
+
+// ==============================================================================
+// 3. EDIT MODAL LOGIC
+// ==============================================================================
+function openEditModal(id) {
+    Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    $.ajax({
+        url: API_ROOT + '/superadmin/employee_account_action.php',
+        type: 'POST',
+        data: { action: 'get_details', id: id },
+        dataType: 'json',
+        success: function(res) {
+            Swal.close();
+            if (res.status === 'success') {
+                const d = res.details;
+                
+                // Populate Edit Modal Fields
+                $('#edit_id').val(d.id);
+                $('#edit_employee_id').val(d.employee_id); // Read-only field
+                $('#edit_email').val(d.email);
+                $('#edit_status').val(d.status);
+                $('#edit_password').val(''); // Always clear password on edit open
+                
+                $('#editEmployeeModal').modal('show');
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function() {
+            Swal.close();
+            Swal.fire('Error', 'Failed to fetch account details.', 'error');
+        }
+    });
+}
+
+// Handle Edit Form Submission
+$('#editEmployeeForm').on('submit', function(e) {
+    e.preventDefault();
+    const formData = $(this).serialize() + '&action=update';
+
+    Swal.fire({ title: 'Updating...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    $.ajax({
+        url: API_ROOT + '/superadmin/employee_account_action.php',
+        type: 'POST',
+        data: formData,
+        dataType: 'json',
+        success: function(res) {
+            Swal.close();
+            if (res.status === 'success') {
+                $('#editEmployeeModal').modal('hide');
+                Swal.fire({ 
+                    icon: 'success', title: 'Updated', 
+                    text: res.message, timer: 1500, showConfirmButton: false 
+                });
+                if(window.AppUtility) window.AppUtility.updateSyncStatus('success');
+                employeeTable.ajax.reload(null, false);
+            } else {
+                Swal.fire('Error', res.message, 'error');
+            }
+        },
+        error: function(xhr) {
+            Swal.close();
+            console.error(xhr.responseText);
+            Swal.fire('Error', 'Server request failed.', 'error');
+        }
+    });
+});
+
+// ==============================================================================
+// 4. DELETE LOGIC
+// ==============================================================================
 function deleteAccount(id) {
     Swal.fire({
-        title: 'Are you sure?',
-        text: "This user will lose access to the system.",
+        title: 'Delete Account?',
+        text: "This removes login access. The HR record remains.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete it!'
+        cancelButtonColor: '#858796',
+        confirmButtonText: 'Yes, delete it'
     }).then((result) => {
         if (result.isConfirmed) {
+            
+            if(window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+
             $.ajax({
-                // ⭐ UPDATED PATH
-                url: '../api/superadmin/employee_account_action.php',
+                url: API_ROOT + '/superadmin/employee_account_action.php',
                 type: 'POST',
                 data: { action: 'delete', id: id },
                 dataType: 'json',
                 success: function(res) {
                     if (res.status === 'success') {
                         Swal.fire('Deleted!', res.message, 'success');
-                        window.refreshPageContent(true); // Trigger Manual Refresh Style
+                        employeeTable.ajax.reload(null, false);
                     } else {
                         Swal.fire('Error', res.message, 'error');
+                        if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
                     }
                 },
                 error: function() {
                     Swal.fire('Error', 'Server connection failed.', 'error');
+                    if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             });
         }
@@ -131,26 +199,28 @@ function deleteAccount(id) {
 }
 
 // ==============================================================================
-// 3. INITIALIZATION
+// 5. INITIALIZATION
 // ==============================================================================
 $(document).ready(function() {
     
-    // 3.1 Initialize DataTable
+    // Initialize DataTable
     employeeTable = $('#employeeTable').DataTable({
         processing: true,
         serverSide: true,
         ordering: true, 
-        dom: 'rtip', 
+        dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+             "<'row'<'col-sm-12'tr>>" +
+             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
         ajax: {
-            // ⭐ UPDATED PATH
-            url: "../api/superadmin/employee_account_action.php", 
+            url: API_ROOT + "/superadmin/employee_account_action.php", 
             type: "POST",
-            data: { action: 'fetch' } 
-        },
-        // AUTOMATIC UI UPDATES ON DRAW
-        drawCallback: function(settings) {
-            updateSyncStatus('success');
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+            data: { action: 'fetch' },
+            error: function (xhr, error, code) {
+                if (error !== 'abort') {
+                    console.error("DataTables Error:", error);
+                    if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
+                }
+            }
         },
         columns: [
             { 
@@ -183,67 +253,31 @@ $(document).ready(function() {
                 className: "text-center align-middle text-nowrap",
                 render: function(data) {
                     return `
-                        <button class="btn btn-sm btn-outline-secondary shadow-sm me-1" onclick="openModal(${data})" title="Edit">
+                        <button class="btn btn-sm btn-outline-primary shadow-sm me-1" onclick="openEditModal(${data})" title="Edit">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary shadow-sm" onclick="deleteAccount(${data})" title="Delete">
+                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteAccount(${data})" title="Delete">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     `;
                 }
             }
         ],
-        language: { emptyTable: "No employee accounts found." }
-    });
-
-    // 3.2 DETECT LOADING STATE
-    $('#employeeTable').on('processing.dt', function (e, settings, processing) {
-        if (processing) {
-            if(!$('#refreshIcon').hasClass('fa-spin')) {
-                updateSyncStatus('loading');
-            }
+        language: { 
+            emptyTable: "<div class='py-4 text-center text-muted'>No employee accounts found.</div>",
+            processing: "<div class='spinner-border text-primary spinner-border-sm'></div> Loading..."
         }
     });
 
-    // 3.3 Handle Form Submission
-    $('#employeeForm').on('submit', function(e) {
-        e.preventDefault();
-        const action = $('#user_id').val() ? 'update' : 'create';
-        const formData = $(this).serialize() + '&action=' + action;
-
-        Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-
-        $.ajax({
-            // ⭐ UPDATED PATH
-            url: '../api/superadmin/employee_account_action.php',
-            type: 'POST',
-            data: formData,
-            dataType: 'json',
-            success: function(res) {
-                Swal.close();
-                if (res.status === 'success') {
-                    $('#employeeModal').modal('hide');
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success',
-                        text: res.message,
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
-                    window.refreshPageContent(true); // Manual refresh style on success
-                } else {
-                    Swal.fire('Error', res.message, 'error');
-                }
-            },
-            error: function() {
-                Swal.fire('Error', 'Server connection failed.', 'error');
-            }
-        });
+    // Detect Loading State for Global Sync
+    $('#employeeTable').on('processing.dt', function (e, settings, processing) {
+        if (window.AppUtility) {
+            if (processing) window.AppUtility.updateSyncStatus('loading');
+        }
     });
 
-    // 3.4 Manual Refresh Button Listener
-    $('#refreshIcon').closest('a, div').on('click', function(e) {
-        e.preventDefault();
-        window.refreshPageContent(true);
+    // Detect Success State
+    $('#employeeTable').on('draw.dt', function() {
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
     });
 });

@@ -1,38 +1,19 @@
-// assets/js/pages/financial_settings.js
+/**
+ * Financial Settings Controller
+ * Handles currency configurations and fiscal year settings.
+ * Integrated with Global AppUtility for Topbar syncing.
+ */
 
 $(document).ready(function() {
 
     // ==============================================================================
-    // 1. UI HELPERS
-    // ==============================================================================
-    function updateSyncStatus(state) {
-        const $dot = $('.live-dot');
-        const $text = $('#last-updated-time');
-        const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-        $dot.removeClass('text-success text-warning text-danger');
-
-        if (state === 'loading') {
-            $text.text('Syncing...');
-            $dot.addClass('text-warning'); 
-        } 
-        else if (state === 'success') {
-            $text.text(`Synced: ${time}`);
-            $dot.addClass('text-success'); 
-        } 
-        else {
-            $text.text(`Failed: ${time}`);
-            $dot.addClass('text-danger');  
-        }
-    }
-
-    // ==============================================================================
-    // 2. FETCH CURRENT DATA ON LOAD
+    // 1. DATA FETCHER
     // ==============================================================================
     function loadDetails() {
-        updateSyncStatus('loading');
+        // Trigger visual loading via Global Utility
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
 
-        $.post('../api/superadmin/financial_settings_action.php', { action: 'get_details' }, function(res) {
+        $.post(API_ROOT + '/superadmin/financial_settings_action.php', { action: 'get_details' }, function(res) {
             if(res.status === 'success') {
                 let d = res.data;
                 $('#currency_code').val(d.currency_code);
@@ -45,23 +26,26 @@ $(document).ready(function() {
                         year: 'numeric', month: 'long', day: 'numeric'
                     }));
                 }
-                updateSyncStatus('success');
+                
+                // Sync Success
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
             } else {
-                updateSyncStatus('error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             }
         }, 'json').fail(function() {
-            updateSyncStatus('error');
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
         });
     }
 
     // Initial Load
     loadDetails();
 
-    // Hook for Master Refresher
+    // ==============================================================================
+    // 2. MASTER REFRESHER HOOK
+    // ==============================================================================
     window.refreshPageContent = function(isManual = false) {
-        if(isManual) $('#refreshIcon').addClass('fa-spin');
+        // AppUtility handles the loading state; loadDetails handles the success/error
         loadDetails();
-        if(isManual) setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
     };
 
     // ==============================================================================
@@ -74,9 +58,12 @@ $(document).ready(function() {
         let formData = $(this).serialize() + '&action=update';
 
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i> Saving...');
+        
+        // Notify Topbar of activity
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
 
         $.ajax({
-            url: '../api/superadmin/financial_settings_action.php',
+            url: API_ROOT + '/superadmin/financial_settings_action.php',
             type: 'POST',
             data: formData,
             dataType: 'json',
@@ -89,13 +76,15 @@ $(document).ready(function() {
                         timer: 2000,
                         showConfirmButton: false
                     });
-                    loadDetails(); // Refresh to update timestamp
+                    loadDetails(); // Refresh to update timestamp and topbar
                 } else {
                     Swal.fire('Error', res.message, 'error');
+                    if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             },
             error: function() {
                 Swal.fire('Error', 'Server connection failed.', 'error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             },
             complete: function() {
                 btn.prop('disabled', false).html('<i class="fas fa-save me-1"></i> Save Configuration');

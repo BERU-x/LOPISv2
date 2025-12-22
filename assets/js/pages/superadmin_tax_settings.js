@@ -1,41 +1,21 @@
-// assets/js/pages/tax_settings.js
+/**
+ * Tax Settings Management Controller
+ * Handles the Philippine Tax Table (TRAIN Law slabs).
+ * Integrated with Global AppUtility for Topbar syncing.
+ */
 
 // ==============================================================================
 // 1. GLOBAL STATE & UI HELPERS
 // ==============================================================================
 var taxTable;
 
-/**
- * Updates the Topbar Status (Text + Dot Color)
- * @param {string} state - 'loading', 'success', or 'error'
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
 // 1.2 MASTER REFRESHER HOOK
+// isManual = true (Spin Icon) | isManual = false (Silent)
 window.refreshPageContent = function(isManual = false) {
     if (taxTable) {
-        if(isManual) {
-            $('#refreshIcon').addClass('fa-spin');
-            updateSyncStatus('loading');
+        // Use Global AppUtility for visual feedback
+        if (isManual && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
         // Reload DataTable (false = keep paging)
         taxTable.ajax.reload(null, false);
@@ -52,12 +32,12 @@ function openModal(id = null) {
     $('#tax_id').val('');
     $('#modalTitle').text(id ? 'Edit Tax Slab' : 'Add Tax Slab');
 
-    if(id) {
+    if (id) {
         Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         
-        $.post('../api/superadmin/tax_settings_action.php', { action: 'get_details', id: id }, function(res) {
+        $.post(API_ROOT + '/superadmin/tax_settings_action.php', { action: 'get_details', id: id }, function(res) {
             Swal.close();
-            if(res.status === 'success') {
+            if (res.status === 'success') {
                 let d = res.details;
                 $('#tax_id').val(d.id);
                 $('#tier_name').val(d.tier_name);
@@ -85,13 +65,17 @@ function deleteSlab(id) {
         confirmButtonColor: '#d33', 
         confirmButtonText: 'Yes, delete it!'
     }).then((res) => {
-        if(res.isConfirmed) {
-            $.post('../api/superadmin/tax_settings_action.php', { action: 'delete', id: id }, function(data) {
-                if(data.status === 'success') {
+        if (res.isConfirmed) {
+            // Trigger visual loading
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+
+            $.post(API_ROOT + '/superadmin/tax_settings_action.php', { action: 'delete', id: id }, function(data) {
+                if (data.status === 'success') {
                     Swal.fire('Deleted', data.message, 'success');
                     window.refreshPageContent(true); 
                 } else {
                     Swal.fire('Error', data.message, 'error');
+                    if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             }, 'json');
         }
@@ -106,7 +90,7 @@ $(document).ready(function() {
     // 3.1 INITIALIZE DATATABLE
     taxTable = $('#taxTable').DataTable({
         ajax: { 
-            url: '../api/superadmin/tax_settings_action.php', 
+            url: API_ROOT + '/superadmin/tax_settings_action.php', 
             type: 'POST', 
             data: { action: 'fetch' } 
         },
@@ -114,8 +98,8 @@ $(document).ready(function() {
         ordering: true,
         order: [[1, 'asc']], // Order by Min Income
         drawCallback: function() { 
-            updateSyncStatus('success');
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+            // Notify Global AppUtility of success
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
         },
         columns: [
             { data: 'tier_name', className: 'align-middle fw-bold' },
@@ -141,10 +125,10 @@ $(document).ready(function() {
                 data: 'id', orderable: false, className: 'text-center align-middle',
                 render: function(data) {
                     return `
-                        <button class="btn btn-sm btn-outline-secondary shadow-sm me-1" onclick="openModal(${data})">
+                        <button class="btn btn-sm btn-outline-primary shadow-sm me-1" onclick="openModal(${data})" title="Edit">
                             <i class="fas fa-pen"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary shadow-sm" onclick="deleteSlab(${data})">
+                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteSlab(${data})" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
                     `;
@@ -155,8 +139,8 @@ $(document).ready(function() {
 
     // 3.2 DETECT LOADING STATE
     $('#taxTable').on('processing.dt', function (e, settings, processing) {
-        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
-            updateSyncStatus('loading');
+        if (processing && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
     });
 
@@ -168,9 +152,9 @@ $(document).ready(function() {
 
         Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-        $.post('../api/superadmin/tax_settings_action.php', formData, function(res) {
+        $.post(API_ROOT + '/superadmin/tax_settings_action.php', formData, function(res) {
             Swal.close();
-            if(res.status === 'success') {
+            if (res.status === 'success') {
                 $('#taxModal').modal('hide');
                 Swal.fire({ icon: 'success', title: 'Saved', text: res.message, timer: 1500, showConfirmButton: false });
                 window.refreshPageContent(true);
@@ -178,11 +162,5 @@ $(document).ready(function() {
                 Swal.fire('Error', res.message, 'error');
             }
         }, 'json');
-    });
-
-    // 3.4 Manual Refresh Button Listener
-    $('#refreshIcon').closest('a, div').on('click', function(e) {
-        e.preventDefault();
-        window.refreshPageContent(true);
     });
 });

@@ -1,46 +1,24 @@
-// assets/js/pages/pay_components.js
+/**
+ * Pay Components Management Controller
+ * Manages Earnings and Deductions tables.
+ * Integrated with Global AppUtility for Topbar syncing.
+ */
 
 // ==============================================================================
 // 1. GLOBAL STATE & UI HELPERS
 // ==============================================================================
 var earningsTable, deductionsTable;
 
-/**
- * Updates the Topbar Status (Text + Dot Color)
- * @param {string} state - 'loading', 'success', or 'error'
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); // Yellow
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); // Green
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  // Red
-    }
-}
-
 // 1.2 MASTER REFRESHER HOOK
 // isManual = true (Spin Icon) | isManual = false (Silent)
 window.refreshPageContent = function(isManual = false) {
-    // 1. Visual Feedback for Manual Click
-    if(isManual) {
-        $('#refreshIcon').addClass('fa-spin');
-        updateSyncStatus('loading');
+    // 1. Visual Feedback for Manual Click via AppUtility
+    if (isManual && window.AppUtility) {
+        window.AppUtility.updateSyncStatus('loading');
     }
 
     // 2. Reload Tables (Silent)
-    // We reload both. The 'drawCallback' in earningsTable will handle removing the spinner/success state.
+    // The 'drawCallback' in earningsTable will handle the 'success' state.
     if (earningsTable) earningsTable.ajax.reload(null, false);
     if (deductionsTable) deductionsTable.ajax.reload(null, false);
 };
@@ -55,7 +33,6 @@ function openModal(type, id = null) {
     $('#comp_id').val('');
     $('#comp_type').val(type);
     
-    // UI Updates
     let typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
     $('#modalTitle').text(id ? 'Edit ' + typeLabel : 'Add New ' + typeLabel);
 
@@ -63,8 +40,7 @@ function openModal(type, id = null) {
         Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         
         $.ajax({
-            // ⭐ UPDATED PATH
-            url: '../api/superadmin/pay_components_action.php',
+            url: API_ROOT + '/superadmin/pay_components_action.php',
             type: 'POST',
             data: { action: 'get_details', id: id },
             dataType: 'json',
@@ -101,13 +77,15 @@ function deleteComponent(id) {
         confirmButtonText: 'Yes, delete it!'
     }).then((res) => {
         if(res.isConfirmed) {
-            // ⭐ UPDATED PATH
-            $.post('../api/superadmin/pay_components_action.php', { action: 'delete', id: id }, function(data) {
+            if(window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+
+            $.post(API_ROOT + '/superadmin/pay_components_action.php', { action: 'delete', id: id }, function(data) {
                 if(data.status === 'success') {
                     Swal.fire('Deleted', data.message, 'success');
-                    window.refreshPageContent(true); // Trigger Manual Refresh Style
+                    window.refreshPageContent(true); 
                 } else {
                     Swal.fire('Error', data.message, 'error');
+                    if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             }, 'json');
         }
@@ -142,8 +120,8 @@ $(document).ready(function() {
             data: 'id', orderable: false, className: 'text-center align-middle',
             render: function(data, type, row) {
                 return `
-                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="openModal('${row.type}', ${data})"><i class="fas fa-pen"></i></button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteComponent(${data})"><i class="fas fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="openModal('${row.type}', ${data})"><i class="fas fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComponent(${data})"><i class="fas fa-trash"></i></button>
                 `;
             }
         }
@@ -151,29 +129,34 @@ $(document).ready(function() {
 
     // 3.2 Initialize Earnings Table
     earningsTable = $('#earningsTable').DataTable({
-        // ⭐ UPDATED PATH
-        ajax: { url: '../api/superadmin/pay_components_action.php', type: 'POST', data: { action: 'fetch', type: 'earning' } },
+        ajax: { 
+            url: API_ROOT + '/superadmin/pay_components_action.php', 
+            type: 'POST', 
+            data: { action: 'fetch', type: 'earning' } 
+        },
         columns: columnsConfig,
         dom: 'rtip',
         drawCallback: function() { 
-            // Only update sync status on the main table to avoid double-firing
-            updateSyncStatus('success'); 
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+            // Sync with Topbar via Global Utility
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
         }
     });
 
     // 3.3 Initialize Deductions Table
     deductionsTable = $('#deductionsTable').DataTable({
-        // ⭐ UPDATED PATH
-        ajax: { url: '../api/superadmin/pay_components_action.php', type: 'POST', data: { action: 'fetch', type: 'deduction' } },
+        ajax: { 
+            url: API_ROOT + '/superadmin/pay_components_action.php', 
+            type: 'POST', 
+            data: { action: 'fetch', type: 'deduction' } 
+        },
         columns: columnsConfig,
         dom: 'rtip'
     });
 
-    // 3.4 Detect Loading State (For visual 'Syncing...' feedback)
+    // 3.4 Detect Loading State
     $('#earningsTable').on('processing.dt', function (e, settings, processing) {
-        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
-            updateSyncStatus('loading');
+        if (processing && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
     });
 
@@ -185,8 +168,7 @@ $(document).ready(function() {
 
         Swal.fire({ title: 'Saving...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-        // ⭐ UPDATED PATH
-        $.post('../api/superadmin/pay_components_action.php', formData, function(res) {
+        $.post(API_ROOT + '/superadmin/pay_components_action.php', formData, function(res) {
             Swal.close();
             if(res.status === 'success') {
                 $('#componentModal').modal('hide');
@@ -196,11 +178,5 @@ $(document).ready(function() {
                 Swal.fire('Error', res.message, 'error');
             }
         }, 'json');
-    });
-    
-    // 3.6 Manual Refresh Button Listener
-    $('#refreshIcon').closest('a, div').on('click', function(e) {
-        e.preventDefault();
-        window.refreshPageContent(true);
     });
 });

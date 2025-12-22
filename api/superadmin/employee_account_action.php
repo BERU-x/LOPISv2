@@ -12,9 +12,11 @@ if (!isset($_SESSION['usertype']) || $_SESSION['usertype'] != 0) {
 }
 
 // --- 2. DEPENDENCIES ---
-// Adjust paths based on location: api/superadmin/
 require_once __DIR__ . '/../../db_connection.php'; 
 require_once __DIR__ . '/../../helpers/audit_helper.php';
+
+// ⭐ IMPORT EMAIL HANDLER
+require_once __DIR__ . '/../../helpers/email_handler.php'; 
 
 // CONSTANT: Target Role = 2 (Employee)
 $TARGET_USERTYPE = 2; 
@@ -96,6 +98,25 @@ try {
     }
 
     // =================================================================================
+    // ACTION 6: GET AVAILABLE EMPLOYEES (FOR DROPDOWN)
+    // =================================================================================
+    if ($action === 'get_available_employees') {
+        // Fetch employees who are NOT already users in tbl_users
+        // This subquery ensures we don't double-create accounts for the same person
+        $sql = "SELECT employee_id, CONCAT(firstname, ' ', lastname) AS name 
+                FROM tbl_employees 
+                WHERE employee_id NOT IN (SELECT employee_id FROM tbl_users)
+                ORDER BY lastname ASC";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        echo json_encode(['status' => 'success', 'employees' => $employees ?: []]);
+        exit;
+    }
+
+    // =================================================================================
     // ACTION 3: CREATE ACCOUNT
     // =================================================================================
     if ($action === 'create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -103,7 +124,7 @@ try {
         $employee_id = trim($_POST['employee_id']);
         $email = trim($_POST['email']);
         $status = $_POST['status'] ?? 1;
-        $raw_password = !empty($_POST['password']) ? $_POST['password'] : 'Employee@123'; 
+        $raw_password = !empty($_POST['password']) ? $_POST['password'] : 'losi123'; 
 
         // Validate Uniqueness
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_users WHERE employee_id = ? OR email = ?");
@@ -121,10 +142,29 @@ try {
         
         if ($stmt->execute([$employee_id, $email, $hashed_password, $TARGET_USERTYPE, $status])) {
             
-            // Audit Log
+            $new_user_id = $pdo->lastInsertId();
+
+            // --- 1. QUEUE WELCOME EMAIL ---
+            $subject = "Welcome to LOPISv2 - Employee Access";
+            $body = "
+                <h3>Welcome!</h3>
+                <p>Your employee account has been created.</p>
+                <ul>
+                    <li><strong>Email:</strong> $email</li>
+                    <li><strong>Temporary Password:</strong> $raw_password</li>
+                </ul>
+                <p>Please log in and change your password immediately.</p>
+                <br>
+                <p>Regards,<br>HR Department</p>
+            ";
+
+            // Add to Global Queue (Type: WELCOME_EMPLOYEE)
+            queueEmail($pdo, $new_user_id, $email, $subject, $body, 'WELCOME_EMPLOYEE');
+            
+            // --- 2. AUDIT LOG ---
             logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'CREATE_EMP_ACC', "Created employee account: $email ($employee_id)");
 
-            echo json_encode(['status' => 'success', 'message' => 'Employee Account created successfully!']);
+            echo json_encode(['status' => 'success', 'message' => 'Employee Account created! Welcome email queued.']);
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Failed to create account.']);
         }

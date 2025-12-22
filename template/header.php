@@ -5,63 +5,61 @@
 // --- 1. START BUFFERING ---
 if (ob_get_level() == 0) ob_start();
 
-// --- 2. SESSION & CHECKING ---
-// This handles Security, Auto-Login, Timezone, and Session Start
+// --- 2. SESSION & SECURITY CHECK ---
+// ⭐ This calls checking.php which now contains the "Single Session Policy" 
+// If the session ID doesn't match the DB, checking.php will exit and redirect here.
 require_once __DIR__ . '/../checking.php';
 require_once __DIR__ . '/../helpers/link_setup.php';
 
-// --- 3. AUTHENTICATION CHECK ---
+// --- 3. AUTHENTICATION GUARD ---
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
-    header("Location: ../index.php"); 
+    // Determine path back to root index
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
+    $host = $_SERVER['HTTP_HOST'];
+    // Redirect to login
+    header("Location: $protocol://$host/LOPISv2/index.php"); 
     exit;
 }
 
-// --- 4. GET USER DATA ---
+// --- 4. USER CONTEXT DATA ---
 $user_id         = $_SESSION['user_id'] ?? 0;
-$user_type       = $_SESSION['usertype'] ?? 99; // 0=SA, 1=Admin, 2=Emp
+$user_type       = $_SESSION['usertype'] ?? 99; 
 $employee_id     = $_SESSION['employee_id'] ?? null;
 $fullname        = $_SESSION['fullname'] ?? 'User';
 $email           = $_SESSION['email'] ?? '';
 $profile_picture = $_SESSION['profile_picture'] ?? 'default.png';
 
 // Define User Type Label
-$usertype_name = '';
-switch ($user_type) {
-    case 0: $usertype_name = 'Super Admin'; break;
-    case 1: $usertype_name = 'Administrator'; break;
-    case 2: $usertype_name = 'Employee'; break;
-    default: $usertype_name = 'Guest'; break;
-}
+$usertype_name = match((int)$user_type) {
+    0 => 'Super Admin',
+    1 => 'Administrator',
+    2 => 'Employee',
+    default => 'Guest'
+};
 
-// --- 5. LOADER LOGIC ---
+// --- 5. PAGE LOADER LOGIC ---
 $show_loader = false; 
 if (isset($_SESSION['show_loader']) && $_SESSION['show_loader'] === true) {
     $show_loader = true;
     unset($_SESSION['show_loader']); 
 }
 
-// --- 6. NOTIFICATIONS ---
+// --- 6. NOTIFICATIONS FETCH ---
 $notifications = [];
 $notif_count = 0;
-
-// Path to the notification model
 $notif_model_path = __DIR__ . '/../app/models/notification_model.php';
 
 if (file_exists($notif_model_path) && isset($pdo)) {
     require_once $notif_model_path;
-    
     if (function_exists('get_my_notifications')) {
-        // Fetch notifications for current user/role
         $notifications = get_my_notifications($pdo, $user_type, 10, $employee_id);
-        
-        // Count unread
         foreach ($notifications as $n) {
-            if ($n['is_read'] == 0) $notif_count++;
+            if (isset($n['is_read']) && $n['is_read'] == 0) $notif_count++;
         }
     }
 }
 
-// --- 7. PAGE TITLE DEFAULT ---
+// --- 7. DEFAULT METADATA ---
 $page_title ??= 'LOPISv2 Portal';
 ?>
 <!DOCTYPE html>
@@ -77,7 +75,11 @@ $page_title ??= 'LOPISv2 Portal';
 
     <link href="../assets/vendor/fa6/css/all.min.css" rel="stylesheet" type="text/css">
     <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet">
+
     <link href="../assets/css/dataTables.min.css" rel="stylesheet"> 
+    
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Dropify/0.2.2/css/dropify.min.css">
     
@@ -95,7 +97,7 @@ $page_title ??= 'LOPISv2 Portal';
                     <div class="progress-bar"></div>
                 </div>
                 <span id="loader-percentage">0%</span>
-                <p class="loader-text mt-3">Initializing workspace...</p>
+                <p class="loader-text mt-3">Preparing your secure workspace...</p>
             </div>
         </div>
     <?php endif; ?>

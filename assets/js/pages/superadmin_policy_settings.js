@@ -1,38 +1,19 @@
-// assets/js/pages/policy_settings.js
+/**
+ * Policy Settings Controller
+ * Handles configuration for attendance grace periods, work hours, and leave benefits.
+ * Integrated with Global AppUtility for Topbar syncing.
+ */
 
 $(document).ready(function() {
 
     // ==============================================================================
-    // 1. UI HELPERS & SYNC STATUS
-    // ==============================================================================
-    function updateSyncStatus(state) {
-        const $dot = $('.live-dot');
-        const $text = $('#last-updated-time');
-        const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-        $dot.removeClass('text-success text-warning text-danger');
-
-        if (state === 'loading') {
-            $text.text('Syncing...');
-            $dot.addClass('text-warning'); 
-        } 
-        else if (state === 'success') {
-            $text.text(`Synced: ${time}`);
-            $dot.addClass('text-success'); 
-        } 
-        else {
-            $text.text(`Failed: ${time}`);
-            $dot.addClass('text-danger');  
-        }
-    }
-
-    // ==============================================================================
-    // 2. LOAD POLICY SETTINGS
+    // 1. DATA FETCHER
     // ==============================================================================
     function loadPolicies() {
-        updateSyncStatus('loading');
+        // Trigger visual loading via Global Utility
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
 
-        $.post('../api/superadmin/policy_settings_action.php', { action: 'get_details' }, function(res) {
+        $.post(API_ROOT + '/superadmin/policy_settings_action.php', { action: 'get_details' }, function(res) {
             if(res.status === 'success') {
                 let d = res.data;
                 
@@ -49,23 +30,26 @@ $(document).ready(function() {
                 if(d.updated_at) {
                     $('#last-updated-text').text('Last Configuration Update: ' + new Date(d.updated_at).toLocaleString());
                 }
-                updateSyncStatus('success');
+                
+                // Notify Global AppUtility of success
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
             } else {
-                updateSyncStatus('error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             }
         }, 'json').fail(function() {
-            updateSyncStatus('error');
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
         });
     }
 
     // Initial Load
     loadPolicies();
 
-    // Hook for Master Refresher (Topbar Sync Icon)
+    // ==============================================================================
+    // 2. MASTER REFRESHER HOOK
+    // ==============================================================================
     window.refreshPageContent = function(isManual = false) {
-        if(isManual) $('#refreshIcon').addClass('fa-spin');
+        // AppUtility handles the loading state; loadPolicies handles the success/error
         loadPolicies();
-        if(isManual) setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
     };
 
     // ==============================================================================
@@ -79,9 +63,11 @@ $(document).ready(function() {
 
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i> Saving...');
 
+        // Notify Topbar of activity
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+
         $.ajax({
-            // ⭐ UPDATED API PATH
-            url: '../api/superadmin/policy_settings_action.php',
+            url: API_ROOT + '/superadmin/policy_settings_action.php',
             type: 'POST',
             data: formData,
             dataType: 'json',
@@ -94,24 +80,20 @@ $(document).ready(function() {
                         timer: 1500,
                         showConfirmButton: false
                     });
-                    loadPolicies(); // Refresh to update timestamps
+                    loadPolicies(); // Refresh to update timestamps and topbar
                 } else {
                     Swal.fire('Error', res.message, 'error');
+                    if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             },
             error: function() {
                 Swal.fire('Error', 'Server connection failed.', 'error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             },
             complete: function() {
                 btn.prop('disabled', false).html('<i class="fas fa-save me-2"></i> Save Policies');
             }
         });
-    });
-
-    // 4. MANUAL REFRESH BUTTON LISTENER (if applicable)
-    $('#refreshIcon').closest('a, div').on('click', function(e) {
-        e.preventDefault();
-        window.refreshPageContent(true);
     });
 
 });

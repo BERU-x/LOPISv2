@@ -1,6 +1,4 @@
 <?php
-error_log(print_r($_POST, true));
-
 // api/superadmin/admin_management_action.php
 // Handles CRUD operations for Managing System Administrators (usertype = 1)
 header('Content-Type: application/json');
@@ -21,7 +19,7 @@ require_once __DIR__ . '/../../db_connection.php';
 require_once __DIR__ . '/../../helpers/audit_helper.php';
 
 // --- 4. INCLUDE EMAIL HANDLER ---
-require_once __DIR__ . '/../../helpers/email_handler.php';  // Add this line
+require_once __DIR__ . '/../../helpers/email_handler.php'; 
 
 // Get the Action
 $action = $_REQUEST['action'] ?? '';
@@ -34,7 +32,6 @@ try {
     if ($action === 'fetch') {
 
         // Base Query: Fetch only Admins (usertype = 1)
-        // We exclude Deleted status (if you use soft deletes) or just fetch all
         $sql = "SELECT id, employee_id, email, status, created_at FROM tbl_users WHERE usertype = 1";
         $params = [];
 
@@ -101,20 +98,20 @@ try {
         }
         exit;
     }
+
     // =================================================================================
     // ACTION 6: GET AVAILABLE EMPLOYEES
     // =================================================================================
     if ($action === 'get_available_employees') {
-        $sql = "SELECT employee_id, CONCAT(firstname, ' ', lastname) AS name FROM tbl_employees WHERE employee_id NOT IN (SELECT employee_id FROM tbl_users)";
+        // Fetch employees who are NOT already users in tbl_users
+        $sql = "SELECT employee_id, CONCAT(firstname, ' ', lastname) AS name 
+                FROM tbl_employees 
+                WHERE employee_id NOT IN (SELECT employee_id FROM tbl_users)";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
         $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        if ($employees) {
-            echo json_encode(['status' => 'success', 'employees' => $employees]);
-        } else {
-            echo json_encode(['status' => 'success', 'employees' => []]); // Return empty array if no employees found
-        }
+        echo json_encode(['status' => 'success', 'employees' => $employees ?: []]);
         exit;
     }
 
@@ -126,9 +123,9 @@ try {
         $employee_id = trim($_POST['employee_id']);
         $email = trim($_POST['email']);
         $status = $_POST['status'] ?? 1;
-        $raw_password = !empty($_POST['password']) ? $_POST['password'] : 'losi@123'; // Default strong password
+        $raw_password = !empty($_POST['password']) ? $_POST['password'] : 'losi@123'; 
 
-        // Validation: Check Duplicates in tbl_users
+        // Validation: Check Duplicates
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_users WHERE employee_id = ? OR email = ?");
         $stmt->execute([$employee_id, $email]);
         if ($stmt->fetchColumn() > 0) {
@@ -136,19 +133,11 @@ try {
             exit;
         }
 
-        // Validation: Check if employee exists in employees table
+        // Validation: Check Employee Existence
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_employees WHERE employee_id = ?");
         $stmt->execute([$employee_id]);
         if ($stmt->fetchColumn() == 0) {
             echo json_encode(['status' => 'error', 'message' => 'Employee ID does not exist in employees table!']);
-            exit;
-        }
-
-        // Validation: Ensure the employee doesn't already HAVE an account (even if not admin)
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_users WHERE employee_id = ?");
-        $stmt->execute([$employee_id]);
-        if ($stmt->fetchColumn() > 0) {
-            echo json_encode(['status' => 'error', 'message' => 'This employee already has a user account.']);
             exit;
         }
 
@@ -161,66 +150,60 @@ try {
 
         if ($stmt->execute([$employee_id, $email, $hashed_password, $usertype, $status])) {
 
-            $user_id = $pdo->lastInsertId(); // Get the newly inserted user's ID
-            $token = bin2hex(random_bytes(32)); // Generate a random token
-            $reason = "new_admin_account"; // Reason for the email
+            $user_id = $pdo->lastInsertId(); 
 
-            // --- ADD PENDING EMAIL (BEFORE SENDING) ---
-            if (!addPendingEmail($pdo, $user_id, $token, $reason)) {
-                error_log("Failed to add pending email to tbl_pending_emails for user ID: $user_id");
-                $message = 'New Admin added successfully! Failed to add pending email.'; // Still a success, but with a warning
-                echo json_encode(['status' => 'success', 'message' => $message]);
-                exit; // Exit early, but still indicate success
-            }
+            // --- 1. EMAIL NOTIFICATION QUEUE ---
+            // We use the new queueEmail() function here instead of addPendingEmail() or send_email()
+            
+            $subject = 'Welcome to LOPISv2 - Admin Account Created';
+            
+            $body_html = "
+                <h3>Welcome to the Team</h3>
+                <p>Dear Admin,</p>
+                <p>A new administrator account has been created for you with the following details:</p>
+                <ul>
+                    <li><strong>Email:</strong> $email</li>
+                    <li><strong>Temporary Password:</strong> $raw_password</li>
+                </ul>
+                <p>Please log in and change your password immediately.</p>
+                <br>
+                <p>Sincerely,<br>The System Administrator</p>
+            ";
 
-            // --- EMAIL NOTIFICATION ---
-            $subject = 'New Admin Account Created';
-            $body = "Dear Admin,\n\nA new admin account has been created for you with the following details:\n\nEmail: $email\nPassword: $raw_password (default)\n\nPlease log in and change your password as soon as possible.\n\nSincerely,\nThe System Administrator";
-            $html_body = "<p>Dear Admin,</p><p>A new admin account has been created for you with the following details:</p><p>Email: $email</p><p>Password: $raw_password (default)</p><p>Please log in and change your password as soon as possible.</p><p>Sincerely,<br>The System Administrator</p>";
+            // Queue the email to be sent by the background worker
+            // We pass 'WELCOME_ADMIN' as the type tag
+            queueEmail($pdo, $user_id, $email, $subject, $body_html, 'WELCOME_ADMIN');
 
-            // Call the send_email function
-            $email_status = send_email($pdo, $email, $subject, $body, $html_body);
+            // --- 2. AUDIT LOG ---
+            logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'CREATE_ADMIN', "Created new admin: $email ($employee_id)");
 
-            if ($email_status === 'sent') {
-                $message = 'New Admin added successfully! Email sent.';
-                // Mark email as sent (if you want to remove it from pending after successful sending)
-                // You'd need the pending email ID here, which isn't readily available.  Consider returning the ID from addPendingEmail
-            } elseif ($email_status === 'disabled') {
-                $message = 'New Admin added successfully! Email sending is disabled.';
-            } else {
-                $message = 'New Admin added successfully!  Failed to send email.';
-            }
-
-            // Audit Log
-            logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'CREATE_ADMIN', "Created new admin: $email");
-
-            echo json_encode(['status' => 'success', 'message' => $message]);
+            echo json_encode(['status' => 'success', 'message' => 'New Admin added successfully! Welcome email has been queued.']);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Failed to add admin.']);
+            echo json_encode(['status' => 'error', 'message' => 'Failed to insert admin into database.']);
         }
         exit;
     }
+
     // =================================================================================
     // ACTION 4: UPDATE ADMIN
     // =================================================================================
     if ($action === 'update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
-        $id = $_POST['id'];
-        $employee_id = trim($_POST['employee_id']);
+        $id = $_POST['admin_id']; // Ensure form field matches this name
         $email = trim($_POST['email']);
         $status = $_POST['status'];
 
         // Check duplicates (excluding self)
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_users WHERE (employee_id = ? OR email = ?) AND id != ?");
-        $stmt->execute([$employee_id, $email, $id]);
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_users WHERE email = ? AND id != ?");
+        $stmt->execute([$email, $id]);
         if ($stmt->fetchColumn() > 0) {
-            echo json_encode(['status' => 'error', 'message' => 'Employee ID or Email already exists for another user.']);
+            echo json_encode(['status' => 'error', 'message' => 'Email is already taken by another user.']);
             exit;
         }
 
         // Prepare Update
-        $params = [$employee_id, $email, $status];
-        $sql = "UPDATE tbl_users SET employee_id = ?, email = ?, status = ?";
+        $params = [$email, $status];
+        $sql = "UPDATE tbl_users SET email = ?, status = ?";
 
         // Only update password if provided
         if (!empty($_POST['password'])) {
@@ -233,10 +216,7 @@ try {
 
         $stmt = $pdo->prepare($sql);
         if ($stmt->execute($params)) {
-
-            // Audit Log
             logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'UPDATE_ADMIN', "Updated admin details for ID: $id ($email)");
-
             echo json_encode(['status' => 'success', 'message' => 'Admin updated successfully!']);
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Failed to update admin.']);
@@ -245,7 +225,7 @@ try {
     }
 
     // =================================================================================
-    // ACTION 5: DELETE ADMIN
+    // ACTION 5: DELETE (REVOKE) ADMIN
     // =================================================================================
     if ($action === 'delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = $_POST['id'];
@@ -256,20 +236,23 @@ try {
             exit;
         }
 
-        // Fetch email for logging before deletion
+        // Fetch email for logging
         $stmt = $pdo->prepare("SELECT email FROM tbl_users WHERE id = ?");
         $stmt->execute([$id]);
         $target_email = $stmt->fetchColumn();
 
-        $stmt = $pdo->prepare("DELETE FROM tbl_users WHERE id = ?");
+        // Option A: Hard Delete
+        // $stmt = $pdo->prepare("DELETE FROM tbl_users WHERE id = ?");
+        
+        // Option B: Soft Delete / Downgrade (Recommended)
+        // Downgrade to standard employee (usertype 2) and set inactive (status 0)
+        $stmt = $pdo->prepare("UPDATE tbl_users SET usertype = 2, status = 0 WHERE id = ?");
+
         if ($stmt->execute([$id])) {
-
-            // Audit Log
-            logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'DELETE_ADMIN', "Deleted admin: $target_email (ID: $id)");
-
-            echo json_encode(['status' => 'success', 'message' => 'Admin deleted successfully.']);
+            logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'DELETE_ADMIN', "Revoked admin access for: $target_email (ID: $id)");
+            echo json_encode(['status' => 'success', 'message' => 'Admin access revoked successfully.']);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'Failed to delete admin.']);
+            echo json_encode(['status' => 'error', 'message' => 'Failed to revoke admin.']);
         }
         exit;
     }
@@ -279,6 +262,7 @@ try {
 
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'Database Error: ' . $e->getMessage()]);
+    error_log("Admin Management Error: " . $e->getMessage());
+    echo json_encode(['status' => 'error', 'message' => 'Server Error: ' . $e->getMessage()]);
 }
 ?>

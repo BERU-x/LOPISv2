@@ -1,40 +1,20 @@
-// assets/js/pages/audit_logs.js
+/**
+ * Audit Logs Controller
+ * Handles the monitoring and purging of system activity logs.
+ * Integrated with Global AppUtility for Topbar syncing.
+ */
 
 // ==============================================================================
 // 1. GLOBAL STATE & UI HELPERS
 // ==============================================================================
 var logsTable;
 
-/**
- * Updates the Topbar Status (Text + Dot Color)
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
 // 1.2 MASTER REFRESHER HOOK
+// isManual = true (Spin Icon) | isManual = false (Silent)
 window.refreshPageContent = function(isManual = false) {
     if (logsTable) {
-        if(isManual) {
-            $('#refreshIcon').addClass('fa-spin');
-            updateSyncStatus('loading');
+        if(isManual && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
         // Reload DataTable without resetting pagination
         logsTable.ajax.reload(null, false);
@@ -47,7 +27,7 @@ window.refreshPageContent = function(isManual = false) {
 
 // 2.1 View Details
 function viewLog(id) {
-    $.post('../api/superadmin/audit_logs_action.php', { action: 'get_details', id: id }, function(res) {
+    $.post(API_ROOT + '/superadmin/audit_logs_action.php', { action: 'get_details', id: id }, function(res) {
         if(res.status === 'success') {
             let d = res.data;
             $('#view_action').text(d.action);
@@ -70,14 +50,16 @@ function confirmClearLogs() {
         confirmButtonText: 'Yes, Purge Now'
     }).then((result) => {
         if (result.isConfirmed) {
+            if(window.AppUtility) window.AppUtility.updateSyncStatus('loading');
             Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             
-            $.post('../api/superadmin/audit_logs_action.php', { action: 'clear_logs' }, function(res) {
+            $.post(API_ROOT + '/superadmin/audit_logs_action.php', { action: 'clear_logs' }, function(res) {
                 if(res.status === 'success') {
                     Swal.fire('Success!', res.message, 'success');
                     window.refreshPageContent(true);
                 } else {
                     Swal.fire('Error', res.message, 'error');
+                    if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
                 }
             }, 'json');
         }
@@ -94,16 +76,19 @@ $(document).ready(function() {
         serverSide: true, 
         processing: true,
         ajax: { 
-            url: '../api/superadmin/audit_logs_action.php', 
+            url: API_ROOT + '/superadmin/audit_logs_action.php', 
             type: 'POST', 
-            data: { action: 'fetch' } 
+            data: { action: 'fetch' },
+            error: function() {
+                if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
+            }
         },
         order: [[0, 'desc']], // Most recent activity first
         pageLength: 25,
         dom: 'rtip',
         drawCallback: function() {
-            updateSyncStatus('success');
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+            // Sync with Topbar via Global Utility
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
         },
         columns: [
             { 
@@ -117,10 +102,16 @@ $(document).ready(function() {
                 }
             },
             { 
-                data: 'full_name', // Uses the COALESCE name from our new API
+                data: 'full_name', 
                 className: 'fw-bold align-middle',
                 render: function(data, type, row) {
-                    return data ? data : '<span class="text-muted fst-italic">System Process</span>';
+                    // If the user_id is 0 or full_name is null, it's a System process
+                    if (!data || row.user_id == 0) {
+                        return `<span class="text-primary">
+                                    <i class="fas fa-robot me-1"></i> LOPIS System
+                                </span>`;
+                    }
+                    return data;
                 }
             },
             { 
@@ -169,14 +160,8 @@ $(document).ready(function() {
 
     // 3.2 DETECT LOADING STATE
     $('#logsTable').on('processing.dt', function (e, settings, processing) {
-        if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
-            updateSyncStatus('loading');
+        if (processing && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
-    });
-
-    // 3.3 Manual Refresh Icon Listener
-    $('#refreshIcon').closest('a, div').on('click', function(e) {
-        e.preventDefault();
-        window.refreshPageContent(true);
     });
 });

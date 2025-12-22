@@ -11,10 +11,26 @@ require '../template/topbar.php';
 <div class="container-fluid">
 
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">System Audit Trails</h1>
-        <button class="btn btn-danger btn-sm shadow-sm" onclick="confirmClearLogs()">
-            <i class="fas fa-trash-alt fa-sm text-white-50 me-2"></i>Clear Old Logs
-        </button>
+        <div>
+            <h1 class="h3 mb-0 text-gray-800">System Audit Trails</h1>
+            <p class="text-xs text-muted mb-0 mt-1">
+                <i class="fas fa-robot me-1"></i> Auto-purge enabled: Logs older than <strong>90 days</strong> are removed daily.
+            </p>
+        </div>
+        
+        <div class="dropdown">
+            <button class="btn btn-outline-danger btn-sm shadow-sm dropdown-toggle" type="button" id="purgeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-broom fa-sm me-2"></i>Maintenance
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="purgeDropdown">
+                <li><h6 class="dropdown-header">Manual Purge</h6></li>
+                <li>
+                    <a class="dropdown-item text-danger" href="javascript:void(0)" onclick="confirmClearLogs()">
+                        <i class="fas fa-trash-alt fa-sm me-2"></i>Purge Now (Manual)
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
 
     <div class="card shadow mb-4">

@@ -102,17 +102,26 @@ function get_payroll_history($pdo) {
  */
 function get_upcoming_leaves($pdo, $limit = 5) {
     try {
-        $sql = "SELECT t1.start_date, t1.end_date, t1.leave_type, t2.firstname, t2.lastname, t2.photo, t2.employee_id 
+        // We add CONCAT here to create the 'fullname' alias the JS expects
+        $sql = "SELECT 
+                    t1.start_date, 
+                    t1.end_date, 
+                    t1.leave_type, 
+                    CONCAT(t2.firstname, ' ', t2.lastname) AS fullname, 
+                    t2.photo, 
+                    t2.employee_id 
                 FROM tbl_leave t1 
                 JOIN tbl_employees t2 ON t1.employee_id = t2.employee_id 
                 WHERE t1.status = 1 AND t1.end_date >= CURRENT_DATE 
                 ORDER BY t1.start_date ASC 
                 LIMIT :limit";
+                
         $stmt = $pdo->prepare($sql);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
+        error_log("Error fetching leaves: " . $e->getMessage());
         return [];
     }
 }

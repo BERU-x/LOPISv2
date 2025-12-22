@@ -1,195 +1,132 @@
 /**
  * Attendance Live Controller
- * Handles real-time attendance logs and dynamic status reporting.
+ * Features: Mutex Locking, Raw Data CSV Export, Stats Auto-Update, and Global Sync.
  */
-
-// ==============================================================================
-// 1. GLOBAL STATE & UI HELPERS
-// ==============================================================================
 let attendanceTable;
+window.isProcessing = false; // ⭐ The "Lock"
 
-/**
- * Updates the Topbar Status (Text + Dot Color)
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
-// 1.2 MASTER REFRESHER HOOK
+// 1. MASTER REFRESHER HOOK
 window.refreshPageContent = function(isManual = false) {
-    loadAttendanceData(isManual);
+    if (window.isProcessing) return; 
+
+    if (attendanceTable && $.fn.DataTable.isDataTable('#todayTable')) {
+        window.isProcessing = true; 
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+        
+        attendanceTable.ajax.reload(function(json) {
+            // Stats card update logic is handled by drawCallback below
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
+            window.isProcessing = false; 
+        }, false);
+    }
 };
 
-// ==============================================================================
-// 2. MAIN DATA FETCHER
-// ==============================================================================
-function loadAttendanceData(isManual = false) {
-    if(isManual) $('#refreshIcon').addClass('fa-spin'); 
-    updateSyncStatus('loading');
-
-    $.ajax({
-        // ⭐ UPDATED API PATH
-        url: '../api/admin/attendance_live.php',
-        type: 'GET',
-        dataType: 'json',
-        success: function(response) {
-            
-            // A. Update Stats Cards (Present, Late, Absent, etc.)
-            if (response.stats) {
-                $('#val-present').text(response.stats.present);
-                $('#val-total').text(response.stats.total_employees);
-                $('#val-absent').text(response.stats.absent);
-                $('#val-late').text(response.stats.late);
-                $('#val-ontime').text(response.stats.ontime);
-            }
-
-            // B. Update Table Data
-            if (attendanceTable) {
-                attendanceTable.clear(); 
-                if (response.logs && response.logs.length > 0) {
-                    attendanceTable.rows.add(response.logs); 
-                }
-                attendanceTable.draw(false); 
-            }
-
-            updateSyncStatus('success');
-        },
-        error: function(err) {
-            console.error("Attendance Sync Failed:", err);
-            updateSyncStatus('error');
-        },
-        complete: function() {
-            if(isManual) setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 600);
-        }
-    });
-}
-
-// ==============================================================================
-// 3. INITIALIZATION
-// ==============================================================================
 $(document).ready(function() {
-    
-    // 3.1 DATATABLE INITIALIZATION
+    // 1. CLEANUP
+    if ($.fn.DataTable.isDataTable('#todayTable')) {
+        $('#todayTable').DataTable().destroy();
+        $('#todayTable').empty();
+        $('#todayTable').append('<thead class="bg-light text-gray-600 text-xs font-weight-bold text-uppercase"><tr><th>Employee Name</th><th>Clock In</th><th>Clock Out</th><th class="text-center">Log Status</th><th class="text-end">Duration</th></tr></thead><tbody></tbody>');
+    }
+
+    // 2. INITIALIZATION
+    window.isProcessing = true; 
+
     attendanceTable = $('#todayTable').DataTable({
-        data: [], 
-        order: [[ 1, "desc" ]], // Order by Time In
+        destroy: true,
+        ajax: {
+            url: API_ROOT + '/admin/attendance_live.php',
+            dataSrc: 'logs'
+        },
+        // 'B' initializes buttons, 'f' search, 'r' processing, 't' table, 'i' info, 'p' pagination
+        dom: 'Bfrtip', 
+        buttons: [{
+            extend: 'csvHtml5',
+            className: 'd-none', // Hidden, triggered by custom UI button
+            title: 'Attendance_Report_' + new Date().toISOString().slice(0, 10),
+            exportOptions: { 
+                columns: [0, 1, 2, 3, 4],
+                format: {
+                    header: function (data) {
+                        // Strips the HTML sorting spans from the header text
+                        return data.replace(/<[^>]*>?/gm, '').trim();
+                    },
+                    body: function (data, rowIdx, columnIdx) {
+                        const rowData = attendanceTable.row(rowIdx).data();
+                        const raw = rowData.raw_data;
+                        switch(columnIdx) {
+                            case 0: return raw.name;
+                            case 1: return raw.clock_in;
+                            case 2: return raw.clock_out;
+                            case 3: return raw.status;
+                            case 4: return raw.duration;
+                            default: return data;
+                        }
+                    }
+                }
+            },
+            customize: function (csv) {
+                return "LOPISv2 TODAY'S ATTENDANCE FEED\n" + 
+                       "Report Date: " + new Date().toLocaleDateString() + "\n" + 
+                       "----------------------------------\n" + csv;
+            }
+        }],
+        // ⭐ AUTO-UPDATE STATS CARDS
+        drawCallback: function(settings) {
+            const json = settings.json;
+            if (json && json.stats) {
+                $('#val-present').text(json.stats.present);
+                $('#val-total').text(json.stats.total_employees);
+                $('#val-absent').text(json.stats.absent);
+                $('#val-late').text(json.stats.late);
+                $('#val-ontime').text(json.stats.ontime);
+            }
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
+            window.isProcessing = false; 
+        },
+        order: [[1, "desc"]],
         pageLength: 25,
-        dom: 'rtip', 
-        responsive: true,
         columns: [
-            // Col 1: Profile & Name
-            { 
-                data: null,
-                className: 'align-middle',
-                render: function (data, type, row) {
-                    let photoPath = row.photo && row.photo !== 'default.png' 
-                        ? `../assets/images/users/${row.photo}` 
-                        : '../assets/images/users/default.png';
-                    
-                    return `
-                        <div class="d-flex align-items-center">
-                            <img src="${photoPath}" class="rounded-circle me-3 border shadow-sm" 
-                                style="width: 42px; height: 42px; object-fit: cover;" 
-                                onerror="this.src='../assets/images/users/default.png'">
+            { data: null, render: function (d, t, row) {
+                let img = row.photo && row.photo !== 'default.png' ? `../assets/images/users/${row.photo}` : '../assets/images/users/default.png';
+                return `<div class="d-flex align-items-center">
+                            <img src="${img}" class="rounded-circle me-3 border shadow-sm" width="42" height="42" style="object-fit:cover" onerror="this.src='../assets/images/users/default.png'">
                             <div>
-                                <div class="fw-bold text-dark mb-0">${row.fullname}</div>
+                                <div class="fw-bold text-dark">${row.fullname}</div>
                                 <div class="small text-muted font-monospace">${row.emp_code} • ${row.department}</div>
                             </div>
                         </div>`;
-                }
+            }},
+            { data: 'time_in', className: 'fw-bold text-primary align-middle' },
+            { data: null, render: d => d.is_active 
+                ? `<span class="badge bg-soft-secondary text-secondary border fw-normal">In Progress</span>` 
+                : `<span class="fw-bold text-dark">${d.time_out}</span>` 
             },
-            // Col 2: Time In
-            { 
-                data: null,
-                className: 'align-middle text-nowrap',
-                render: function(data, type, row) {
-                    return `
-                        <div class="fw-bold text-primary">${row.time_in}</div>
-                        <div class="small text-muted">${row.date_in}</div>
-                    `;
-                }
-            },
-            // Col 3: Time Out
-            { 
-                data: null,
-                className: 'align-middle text-nowrap',
-                render: function(data, type, row) {
-                    if(row.is_active) {
-                        return `<span class="badge bg-soft-secondary text-secondary font-monospace fw-normal">In Progress</span>`;
-                    }
-                    return `
-                        <div class="fw-bold text-dark">${row.time_out}</div>
-                        <div class="small text-muted">${row.date_out || '--'}</div>
-                    `;
-                }
-            },
-            // Col 4: Status Badges
-            { 
-                data: 'status',
-                className: 'text-center align-middle',
-                render: function(data, type, row) {
-                    let status = (data || '').toLowerCase();
-                    let html = '';
-
-                    // Ontime/Late logic
-                    if(status.includes('ontime')) 
-                        html += '<span class="badge bg-soft-success text-success border border-success px-3 rounded-pill me-1">Ontime</span>';
-                    else if(status.includes('late')) 
-                        html += '<span class="badge bg-soft-warning text-warning border border-warning px-3 rounded-pill me-1">Late</span>';
-
-                    // Additional context
-                    if(status.includes('overtime')) 
-                        html += '<span class="badge bg-soft-primary text-primary border border-primary px-3 rounded-pill">OT</span>';
-                    
-                    if(row.is_active) {
-                        html += '<span class="ms-1 text-success small"><i class="fa-solid fa-circle-play fa-fade"></i></span>';
-                    }
-
-                    return html || '<span class="text-muted small">--</span>';
-                }
-            },
-            // Col 5: Duration
-            { 
-                data: 'hours', 
-                className: 'fw-bold text-end text-dark align-middle font-monospace' 
-            }
-        ],
-        language: { "emptyTable": "No employees have clocked in yet today." }
+            { data: 'status', className: 'text-center align-middle', render: function(d, t, row) {
+                let s = (d || '').toLowerCase();
+                let h = '';
+                if(s.includes('ontime')) h += '<span class="badge bg-soft-success text-success border border-success px-3 rounded-pill me-1">Ontime</span>';
+                if(s.includes('late')) h += '<span class="badge bg-soft-warning text-warning border border-warning px-3 rounded-pill me-1">Late</span>';
+                if(row.overtime > 0) h += `<span class="badge bg-soft-primary text-primary border border-primary px-3 rounded-pill">OT</span>`;
+                if(row.is_active) h += '<span class="ms-1 text-success small"><i class="fa-solid fa-circle-play fa-fade"></i></span>';
+                return h || '<span class="text-muted small">--</span>';
+            }},
+            { data: 'hours', className: 'fw-bold text-end text-dark align-middle font-monospace' }
+        ]
     });
 
-    // 3.2 Custom Search Hook
+    // 3. EVENT BINDINGS
+    $('#btn-export-csv').on('click', function(e) {
+        e.preventDefault();
+        attendanceTable.button('.buttons-csv').trigger();
+    });
+
     $('#customSearch').on('keyup', function() { 
         attendanceTable.search(this.value).draw(); 
     });
 
-    // 3.3 Set Interval for Auto-Refresh (Every 60 Seconds)
-    setInterval(function() {
-        loadAttendanceData(false); // Silent refresh
-    }, 60000);
-
-    // 3.4 Initial Load
-    loadAttendanceData(true);
-
-    // 3.5 Manual Refresh Button
     $('#btn-refresh').on('click', function(e) {
         e.preventDefault();
-        loadAttendanceData(true);
+        window.refreshPageContent(true);
     });
 });

@@ -53,13 +53,6 @@ function isActive($page_name, $current_page) {
                 <i class="fa-solid fa-fw fa-users"></i>
                 <span>Employees</span>
             </a>
-        </li>   
-        
-        <li class="nav-item <?php echo isActive('roles_management', $current_page); ?>">
-            <a class="nav-link" href="<?php echo $base_link; ?>roles_management.php">
-                <i class="fa-solid fa-fw fa-user-gear"></i>
-                <span>User Roles & Permissions</span>
-            </a>
         </li>
 
         <hr class="sidebar-divider">
