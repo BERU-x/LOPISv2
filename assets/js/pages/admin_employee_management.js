@@ -1,52 +1,34 @@
 /**
  * Employee Management Controller
- * Handles DataTables SSP, Multipart Form submissions (Photos), and Dropify.
+ * Updated: Global API_ROOT, Mutex Locking, and AppUtility Sync.
  */
 
-// ==============================================================================
-// 1. GLOBAL STATE & HELPER FUNCTIONS
-// ==============================================================================
 var employeesTable; 
-window.currentPhotoUrl = null; // Holds the URL for Dropify default-file logic
+window.isProcessing = false; // ⭐ The "Lock"
+window.currentPhotoUrl = null; 
 
-/**
- * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
-// 1.2 MASTER REFRESHER TRIGGER
+// ==============================================================================
+// 1. MASTER REFRESHER TRIGGER
+// ==============================================================================
 window.refreshPageContent = function(isManual = false) {
-    if (employeesTable) {
-        if(isManual) {
-            $('#refreshIcon').addClass('fa-spin');
-            updateSyncStatus('loading');
-        }
-        employeesTable.ajax.reload(null, false);
+    if (window.isProcessing) return;
+
+    if (employeesTable && $.fn.DataTable.isDataTable('#employeesTable')) {
+        window.isProcessing = true; 
+        
+        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+        if (isManual) $('#refreshIcon').addClass('fa-spin');
+
+        employeesTable.ajax.reload(function() {
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
+            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+            window.isProcessing = false; // 🔓 Release lock
+        }, false);
     }
 };
 
 /**
- * 1.3 HELPER: Dropify Re-initialization
- * Re-creates the DOM element to force Dropify to recognize new default files.
+ * 1.1 HELPER: Dropify Re-initialization
  */
 function resetDropify(targetId, defaultFile = null) {
     const $dropify = $(`#${targetId}`);
@@ -85,8 +67,8 @@ window.editEmployee = function(id) {
     window.currentPhotoUrl = null; 
 
     $.ajax({
-        // ⭐ UPDATED API PATH
-        url: '../api/admin/employee_action.php?action=get_details',
+        // ⭐ UPDATED TO USE GLOBAL API_ROOT
+        url: API_ROOT + '/admin/employee_action.php?action=get_details',
         type: 'POST',
         data: { employee_id: id },
         dataType: 'json',
@@ -122,7 +104,7 @@ window.editEmployee = function(id) {
                 form.find('#edit_account_number').val(data.account_number);
 
                 // Photo Handling
-                window.currentPhotoUrl = data.photo ? `../assets/images/users/${data.photo}` : null;
+                window.currentPhotoUrl = data.photo ? `${WEB_ROOT}/assets/images/users/${data.photo}` : null;
                 
                 $('#editModal').modal('show'); 
             } else {
@@ -140,18 +122,22 @@ window.editEmployee = function(id) {
 $(document).ready(function() {
 
     // 3.1 Initialize DataTable
+    window.isProcessing = true; 
+
     employeesTable = $('#employeesTable').DataTable({
         processing: true,
         serverSide: true,
         ordering: true, 
         dom: 'rtip', 
         ajax: {
-            url: "../api/admin/employee_action.php?action=fetch", 
+            // ⭐ UPDATED TO USE GLOBAL API_ROOT
+            url: API_ROOT + "/admin/employee_action.php?action=fetch", 
             type: "GET"
         },
         drawCallback: function() {
-            updateSyncStatus('success');
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
             setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+            window.isProcessing = false; 
         },
         columns: [
             { data: 'employee_id', className: 'fw-bold text-dark align-middle' },
@@ -160,10 +146,10 @@ $(document).ready(function() {
                 className: 'align-middle',
                 render: function(data, type, row) {
                     const fullName = `${row.firstname} ${row.lastname}`;
-                    const photo = row.photo ? `../assets/images/users/${row.photo}` : `../assets/images/users/default.png`;
+                    const photo = row.photo ? `${WEB_ROOT}/assets/images/users/${row.photo}` : `${WEB_ROOT}/assets/images/users/default.png`;
                     return `
                         <div class="d-flex align-items-center">
-                            <img src="${photo}" class="rounded-circle me-3 border shadow-sm" style="width: 40px; height: 40px; object-fit: cover;" onerror="this.src='../assets/images/users/default.png'">
+                            <img src="${photo}" class="rounded-circle me-3 border shadow-sm" style="width: 40px; height: 40px; object-fit: cover;" onerror="this.src='${WEB_ROOT}/assets/images/users/default.png'">
                             <div>
                                 <div class="fw-bold text-dark mb-0">${fullName}</div>
                                 <div class="small text-muted">${row.position}</div>
@@ -208,7 +194,8 @@ $(document).ready(function() {
         Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
-            url: `../api/admin/employee_action.php?action=${action}`,
+            // ⭐ UPDATED TO USE GLOBAL API_ROOT
+            url: API_ROOT + `/admin/employee_action.php?action=${action}`,
             type: 'POST',
             data: formData,
             processData: false,
@@ -239,5 +226,9 @@ $(document).ready(function() {
 
     // 3.4 Search & Refresh
     $('#customSearch').on('keyup', function() { employeesTable.search(this.value).draw(); });
-    $('#btn-refresh').on('click', function(e) { e.preventDefault(); window.refreshPageContent(true); });
+    
+    $('#btn-refresh').on('click', function(e) { 
+        e.preventDefault(); 
+        window.refreshPageContent(true); 
+    });
 });

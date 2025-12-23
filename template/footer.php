@@ -261,6 +261,29 @@ $api_root = isset($api_root) ? $api_root : '../api';
             if (interval > 1) return interval + " minutes ago";
             return Math.floor(seconds) + " seconds ago";
         }
+
+    const loader = document.getElementById("page-loader");
+    const progressBar = document.querySelector(".progress-bar");
+    const percentageText = document.getElementById("loader-percentage");
+
+    let progress = 0;
+    const speed = 20; // faster (20ms per tick ≈ 2 seconds total)
+
+    if (loader && progressBar && percentageText) {
+        let progress = 0;
+        const interval = setInterval(() => {
+            if (progress < 100) {
+                progress += 1;
+                progressBar.style.width = progress + "%";
+                percentageText.textContent = progress + "%";
+            } else {
+                clearInterval(interval);
+                setTimeout(() => {
+                    loader.classList.add("hidden");
+                }, 300); // faster fade after completion
+            }
+        }, speed);
+    }
     </script>
     
     <?php if (isset($_SESSION['user_id'])) { ?>
