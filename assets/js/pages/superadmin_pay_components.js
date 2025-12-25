@@ -104,7 +104,7 @@ $(document).ready(function() {
             data: 'is_taxable', className: 'text-center align-middle',
             render: function(data) {
                 return data == 1 
-                    ? '<span class="badge bg-soft-primary text-primary">Taxable</span>' 
+                    ? '<span class="badge bg-soft-secondary text-secondary">Taxable</span>' 
                     : '<span class="badge bg-soft-secondary text-secondary">Non-Taxable</span>';
             }
         },
@@ -120,8 +120,8 @@ $(document).ready(function() {
             data: 'id', orderable: false, className: 'text-center align-middle',
             render: function(data, type, row) {
                 return `
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="openModal('${row.type}', ${data})"><i class="fas fa-pen"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteComponent(${data})"><i class="fas fa-trash"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="openModal('${row.type}', ${data})"><i class="fas fa-pen"></i></button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="deleteComponent(${data})"><i class="fas fa-trash"></i></button>
                 `;
             }
         }

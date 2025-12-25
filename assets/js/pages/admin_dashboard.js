@@ -47,8 +47,8 @@ function renderPayrollChart(history) {
     if(payrollChart) payrollChart.destroy();
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(78, 115, 223, 0.2)'); 
-    gradient.addColorStop(1, 'rgba(78, 115, 223, 0)'); 
+    gradient.addColorStop(0, 'rgba(12, 192, 223, 0.2)'); 
+    gradient.addColorStop(1, 'rgba(12, 192, 223, 0)'); 
 
     payrollChart = new Chart(ctx, {
         type: 'line',
@@ -58,10 +58,10 @@ function renderPayrollChart(history) {
                 label: "Total Payout",
                 data: history.data, 
                 backgroundColor: gradient,
-                borderColor: "#4e73df",
+                borderColor: "#0CC0DF",
                 pointRadius: 3,
-                pointBackgroundColor: "#4e73df",
-                pointBorderColor: "#4e73df",
+                pointBackgroundColor: "#0CC0DF",
+                pointBorderColor: "#0CC0DF",
                 fill: true,
                 tension: 0.3
             }]
@@ -160,7 +160,7 @@ function renderLeavesList(leaves) {
                         <small class="text-muted">${item.leave_type || 'General Leave'}</small>
                     </div>
                     <div class="text-end">
-                        <div class="badge bg-soft-primary text-primary px-2 py-1 mb-1" style="font-size: 0.7rem;">
+                        <div class="badge bg-soft-teal px-2 py-1 mb-1" style="font-size: 0.7rem;">
                             <i class="far fa-calendar-alt me-1"></i> ${new Date(item.start_date).toLocaleDateString('en-US', {month:'short', day:'numeric'})}
                         </div>
                         <div class="text-xs text-muted">${item.duration_days || 1} day(s)</div>
@@ -212,7 +212,7 @@ function renderHolidaysList(holidays) {
                     </div>
                     <div class="flex-grow-1">
                         <h6 class="mb-0 text-sm font-weight-bold text-dark">${h.holiday_name}</h6>
-                        <small class="${isRegular ? 'text-primary' : 'text-warning'} text-xs font-weight-bold">
+                        <small class="${isRegular ? 'text-teal' : 'text-warning'} text-xs font-weight-bold">
                             <i class="fas fa-tag me-1"></i> ${h.holiday_type}
                         </small>
                     </div>

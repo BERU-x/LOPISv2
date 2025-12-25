@@ -12,7 +12,7 @@ require '../template/topbar.php';
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <div>
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Attendance Monitor</h1>
-            <p class="mb-0 text-muted">Real-time status for <span class="text-primary fw-bold"><?php echo date('F d, Y'); ?></span></p>
+            <p class="mb-0 text-muted">Real-time status for <span class="text-teal fw-bold"><?php echo date('F d, Y'); ?></span></p>
         </div>
         <div class="d-flex">
             <button id="btn-export-csv" class="btn btn-sm btn-outline-success shadow-sm me-2">
@@ -24,10 +24,10 @@ require '../template/topbar.php';
     <div class="row mb-4">
         <?php 
         $cards = [
-            ['Present', 'val-present', 'success', 'user-check', 'val-total'],
-            ['Absent', 'val-absent', 'danger', 'user-times'],
-            ['Late', 'val-late', 'warning', 'walking'],
-            ['On Time', 'val-ontime', 'info', 'clock']
+            ['Present', 'val-present', 'label', 'user-check', 'val-total'],
+            ['Absent', 'val-absent', 'label', 'user-times'],
+            ['Late', 'val-late', 'label', 'walking'],
+            ['On Time', 'val-ontime', 'label', 'clock']
         ];
         foreach ($cards as $c): ?>
         <div class="col-xl-3 col-md-6 mb-4">
@@ -36,7 +36,7 @@ require '../template/topbar.php';
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-<?php echo $c[2]; ?> text-uppercase mb-1"><?php echo $c[0]; ?></div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            <div class="h5 mb-0 font-weight-bold text-dark">
                                 <span id="<?php echo $c[1]; ?>"><i class="fas fa-circle-notch fa-spin text-gray-300"></i></span>
                                 <?php if(isset($c[4])): ?> 
                                     <small class="text-gray-400 font-weight-light" style="font-size: 0.8rem;">
@@ -57,7 +57,7 @@ require '../template/topbar.php';
 
     <div class="card shadow mb-4 border-0">
         <div class="card-header py-3 d-flex align-items-center justify-content-between bg-white">
-            <h6 class="m-0 font-weight-bold text-primary">
+            <h6 class="m-0 font-weight-bold text-label">
                 <i class="fas fa-stream me-2"></i>Live Attendance Feed
             </h6>
             <div class="input-group" style="max-width: 300px;">

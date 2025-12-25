@@ -20,7 +20,7 @@ require '../template/topbar.php';
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 border-left-warning d-flex flex-row align-items-center justify-content-between">
-            <h6 class="m-0 font-weight-bold text-primary">
+            <h6 class="m-0 font-weight-bold text-label">
                 <i class="fas fa-envelope-open-text me-2"></i>Pending & Failed Communications
             </h6>
         </div>

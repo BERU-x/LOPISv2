@@ -253,10 +253,10 @@ $(document).ready(function() {
                 className: "text-center align-middle text-nowrap",
                 render: function(data) {
                     return `
-                        <button class="btn btn-sm btn-outline-primary shadow-sm me-1" onclick="openEditModal(${data})" title="Edit">
+                        <button class="btn btn-sm btn-outline-secondary shadow-sm me-1" onclick="openEditModal(${data})" title="Edit">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteAccount(${data})" title="Delete">
+                        <button class="btn btn-sm btn-outline-secondary shadow-sm" onclick="deleteAccount(${data})" title="Delete">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     `;

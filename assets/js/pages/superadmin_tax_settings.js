@@ -125,10 +125,10 @@ $(document).ready(function() {
                 data: 'id', orderable: false, className: 'text-center align-middle',
                 render: function(data) {
                     return `
-                        <button class="btn btn-sm btn-outline-primary shadow-sm me-1" onclick="openModal(${data})" title="Edit">
+                        <button class="btn btn-sm btn-outline-secondary shadow-sm me-1" onclick="openModal(${data})" title="Edit">
                             <i class="fas fa-pen"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteSlab(${data})" title="Delete">
+                        <button class="btn btn-sm btn-outline-secondary shadow-sm" onclick="deleteSlab(${data})" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
                     `;

@@ -3,7 +3,7 @@
 header('Content-Type: application/json; charset=utf-8');
 session_start();
 
-// --- 1. AUTHENTICATION & DEPENDENCIES ---
+// --- 1. AUTHENTICATION ---
 if (!isset($_SESSION['usertype']) || $_SESSION['usertype'] != 1) {
     http_response_code(403);
     echo json_encode(['status' => 'error', 'message' => 'Unauthorized access.']);
@@ -11,10 +11,10 @@ if (!isset($_SESSION['usertype']) || $_SESSION['usertype'] != 1) {
 }
 
 require_once __DIR__ . '/../../db_connection.php'; 
-require_once __DIR__ . '/../../helpers/audit_helper.php'; // For tracking changes
+require_once __DIR__ . '/../../helpers/audit_helper.php'; 
 
 // --- 2. CONFIGURATION ---
-$UPLOAD_DIR = __DIR__ . '/../../assets/images/users/'; // Standardized user photo path
+$UPLOAD_DIR = __DIR__ . '/../../assets/images/users/';
 
 if (!isset($pdo)) {
     echo json_encode(['draw' => 1, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => [], 'error' => 'DB Connection failed.']);
@@ -24,7 +24,7 @@ if (!isset($pdo)) {
 $action = $_GET['action'] ?? '';
 
 // =================================================================================
-// ACTION: FETCH EMPLOYEES (DataTables SSP)
+// ACTION: FETCH EMPLOYEES (Compensation Removed)
 // =================================================================================
 if ($action === 'fetch') {
     $draw = (int)($_GET['draw'] ?? 1);
@@ -32,12 +32,14 @@ if ($action === 'fetch') {
     $length = (int)($_GET['length'] ?? 10);
     $search_value = $_GET['search']['value'] ?? '';
     
+    // ⭐ Removed 'c.daily_rate'
     $columns = [
-        0 => 'e.employee_id', 1 => 'e.lastname', 2 => 'e.employment_status', 3 => 'c.daily_rate',
+        0 => 'e.employee_id', 1 => 'e.lastname', 2 => 'e.employment_status', 3 => 'e.employee_id'
     ];
 
-    $base_sql = " FROM tbl_employees e LEFT JOIN tbl_compensation c ON e.employee_id = c.employee_id";
-    $status_filter = "e.employment_status < 7"; // Exclude deleted/archived
+    // ⭐ Removed LEFT JOIN tbl_compensation
+    $base_sql = " FROM tbl_employees e ";
+    $status_filter = "e.employment_status < 7"; 
     
     $where_params = [$status_filter];
     $where_bindings = [];
@@ -56,7 +58,6 @@ if ($action === 'fetch') {
         $stmt->execute($where_bindings);
         $recordsFiltered = (int)$stmt->fetchColumn();
 
-        // Ordering Logic
         $order_sql = " ORDER BY e.employment_status ASC, e.lastname ASC";
         if (isset($_GET['order'])) {
             $col_idx = (int)$_GET['order'][0]['column'];
@@ -66,7 +67,8 @@ if ($action === 'fetch') {
             }
         }
 
-        $sql_data = "SELECT e.employee_id, e.firstname, e.lastname, e.photo, e.employment_status, e.position, c.daily_rate 
+        // ⭐ Removed c.daily_rate from SELECT
+        $sql_data = "SELECT e.employee_id, e.firstname, e.lastname, e.photo, e.employment_status, e.position 
                      $base_sql $where_sql $order_sql LIMIT ?, ?";
 
         $stmt = $pdo->prepare($sql_data);
@@ -85,7 +87,7 @@ if ($action === 'fetch') {
 }
 
 // =================================================================================
-// ACTION: CREATE / UPDATE EMPLOYEE
+// ACTION: CREATE / UPDATE EMPLOYEE (Compensation Removed)
 // =================================================================================
 if (($action === 'create' || $action === 'update') && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $emp_id = trim($_POST['employee_id']);
@@ -101,7 +103,6 @@ if (($action === 'create' || $action === 'update') && $_SERVER['REQUEST_METHOD']
             $photo_filename = "profile_" . $emp_id . "_" . time() . "." . $file_ext;
             
             if (move_uploaded_file($_FILES['photo']['tmp_name'], $UPLOAD_DIR . $photo_filename)) {
-                // If updating, delete the old photo
                 if (!$is_new) {
                     $old = $pdo->prepare("SELECT photo FROM tbl_employees WHERE employee_id = ?");
                     $old->execute([$emp_id]);
@@ -111,7 +112,7 @@ if (($action === 'create' || $action === 'update') && $_SERVER['REQUEST_METHOD']
             }
         }
 
-        // 2. Process Employee Table
+        // 2. Process Employee Table (Removed Compensation variables)
         if ($is_new) {
             $sql = "INSERT INTO tbl_employees (employee_id, firstname, middlename, lastname, suffix, address, birthdate, contact_info, gender, position, department, employment_status, photo, bank_name, account_number, created_on) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
@@ -120,39 +121,33 @@ if (($action === 'create' || $action === 'update') && $_SERVER['REQUEST_METHOD']
         }
 
         $stmt = $pdo->prepare($sql);
-        $params = [
-            $emp_id, trim($_POST['firstname']), trim($_POST['middlename']), trim($_POST['lastname']), trim($_POST['suffix']),
-            trim($_POST['address']), $_POST['birthdate'], $_POST['contact_info'], (int)$_POST['gender'],
-            trim($_POST['position']), trim($_POST['department']), (int)$_POST['employment_status'], 
-            ($is_new ? $photo_filename : trim($_POST['bank_name'])), ($is_new ? trim($_POST['bank_name']) : trim($_POST['account_number']))
-        ];
         
-        // Re-aligning params for Update vs Create
-        if (!$is_new) {
-            $params = [
-                trim($_POST['firstname']), trim($_POST['middlename']), trim($_POST['lastname']), trim($_POST['suffix']),
-                trim($_POST['address']), $_POST['birthdate'], $_POST['contact_info'], (int)$_POST['gender'],
-                trim($_POST['position']), trim($_POST['department']), (int)$_POST['employment_status'],
-                trim($_POST['bank_name']), trim($_POST['account_number'])
-            ];
+        // Prepare Params
+        $p_fname = trim($_POST['firstname']);
+        $p_mname = trim($_POST['middlename']);
+        $p_lname = trim($_POST['lastname']);
+        $p_suffix = trim($_POST['suffix']);
+        $p_addr = trim($_POST['address']);
+        $p_bdate = $_POST['birthdate'];
+        $p_contact = $_POST['contact_info'];
+        $p_gender = (int)$_POST['gender'];
+        $p_pos = trim($_POST['position']);
+        $p_dept = trim($_POST['department']);
+        $p_stat = (int)$_POST['employment_status'];
+        $p_bank = trim($_POST['bank_name']);
+        $p_acc = trim($_POST['account_number']);
+
+        if ($is_new) {
+            $params = [$emp_id, $p_fname, $p_mname, $p_lname, $p_suffix, $p_addr, $p_bdate, $p_contact, $p_gender, $p_pos, $p_dept, $p_stat, $photo_filename, $p_bank, $p_acc];
+        } else {
+            $params = [$p_fname, $p_mname, $p_lname, $p_suffix, $p_addr, $p_bdate, $p_contact, $p_gender, $p_pos, $p_dept, $p_stat, $p_bank, $p_acc];
             if ($photo_filename) { $params[] = $photo_filename; }
             $params[] = $emp_id;
-        } else {
-            // Fix param list for Create specifically to match the INSERT statement
-            $params = [
-                $emp_id, trim($_POST['firstname']), trim($_POST['middlename']), trim($_POST['lastname']), trim($_POST['suffix']),
-                trim($_POST['address']), $_POST['birthdate'], $_POST['contact_info'], (int)$_POST['gender'],
-                trim($_POST['position']), trim($_POST['department']), (int)$_POST['employment_status'], $photo_filename,
-                trim($_POST['bank_name']), trim($_POST['account_number'])
-            ];
         }
 
         $stmt->execute($params);
 
-        // 3. Compensation Table (Robust Update)
-        $sql_comp = "INSERT INTO tbl_compensation (employee_id, daily_rate, monthly_rate, food_allowance, transpo_allowance) 
-                     VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE daily_rate=VALUES(daily_rate), monthly_rate=VALUES(monthly_rate), food_allowance=VALUES(food_allowance), transpo_allowance=VALUES(transpo_allowance)";
-        $pdo->prepare($sql_comp)->execute([$emp_id, (float)$_POST['daily_rate'], (float)$_POST['monthly_rate'], (float)$_POST['food_allowance'], (float)$_POST['transpo_allowance']]);
+        // ⭐ REMOVED: Step 3 (Compensation Table Insert/Update)
 
         // 4. Audit Log
         logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], ($is_new ? 'CREATE_EMPLOYEE' : 'UPDATE_EMPLOYEE'), "Employee ID: $emp_id");
@@ -165,3 +160,34 @@ if (($action === 'create' || $action === 'update') && $_SERVER['REQUEST_METHOD']
     }
     exit;
 }
+
+// =================================================================================
+// ACTION: GET DETAILS (No Compensation)
+// =================================================================================
+if ($action === 'get_details' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $emp_id = trim($_POST['employee_id'] ?? '');
+
+    if (empty($emp_id)) {
+        echo json_encode(['status' => 'error', 'message' => 'Employee ID is required.']);
+        exit;
+    }
+
+    try {
+        $sql = "SELECT * FROM tbl_employees WHERE employee_id = :id LIMIT 1";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([':id' => $emp_id]);
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($data) {
+            echo json_encode(['status' => 'success', 'data' => $data]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Employee not found.']);
+        }
+
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+?>

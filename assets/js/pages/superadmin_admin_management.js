@@ -198,10 +198,10 @@ $(document).ready(function() {
                 className: "text-center align-middle text-nowrap",
                 render: function(data) {
                     return `
-                        <button class="btn btn-sm btn-outline-primary shadow-sm me-1" onclick="openModal(${data})" title="Edit Admin">
+                        <button class="btn btn-sm btn-outline-secondary shadow-sm me-1" onclick="openModal(${data})" title="Edit Admin">
                             <i class="fa-solid fa-pen-to-square"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="deleteAdmin(${data})" title="Revoke Admin">
+                        <button class="btn btn-sm btn-outline-secondary shadow-sm" onclick="deleteAdmin(${data})" title="Revoke Admin">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     `;

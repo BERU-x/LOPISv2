@@ -1,46 +1,36 @@
 /**
  * Attendance History Controller
+ * Standardized with Mutex Locking and AppUtility Sync Patterns.
  * Handles Server-Side Processing (SSP) for historical logs with range filtering.
  */
 
 // ==============================================================================
 // 1. GLOBAL STATE & UI HELPERS
 // ==============================================================================
-var attendanceTable; 
+var attendanceTable;
+window.isProcessing = false; // ⭐ The "Lock"
 
 /**
- * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * 1.1 MASTER REFRESHER TRIGGER (Standardized with Mutex)
  */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
-// 1.2 MASTER REFRESHER TRIGGER
 window.refreshPageContent = function(isManual = false) {
-    if (attendanceTable) {
-        if(isManual) {
+    // 1. Check Mutex Lock
+    if (window.isProcessing) return;
+
+    if (attendanceTable && $.fn.DataTable.isDataTable('#attendanceTable')) {
+        window.isProcessing = true;
+        
+        // 2. Update UI State
+        if (window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
+        } else {
             $('#refreshIcon').addClass('fa-spin');
-            updateSyncStatus('loading');
         }
-        // Reload DataTable without resetting pagination
-        attendanceTable.ajax.reload(null, false);
+
+        // 3. Reload DataTable without resetting pagination
+        attendanceTable.ajax.reload(function(json) {
+            // Unlock and Success status are handled in drawCallback
+        }, false);
     }
 };
 
@@ -51,7 +41,10 @@ $(document).ready(function() {
 
     if ($('#attendanceTable').length) {
         
-        // 2.1 Initialize DataTable (SSP Mode)
+        // 2.1 Mutex Initial State
+        window.isProcessing = true;
+
+        // 2.2 Initialize DataTable (SSP Mode)
         attendanceTable = $('#attendanceTable').DataTable({
             processing: true,
             serverSide: true,
@@ -67,60 +60,64 @@ $(document).ready(function() {
                     d.end_date = $('#filter_end_date').val();
                 },
                 error: function() {
-                    updateSyncStatus('error');
+                    if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
+                    window.isProcessing = false;
+                    $('#refreshIcon').removeClass('fa-spin');
                 }
             },
             
-            // Standardized UI updates after data fetch
-            drawCallback: function() {
-                updateSyncStatus('success');
+            // ⭐ DRAW CALLBACK (Mutex Unlock & Standardized Sync Status)
+            drawCallback: function(settings) {
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
+                
+                // UI Cleanup
                 setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+                
+                // 🔓 Release the Lock
+                window.isProcessing = false; 
             },
 
-            // Column Mapping (Matches updated SSP API)
+            // Column Mapping (Matches your tbl_attendance schema)
             columns: [
                 { data: 'employee_name', className: 'align-middle' },
                 { data: 'date', className: "text-nowrap align-middle" },
                 { data: 'time_in', className: "align-middle" },
-                { data: 'status', className: "text-center align-middle" }, 
                 { data: 'time_out', className: "align-middle" },
-                { data: 'num_hr', className: "text-center align-middle" },
-                { data: 'overtime_hr', className: "text-center align-middle" }
+                { data: 'status', className: "text-center align-middle" }, 
+                { data: 'num_hr', className: "text-center align-middle font-monospace" },
+                { data: 'overtime_hr', className: "text-center align-middle font-monospace" }
             ],
             
-            order: [[1, 'desc']], // Default: Newest dates first
+            order: [[1, 'desc']], // Default: Newest dates first (a.date)
             
             language: {
-                processing: '<div class="spinner-border text-primary spinner-border-sm" role="status"></div> Loading logs...',
+                processing: '<div class="spinner-border text-primary spinner-border-sm" role="status"></div>',
                 emptyTable: "No attendance records found.",
                 zeroRecords: "No matching records found."
             }
         });
 
-        // 2.2 DETECT LOADING STATE (Silent sync vs Manual refresh)
-        $('#attendanceTable').on('processing.dt', function (e, settings, processing) {
-            if (processing && !$('#refreshIcon').hasClass('fa-spin')) {
-                updateSyncStatus('loading');
+        // 2.3 Custom Search Binding (Respects Mutex)
+        $('#customSearch').on('keyup', function() {
+            if (!window.isProcessing) {
+                attendanceTable.search(this.value).draw();
             }
         });
 
-        // 2.3 Custom Search Binding
-        $('#customSearch').on('keyup', function() {
-            attendanceTable.search(this.value).draw();
-        });
-
-        // 2.4 Range Filter Buttons
+        // 2.4 Range Filter Logic (Uses standard refresher)
         $('#applyFilterBtn').on('click', function() {
             window.refreshPageContent(true); 
         });
         
         $('#clearFilterBtn').on('click', function() {
             $('#filter_start_date, #filter_end_date, #customSearch').val('');
-            attendanceTable.search('').draw();
-            window.refreshPageContent(true); 
+            if (!window.isProcessing) {
+                attendanceTable.search('').draw();
+                window.refreshPageContent(true); 
+            }
         });
 
-        // 2.5 Topbar Refresh Button
+        // 2.5 Topbar Refresh Button binding
         $('#btn-refresh').on('click', function(e) {
             e.preventDefault();
             window.refreshPageContent(true);

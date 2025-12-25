@@ -48,12 +48,11 @@ require '../template/topbar.php';
                             <th class="border-0">ID</th>
                             <th class="border-0">Name & Position</th>
                             <th class="border-0 text-center">Status</th>
-                            <th class="border-0 text-center">Daily Rate</th>
                             <th class="border-0 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                    </tbody>
+                        </tbody>
                 </table>
             </div>
         </div>
@@ -179,28 +178,7 @@ require '../template/topbar.php';
                         <div class="col-md-5">
                             <div class="card card-body p-4 border-0 h-100">
                                 
-                                <h6 class="fw-bold text-label mb-3"><i class="fa-solid fa-coins me-2"></i> Compensation Details</h6>
-                                <hr class="mt-1 mb-4">
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="daily_rate" class="text-label mb-1">Daily Rate (₱)</label>
-                                        <input type="number" step="0.01" min="0" name="daily_rate" id="daily_rate" class="form-control" required placeholder="500.00">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="monthly_rate" class="text-label mb-1">Monthly Rate (₱)</label>
-                                        <input type="number" step="0.01" min="0" name="monthly_rate" id="monthly_rate" class="form-control" placeholder="10000.00">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="food_allowance" class="text-label mb-1">Food Allowance (₱)</label>
-                                        <input type="number" step="0.01" min="0" name="food_allowance" id="food_allowance" class="form-control" placeholder="0.00">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="transpo_allowance" class="text-label mb-1">Transpo Allowance (₱)</label>
-                                        <input type="number" step="0.01" min="0" name="transpo_allowance" id="transpo_allowance" class="form-control" placeholder="0.00">
-                                    </div>
-                                </div>
-
-                                <h6 class="fw-bold text-label mt-4 mb-3"><i class="fa-solid fa-bank me-2"></i> Banking Details</h6>
+                                <h6 class="fw-bold text-label mb-3"><i class="fa-solid fa-bank me-2"></i> Banking Details</h6>
                                 <hr class="mt-1 mb-4">
                                 <div class="row g-3">
                                     <div class="col-md-6">
@@ -250,11 +228,9 @@ require '../template/topbar.php';
                 <input type="hidden" name="form_action_type" value="update">
 
                 <div class="modal-body pt-0 px-4">
-                    
                     <div class="row g-4">
                         <div class="col-md-7">
                             <div class="card card-body p-4 border-0 h-100">
-                                
                                 <h6 class="fw-bold text-label mb-3"><i class="fa-solid fa-id-card me-2"></i> Personal Information</h6>
                                 <hr class="mt-1 mb-4">
                                 <div class="row g-3">
@@ -351,7 +327,6 @@ require '../template/topbar.php';
                                             <?php foreach ($employment_statuses as $id => $name): ?><option value="<?php echo $id; ?>"><?php echo $name; ?></option><?php endforeach; ?>
                                         </select>
                                     </div>
-
                                 </div>
                             </div>
                         </div>
@@ -359,28 +334,7 @@ require '../template/topbar.php';
                         <div class="col-md-5">
                             <div class="card card-body p-4 border-0 h-100">
 
-                                <h6 class="fw-bold text-label mb-3"><i class="fa-solid fa-coins me-2"></i> Compensation Details</h6>
-                                <hr class="mt-1 mb-4">
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="edit_daily_rate" class="text-label mb-1">Daily Rate (₱)</label>
-                                        <input type="number" step="0.01" min="0" name="daily_rate" id="edit_daily_rate" class="form-control" required placeholder="500.00">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="edit_monthly_rate" class="text-label mb-1">Monthly Rate (₱)</label>
-                                        <input type="number" step="0.01" min="0" name="monthly_rate" id="edit_monthly_rate" class="form-control" placeholder="10000.00">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="edit_food_allowance" class="text-label mb-1">Food Allowance (₱)</label>
-                                        <input type="number" step="0.01" min="0" name="food_allowance" id="edit_food_allowance" class="form-control" placeholder="0.00">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="edit_transpo_allowance" class="text-label mb-1">Transpo Allowance (₱)</label>
-                                        <input type="number" step="0.01" min="0" name="transpo_allowance" id="edit_transpo_allowance" class="form-control" placeholder="0.00">
-                                    </div>
-                                </div>
-                                
-                                <h6 class="fw-bold text-label mt-4 mb-3"><i class="fa-solid fa-bank me-2"></i> Banking Details</h6>
+                                <h6 class="fw-bold text-label mb-3"><i class="fa-solid fa-bank me-2"></i> Banking Details</h6>
                                 <hr class="mt-1 mb-4">
                                 <div class="row g-3">
                                     <div class="col-md-6">
@@ -392,7 +346,7 @@ require '../template/topbar.php';
                                         <input type="text" name="account_number" id="edit_account_number" class="form-control" placeholder="0000-0000-00">
                                     </div>
                                 </div>
-
+                                
                                 <h6 class="fw-bold text-label mt-4 mb-3"><i class="fa-solid fa-camera me-2"></i> Profile Photo</h6>
                                 <hr class="mt-1 mb-3">
                                 <div class="col-12">

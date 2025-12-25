@@ -7,20 +7,20 @@ $current_page = 'financial_management';
 
 // Categories matching your Database ENUM
 $financial_categories = [
-    'Savings' => 'Savings Fund',
-    'SSS_Loan' => 'SSS Loan',
+    'Savings'      => 'Savings Fund',
+    'SSS_Loan'     => 'SSS Loan',
     'Pagibig_Loan' => 'Pag-IBIG Loan',
     'Company_Loan' => 'Company Loan',
-    'Cash_Assist' => 'Cash Assistance'
+    'Cash_Assist'  => 'Cash Assistance'
 ];
 
 // Transaction Types matching your Database ENUM
 $transaction_types = [
-    'Deposit' => 'Deposit (Add to Savings)',
-    'Withdrawal' => 'Withdrawal (Deduct from Savings)',
-    'Loan_Grant' => 'Loan Grant (Add to Debt)',
-    'Loan_Payment' => 'Loan Payment (Deduct from Debt)',
-    'Adjustment' => 'Adjustment'
+    'Deposit'      => 'Deposit',
+    'Withdrawal'   => 'Withdrawal',
+    'Loan_Grant'   => 'Loan Grant',
+    'Loan_Payment' => 'Loan Payment',
+    'Adjustment'   => 'Adjustment'
 ];
 
 // --- TEMPLATE INCLUDES ---
@@ -34,7 +34,7 @@ require '../template/topbar.php';
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <div>
             <h1 class="h3 mb-0 text-gray-800 font-weight-bold">Financial Management</h1>
-            <p class="mb-0 text-muted">Manage employee savings, loans, and ledger history.</p>
+            <p class="mb-0 text-muted">Manage employee savings, loans, ledger history, and compensation rates.</p>
         </div>
     </div>
 
@@ -50,7 +50,7 @@ require '../template/topbar.php';
 
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-bordered table-hover align-middle" id="financialTable" width="100%" cellspacing="0" role="grid" aria-describedby="financialTable_info">
+                <table class="table table-bordered table-hover align-middle" id="financialTable" width="100%" cellspacing="0">
                     <thead class="bg-light text-uppercase text-label text-xs font-weight-bold text-center">
                         <tr>
                             <th class="border-0 align-middle" scope="col">Employee</th>
@@ -59,7 +59,7 @@ require '../template/topbar.php';
                             <th class="border-0 align-middle" scope="col">Pag-IBIG (₱)</th>
                             <th class="border-0 align-middle" scope="col">Company (₱)</th>
                             <th class="border-0 align-middle" scope="col">Cash Assist (₱)</th>
-                            <th class="border-0 align-middle" scope="col">Actions</th>
+                            <th class="border-0 align-middle" scope="col" width="10%">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -68,7 +68,7 @@ require '../template/topbar.php';
             </div>
         </div>
     </div>
-    </div> 
+</div> 
     
 <div class="modal fade" id="combinedFinancialModal" tabindex="-1" aria-labelledby="combinedFinancialModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"> 
@@ -79,7 +79,7 @@ require '../template/topbar.php';
                         <i class="fas fa-chart-line me-2"></i> Financial Record Management
                     </h5>
                     <p class="mb-0 text-muted small" id="combined_employee_name">Viewing records for: ...</p>
-                                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
@@ -102,65 +102,96 @@ require '../template/topbar.php';
                     
                     <div class="tab-pane fade show active" id="adjustment-pane" role="tabpanel" aria-labelledby="adjustment-tab" tabindex="0">
                         <form id="adjustmentForm">
-                            
                             <input type="hidden" name="employee_id" id="adjust_employee_id"> 
+                            <input type="hidden" name="action_type" value="update_financial_record">
 
                             <div class="row g-4">
                                 
-                                <div class="col-md-6">
-                                    <div class="card card-body bg-light">
-                                        <h6 class="fw-bold text-primary">Savings Fund</h6>
-                                        <label for="adjust_savings_bal" class="text-label mb-1">Current Balance</label>
-                                        <input type="number" step="0.01" id="adjust_savings_bal" name="savings_bal" class="form-control mb-2" required>
-                                        <label for="adjust_savings_contrib" class="text-label mb-1">Monthly Contribution</label>
-                                        <input type="number" step="0.01" id="adjust_savings_contrib" name="savings_contrib" class="form-control">
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="card card-body bg-light">
-                                        <h6 class="fw-bold text-danger">SSS Loan</h6>
-                                        <label for="adjust_sss_bal" class="text-label mb-1">Current Balance Owed</label>
-                                        <input type="number" step="0.01" id="adjust_sss_bal" name="sss_bal" class="form-control mb-2" required>
-                                        <label for="adjust_sss_amort" class="text-label mb-1">Monthly Amortization</label>
-                                        <input type="number" step="0.01" id="adjust_sss_amort" name="sss_amort" class="form-control">
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-6">
-                                    <div class="card card-body bg-light">
-                                        <h6 class="fw-bold text-danger">Pag-IBIG Loan</h6>
-                                        <label for="adjust_pagibig_bal" class="text-label mb-1">Current Balance Owed</label>
-                                        <input type="number" step="0.01" id="adjust_pagibig_bal" name="pagibig_bal" class="form-control mb-2" required>
-                                        <label for="adjust_pagibig_amort" class="text-label mb-1">Monthly Amortization</label>
-                                        <input type="number" step="0.01" id="adjust_pagibig_amort" name="pagibig_amort" class="form-control">
-                                        
-                                    </div>
-                                </div>
-                                
-                                <div class="col-md-6">
-                                    <div class="card card-body bg-light">
-                                        <h6 class="fw-bold text-danger">Company Loan</h6>
-                                        <label for="adjust_company_bal" class="text-label mb-1">Current Balance Owed</label>
-                                        <input type="number" step="0.01" id="adjust_company_bal" name="company_bal" class="form-control mb-2" required>
-                                        <label for="adjust_company_amort" class="text-label mb-1">Monthly Amortization</label>
-                                        <input type="number" step="0.01" id="adjust_company_amort" name="company_amort" class="form-control">
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6">
-                                    <div class="card card-body bg-light">
-                                        <h6 class="fw-bold text-danger">Cash Assistance</h6>
-                                        <label for="adjust_cash_bal" class="text-label mb-1">Current Balance Owed</label>
-                                        <input type="number" step="0.01" id="adjust_cash_bal" name="cash_bal" class="form-control mb-2" required>
-                                        <label for="adjust_cash_amort" class="text-label mb-1">Monthly Amortization</label>
-                                        <input type="number" step="0.01" id="adjust_cash_amort" name="cash_amort" class="form-control">
-                                    </div>
-                                </div>
-
                                 <div class="col-12">
-                                    <label for="adjustment_remarks" class="text-label mb-1">Reason for Adjustment / Remarks</label>
-                                    <textarea name="adjustment_remarks" id="adjustment_remarks" class="form-control" rows="2" required placeholder="State the reason for manual balance or amortization adjustment."></textarea>
+                                    <div class="card card-body bg-soft-teal border-0">
+                                        <h6 class="fw-bold text-teal mb-3"><i class="fa-solid fa-coins me-2"></i> Compensation & Allowances</h6>
+                                        <div class="row g-3">
+                                            <div class="col-md-3">
+                                                <label for="adjust_daily_rate" class="text-label mb-1">Daily Rate (₱)</label>
+                                                <input type="number" step="0.01" min="0" id="adjust_daily_rate" name="daily_rate" class="form-control fw-bold" required placeholder="0.00">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label for="adjust_monthly_rate" class="text-label mb-1">Monthly Rate (₱)</label>
+                                                <input type="number" step="0.01" min="0" id="adjust_monthly_rate" name="monthly_rate" class="form-control" placeholder="0.00">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label for="adjust_food_allowance" class="text-label mb-1">Food Allowance (₱)</label>
+                                                <input type="number" step="0.01" min="0" id="adjust_food_allowance" name="food_allowance" class="form-control" placeholder="0.00">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label for="adjust_transpo_allowance" class="text-label mb-1">Transpo Allowance (₱)</label>
+                                                <input type="number" step="0.01" min="0" id="adjust_transpo_allowance" name="transpo_allowance" class="form-control" placeholder="0.00">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <hr class="text-muted my-4">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="card card-body bg-light h-100 border-start-success">
+                                        <h6 class="fw-bold text-success"><i class="fas fa-piggy-bank me-1"></i> Savings Fund</h6>
+                                        <label for="adjust_savings_bal" class="text-label mb-1 mt-2 small text-muted">Total Savings Balance</label>
+                                        <input type="number" step="0.01" id="adjust_savings_bal" name="adjust_savings_bal" class="form-control mb-2 fw-bold text-dark" required>
+                                        
+                                        <label for="adjust_savings_contrib" class="text-label mb-1 small text-muted">Monthly Contribution</label>
+                                        <input type="number" step="0.01" id="adjust_savings_contrib" name="adjust_savings_contrib" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="card card-body bg-light h-100 border-start-warning">
+                                        <h6 class="fw-bold text-primary">SSS Loan</h6>
+                                        <label for="adjust_sss_bal" class="text-label mb-1 mt-2 small text-muted">Remaining Balance</label>
+                                        <input type="number" step="0.01" id="adjust_sss_bal" name="adjust_sss_bal" class="form-control mb-2 fw-bold text-danger" required>
+                                        
+                                        <label for="adjust_sss_amort" class="text-label mb-1 small text-muted">Monthly Amortization</label>
+                                        <input type="number" step="0.01" id="adjust_sss_amort" name="adjust_sss_amort" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="card card-body bg-light h-100 border-start-warning">
+                                        <h6 class="fw-bold text-primary">Pag-IBIG Loan</h6>
+                                        <label for="adjust_pagibig_bal" class="text-label mb-1 mt-2 small text-muted">Remaining Balance</label>
+                                        <input type="number" step="0.01" id="adjust_pagibig_bal" name="adjust_pagibig_bal" class="form-control mb-2 fw-bold text-danger" required>
+                                        
+                                        <label for="adjust_pagibig_amort" class="text-label mb-1 small text-muted">Monthly Amortization</label>
+                                        <input type="number" step="0.01" id="adjust_pagibig_amort" name="adjust_pagibig_amort" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="card card-body bg-light h-100 border-start-danger">
+                                        <h6 class="fw-bold text-danger">Company Loan</h6>
+                                        <label for="adjust_company_bal" class="text-label mb-1 mt-2 small text-muted">Remaining Balance</label>
+                                        <input type="number" step="0.01" id="adjust_company_bal" name="adjust_company_bal" class="form-control mb-2 fw-bold text-danger" required>
+                                        
+                                        <label for="adjust_company_amort" class="text-label mb-1 small text-muted">Monthly Amortization</label>
+                                        <input type="number" step="0.01" id="adjust_company_amort" name="adjust_company_amort" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <div class="card card-body bg-light h-100 border-start-danger">
+                                        <h6 class="fw-bold text-danger">Cash Assistance</h6>
+                                        <label for="adjust_cash_bal" class="text-label mb-1 mt-2 small text-muted">Remaining Balance</label>
+                                        <input type="number" step="0.01" id="adjust_cash_bal" name="adjust_cash_bal" class="form-control mb-2 fw-bold text-danger" required>
+                                        
+                                        <label for="adjust_cash_amort" class="text-label mb-1 small text-muted">Monthly Amortization</label>
+                                        <input type="number" step="0.01" id="adjust_cash_amort" name="adjust_cash_amort" class="form-control form-control-sm">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <div class="w-100">
+                                        <label for="adjustment_remarks" class="text-label mb-1 fw-bold">Reason for Change / Remarks</label>
+                                        <textarea name="adjustment_remarks" id="adjustment_remarks" class="form-control" rows="4" required placeholder="State reason for adjustment (Required for audit logs)."></textarea>
+                                    </div>
                                 </div>
 
                             </div>
@@ -174,10 +205,10 @@ require '../template/topbar.php';
                     </div>
 
                     <div class="tab-pane fade" id="history-pane" role="tabpanel" aria-labelledby="history-tab" tabindex="0">
-                        <div class="row g-2 mb-3">
-                            <div class="col-md-4">
-                                <label for="filter_category" class="visually-hidden">Filter Category</label>
-                                <select id="filter_category" class="form-select form-select-sm" aria-label="Filter Ledger Category">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold text-gray-800 m-0">Transaction History</h6>
+                            <div class="w-25">
+                                <select id="filter_category" class="form-select form-select-sm shadow-sm">
                                     <option value="All">All Categories</option>
                                     <?php foreach ($financial_categories as $key => $val): ?>
                                         <option value="<?php echo $key; ?>"><?php echo $val; ?></option>
@@ -187,13 +218,12 @@ require '../template/topbar.php';
                         </div>
 
                         <div class="table-responsive">
-                            <table class="table table-sm table-bordered table-striped" id="ledgerTable" width="100%" role="grid">
-                                <thead class="bg-light text-uppercase text-xs">
+                            <table class="table table-sm table-bordered table-striped" id="ledgerTable" width="100%">
+                                <thead class="bg-light text-uppercase text-xs text-center">
                                     <tr>
                                         <th scope="col">Date</th>
                                         <th scope="col">Category</th>
                                         <th scope="col">Type</th>
-                                        <th scope="col">Ref No.</th>
                                         <th scope="col" class="text-end">Amount</th>
                                         <th scope="col" class="text-end">Run. Bal.</th>
                                         <th scope="col">Remarks</th>
@@ -201,7 +231,7 @@ require '../template/topbar.php';
                                 </thead>
                                 <tbody id="ledgerTableBody">
                                     <tr>
-                                        <td colspan="7" class="text-center py-4 text-muted">Select an employee to view history.</td>
+                                        <td colspan="6" class="text-center py-4 text-muted">Select an employee to view history.</td>
                                     </tr>
                                 </tbody>
                             </table>

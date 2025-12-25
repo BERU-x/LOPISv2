@@ -57,7 +57,7 @@ $(document).ready(function() {
                         switch(columnIdx) {
                             case 0: return raw.name;
                             case 1: return raw.clock_in;
-                            case 2: return raw.clock_out;
+                            case 2: return raw.clock_out; // Now contains "No Time Out" if flagged
                             case 3: return raw.status;
                             case 4: return raw.duration;
                             default: return data;
@@ -97,18 +97,28 @@ $(document).ready(function() {
                             </div>
                         </div>`;
             }},
-            { data: 'time_in', className: 'fw-bold text-primary align-middle' },
-            { data: null, render: d => d.is_active 
-                ? `<span class="badge bg-soft-secondary text-secondary border fw-normal">In Progress</span>` 
-                : `<span class="fw-bold text-dark">${d.time_out}</span>` 
-            },
+            // Column 2: Time In (Time Only)
+            { data: 'time_in', className: 'fw-bold align-middle' },
+            
+            // Column 3: Clock Out (Handles "No Time Out" Logic)
+            { data: null, className: 'align-middle', render: d => {
+                if (d.is_missing_out) {
+                    // ⭐ FIXED SCHEDULE + PAST 6PM TRIGGER
+                    return `<span class="badge bg-soft-danger text-danger border fw-bold animate__animated animate__flash animate__slow animate__infinite">No Time Out</span>`;
+                } else if (d.is_active) {
+                    return `<span class="badge bg-soft-teal text-teal border fw-normal">Working</span>`;
+                } else {
+                    return `<span class="fw-bold text-dark">${d.time_out}</span>`;
+                }
+            }},
+            
             { data: 'status', className: 'text-center align-middle', render: function(d, t, row) {
                 let s = (d || '').toLowerCase();
                 let h = '';
                 if(s.includes('ontime')) h += '<span class="badge bg-soft-success text-success border border-success px-3 rounded-pill me-1">Ontime</span>';
                 if(s.includes('late')) h += '<span class="badge bg-soft-warning text-warning border border-warning px-3 rounded-pill me-1">Late</span>';
                 if(row.overtime > 0) h += `<span class="badge bg-soft-primary text-primary border border-primary px-3 rounded-pill">OT</span>`;
-                if(row.is_active) h += '<span class="ms-1 text-success small"><i class="fa-solid fa-circle-play fa-fade"></i></span>';
+                if(row.is_active) h += '<span class="badge bg-soft-success text-success border border-success px-2 rounded-pill"><i class="fa-solid fa-circle-play fa-fade me-1"></i>Active</span>';
                 return h || '<span class="text-muted small">--</span>';
             }},
             { data: 'hours', className: 'fw-bold text-end text-dark align-middle font-monospace' }

@@ -1,6 +1,6 @@
 /**
  * Employee Management Controller
- * Updated: Global API_ROOT, Mutex Locking, and AppUtility Sync.
+ * Updated: Fixed Form Selector, Global API_ROOT, Mutex Locking, AppUtility Sync, and Compensation Removed.
  */
 
 var employeesTable; 
@@ -67,7 +67,6 @@ window.editEmployee = function(id) {
     window.currentPhotoUrl = null; 
 
     $.ajax({
-        // ⭐ UPDATED TO USE GLOBAL API_ROOT
         url: API_ROOT + '/admin/employee_action.php?action=get_details',
         type: 'POST',
         data: { employee_id: id },
@@ -93,12 +92,6 @@ window.editEmployee = function(id) {
                 form.find('#edit_department').val(data.department);
                 form.find('#edit_employment_status').val(data.employment_status);
 
-                // Populate Compensation
-                form.find('#edit_daily_rate').val(data.daily_rate || 0);
-                form.find('#edit_monthly_rate').val(data.monthly_rate || 0);
-                form.find('#edit_food_allowance').val(data.food_allowance || 0);
-                form.find('#edit_transpo_allowance').val(data.transpo_allowance || 0);
-                
                 // Financials
                 form.find('#edit_bank_name').val(data.bank_name);
                 form.find('#edit_account_number').val(data.account_number);
@@ -130,7 +123,6 @@ $(document).ready(function() {
         ordering: true, 
         dom: 'rtip', 
         ajax: {
-            // ⭐ UPDATED TO USE GLOBAL API_ROOT
             url: API_ROOT + "/admin/employee_action.php?action=fetch", 
             type: "GET"
         },
@@ -168,17 +160,12 @@ $(document).ready(function() {
                     return `<span class="badge bg-soft-${cls} text-${cls} border border-${cls} px-2 rounded-pill">${name}</span>`;
                 }
             },
-            { 
-                data: 'daily_rate', 
-                className: 'text-end fw-bold align-middle',
-                render: $.fn.dataTable.render.number(',', '.', 2, '₱ ') 
-            },
             {
                 data: 'employee_id',
                 orderable: false,
                 className: 'text-center align-middle',
                 render: function(data) {
-                    return `<button class="btn btn-sm btn-outline-teal fw-bold" onclick="editEmployee('${data}')"><i class="fa-solid fa-eye me-1"></i> Details</button>`;
+                    return `<button class="btn btn-sm btn-outline-secondary fw-bold" onclick="editEmployee('${data}')"><i class="fa-solid fa-eye me-1"></i> Details</button>`;
                 }
             }
         ],
@@ -186,15 +173,17 @@ $(document).ready(function() {
     });
 
     // 3.2 Form Submissions (Create/Update)
-    $('.employee-form').on('submit', function(e) {
-        e.preventDefault();
-        const action = $(this).attr('id') === 'addEmployeeForm' ? 'create' : 'update';
+    // ⭐ KEY FIX: Target the IDs explicitly because the class was missing
+    $('#addEmployeeForm, #editEmployeeForm').on('submit', function(e) {
+        e.preventDefault(); // Stop the page from reloading
+        
+        const formId = $(this).attr('id');
+        const action = formId === 'addEmployeeForm' ? 'create' : 'update';
         const formData = new FormData(this);
         
         Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
-            // ⭐ UPDATED TO USE GLOBAL API_ROOT
             url: API_ROOT + `/admin/employee_action.php?action=${action}`,
             type: 'POST',
             data: formData,
@@ -210,7 +199,10 @@ $(document).ready(function() {
                     Swal.fire('Error', res.message, 'error');
                 }
             },
-            error: function() { Swal.fire('Error', 'Server error during submission.', 'error'); }
+            error: function(xhr, status, error) { 
+                console.error(xhr.responseText); // Log error for debugging
+                Swal.fire('Error', 'Server error. Check console.', 'error'); 
+            }
         });
     });
 

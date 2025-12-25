@@ -1,7 +1,11 @@
 <?php
-// api/admin/attendance_ssp.php
-// Handles Server-Side Processing for Attendance Logs with Advanced Filtering
-header('Content-Type: application/json');
+/**
+ * api/admin/attendance_ssp.php
+ * Handles Server-Side Processing for Attendance Logs.
+ * Strictly uses tbl_attendance and tbl_employees.
+ */
+
+header('Content-Type: application/json; charset=utf-8');
 session_start();
 
 // --- 1. AUTHENTICATION CHECK ---
@@ -20,99 +24,74 @@ if (!isset($pdo)) {
     exit;
 }
 
-// Mapping DataTables index to DB columns
-$columns = array(
-    array( 'db' => 'employee_id',       'dt' => 'employee_id' ),
-    array( 'db' => 'employee_name',     'dt' => 'employee_name' ),
-    array( 'db' => 'date',              'dt' => 'date' ),
-    array( 'db' => 'time_in',           'dt' => 'time_in' ),
-    array( 'db' => 'attendance_status', 'dt' => 'status' ),
-    array( 'db' => 'time_out',          'dt' => 'time_out' ),
-    array( 'db' => 'num_hr',            'dt' => 'num_hr' ),
-    array( 'db' => 'overtime_hr',       'dt' => 'overtime_hr' )
-);
-
-$sql_details = " FROM tbl_attendance a LEFT JOIN tbl_employees e ON a.employee_id = e.employee_id ";
-
 // --- 3. SSP REQUEST PARSING ---
 $draw   = (int)($_GET['draw'] ?? 1);
 $start  = (int)($_GET['start'] ?? 0);
 $length = (int)($_GET['length'] ?? 10);
+$search = $_GET['search']['value'] ?? '';
+$start_date = $_GET['start_date'] ?? null;
+$end_date   = $_GET['end_date'] ?? null;
+
 $limit_sql = " LIMIT $start, $length";
 
-// Default ordering: Newest logs first
-$order_sql = " ORDER BY a.date DESC, TIME(a.time_in) DESC";
-$order = $_GET['order'] ?? null;
+// Column mapping for ordering
+$columns = [
+    0 => 'e.lastname',        // Employee Name
+    1 => 'a.date',            // Date (Time In Date)
+    2 => 'a.time_in',         // Clock In
+    3 => 'a.time_out',        // Clock Out
+    4 => 'a.attendance_status',
+    5 => 'a.num_hr',
+    6 => 'a.overtime_hr'
+];
 
-if ($order) {
-    $col_idx = (int)$order[0]['column'];
-    $dir = $order[0]['dir'] === 'asc' ? 'ASC' : 'DESC';
-
-    if (isset($columns[$col_idx])) {
-        $db_column = $columns[$col_idx]['db'];
-
-        if ($db_column === 'time_in') {
-            $sort_column = "TIME(a.time_in)";
-        } elseif ($db_column === 'employee_name') {
-            $sort_column = "e.lastname";
-        } elseif ($db_column === 'date') {
-            $sort_column = "a.date";
-        } else {
-            $sort_column = "a.$db_column";
-        }
-        $order_sql .= ", $sort_column $dir"; // Adds to the default
+$order_sql = " ORDER BY a.date DESC, a.time_in DESC"; // Default
+if (isset($_GET['order'][0])) {
+    $col = (int)$_GET['order'][0]['column'];
+    $dir = $_GET['order'][0]['dir'] === 'asc' ? 'ASC' : 'DESC';
+    if (isset($columns[$col])) {
+        $order_sql = " ORDER BY " . $columns[$col] . " $dir";
     }
 }
 
 // --- 4. FILTERING LOGIC ---
-$search = $_GET['search']['value'] ?? '';
-$where_params = []; 
-$where_bindings = []; 
-$where_sql = "";
+$where_params = ["1=1"]; 
+$where_bindings = [];
 
 if (!empty($search)) {
-    $val = '%' . $search . '%';
-    $conds = ["a.employee_id LIKE :search", "e.firstname LIKE :search", "e.lastname LIKE :search", "a.attendance_status LIKE :search"];
-    $where_params[] = "(" . implode(' OR ', $conds) . ")";
-    $where_bindings[':search'] = $val;
+    $where_params[] = "(a.employee_id LIKE :search OR e.firstname LIKE :search OR e.lastname LIKE :search OR a.attendance_status LIKE :search)";
+    $where_bindings[':search'] = "%$search%";
 }
 
-// Custom Date Range Filtering
-$start_date = $_GET['start_date'] ?? null;
-$end_date   = $_GET['end_date'] ?? null;
-if ($start_date && $end_date) { 
+if (!empty($start_date) && !empty($end_date)) { 
     $where_params[] = "a.date BETWEEN :sd AND :ed"; 
     $where_bindings[':sd'] = $start_date; 
     $where_bindings[':ed'] = $end_date; 
 }
 
-if (!empty($where_params)) $where_sql = " WHERE " . implode(' AND ', $where_params);
+$where_sql = " WHERE " . implode(' AND ', $where_params);
+$join_sql = " FROM tbl_attendance a LEFT JOIN tbl_employees e ON a.employee_id = e.employee_id ";
 
 try {
-    // Total Unfiltered Records
-    $stmt = $pdo->query("SELECT COUNT(a.id) FROM tbl_attendance a");
-    $recordsTotal = (int)$stmt->fetchColumn();
+    // Total Unfiltered
+    $recordsTotal = $pdo->query("SELECT COUNT(id) FROM tbl_attendance")->fetchColumn();
 
-    // Total Filtered Records
-    $stmt = $pdo->prepare("SELECT COUNT(a.id) $sql_details $where_sql");
+    // Total Filtered
+    $stmt = $pdo->prepare("SELECT COUNT(a.id) $join_sql $where_sql");
     $stmt->execute($where_bindings);
-    $recordsFiltered = (int)$stmt->fetchColumn();
+    $recordsFiltered = $stmt->fetchColumn();
 
-    // Main Data Fetch
+    // Data Fetch
     $sql_select = "SELECT 
-        a.id, a.employee_id, 
-        CONCAT_WS(' ', e.firstname, e.lastname) AS employee_name, 
-        a.date, a.time_in, a.time_out, a.time_out_date, 
-        a.attendance_status, a.num_hr, a.overtime_hr, 
-        e.photo, e.department, e.employee_id as emp_code
-        $sql_details $where_sql $order_sql $limit_sql";
+        a.*, 
+        e.firstname, e.lastname, e.photo, e.department
+        $join_sql $where_sql $order_sql $limit_sql";
         
     $stmt = $pdo->prepare($sql_select);
     $stmt->execute($where_bindings);
     $raw_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
-    http_response_code(500);
     echo json_encode(["draw" => $draw, "error" => $e->getMessage()]);
     exit;
 }
@@ -120,25 +99,27 @@ try {
 // --- 5. DATA FORMATTING ---
 $formatted_data = [];
 
+
+
 foreach ($raw_data as $row) {
-    // Clock In Time
+    // Clock In
     $time_in = date('h:i A', strtotime($row['time_in']));
     
-    // Clock Out & Overnight Date Logic
-    $time_out = '--';
+    // Clock Out + Overnight Logic
+    $time_out = '<span class="text-muted">--</span>';
     if ($row['time_out'] && $row['time_out'] !== '00:00:00') {
         $time_out_str = date('h:i A', strtotime($row['time_out']));
-        $date_indicator = '';
+        
+        // If they clocked out on a different day (Overnight shift)
         if (!empty($row['time_out_date']) && $row['time_out_date'] !== $row['date']) {
-            $date_indicator = '<br><span class="text-danger" style="font-size: 0.8em; font-weight: 600;">' . date('M d', strtotime($row['time_out_date'])) . '</span>';
+            $time_out_str .= '<br><span class="badge bg-light text-danger border-0 pt-0" style="font-size: 10px;">' . date('M d', strtotime($row['time_out_date'])) . '</span>';
         }
-        $time_out = $time_out_str . $date_indicator;
+        $time_out = '<span class="fw-bold">' . $time_out_str . '</span>';
     }
     
-    // UI Badges Generation
-    $status_str = $row['attendance_status'];
+    // Status Badges
+    $status_str = $row['attendance_status'] ?? '';
     $badges = '';
-
     $status_map = [
         'Ontime'    => 'success',
         'Late'      => 'warning',
@@ -154,36 +135,37 @@ foreach ($raw_data as $row) {
         }
     }
 
-    if ($time_out == '--' && stripos($status_str, 'Forgot') === false) {
-        $badges .= '<span class="badge bg-soft-secondary text-secondary border px-2 rounded-pill"><i class="fa-solid fa-circle-play fa-fade me-1"></i>Active</span>';
+    // Active Status (If no time out and not marked as forgot)
+    if (($row['time_out'] == null || $row['time_out'] == '00:00:00') && stripos($status_str, 'Forgot') === false) {
+        $badges .= '<span class="badge bg-soft-success text-success border border-success px-2 rounded-pill"><i class="fa-solid fa-circle-play fa-fade me-1"></i>Active</span>';
     }
 
-    // Wrap Employee Details (Photo + Name)
+    // Employee column with Photo
     $photo = !empty($row['photo']) ? $row['photo'] : 'default.png';
-    $emp_details = '
+    $emp_display = '
         <div class="d-flex align-items-center">
-            <img src="../assets/images/users/'.$photo.'" class="rounded-circle me-2 border" style="width: 32px; height: 32px; object-fit: cover;">
+            <img src="../assets/images/users/'.$photo.'" class="rounded-circle me-2 border shadow-sm" style="width: 35px; height: 35px; object-fit: cover;">
             <div>
-                <div class="fw-bold text-dark" style="font-size: 0.9em;">' . $row['employee_name'] . '</div>
-                <div class="small text-muted" style="font-size: 0.8em;">' . $row['emp_code'] . '</div>
+                <div class="fw-bold text-dark" style="line-height: 1.2;">' . $row['firstname'] . ' ' . $row['lastname'] . '</div>
+                <div class="text-muted font-monospace" style="font-size: 11px;">ID: ' . $row['employee_id'] . '</div>
             </div>
         </div>';
 
     $formatted_data[] = [
         'employee_id'   => $row['employee_id'],
-        'employee_name' => $emp_details, 
+        'employee_name' => $emp_display, 
         'date'          => '<span class="fw-bold">' . date('M d, Y', strtotime($row['date'])) . '</span>',
-        'time_in'       => '<span class="text-primary fw-bold">' . $time_in . '</span>',
+        'time_in'       => '<span class="fw-bold">' . $time_in . '</span>',
         'time_out'      => $time_out, 
         'status'        => $badges, 
-        'num_hr'        => '<span class="fw-bold">' . number_format($row['num_hr'], 2) . '</span>',
-        'overtime_hr'   => (float)$row['overtime_hr'] > 0 ? '<span class="text-primary fw-bold">'.number_format($row['overtime_hr'], 2).'</span>' : '--'
+        'num_hr'        => '<span class="fw-bold">' . number_format($row['num_hr'], 2) . ' hr</span>',
+        'overtime_hr'   => (float)$row['overtime_hr'] > 0 ? '<span class="text-primary fw-bold">'.number_format($row['overtime_hr'], 2).' hr</span>' : '--'
     ];
 }
 
 echo json_encode([
     "draw" => $draw,
-    "recordsTotal" => $recordsTotal,
-    "recordsFiltered" => $recordsFiltered,
+    "recordsTotal" => (int)$recordsTotal,
+    "recordsFiltered" => (int)$recordsFiltered,
     "data" => $formatted_data
 ]);

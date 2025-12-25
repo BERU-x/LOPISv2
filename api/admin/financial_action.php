@@ -1,7 +1,8 @@
 <?php
 /**
  * api/admin/financial_action.php
- * Handles Employee Financial Overviews, Ledger Histories, and Manual Adjustments.
+ * Strictly uses: tbl_employees, tbl_compensation, tbl_financial_records, tbl_employee_ledger
+ * REMOVED: AppUtility dependency to prevent Fatal Errors.
  */
 
 session_start();
@@ -9,59 +10,50 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../db_connection.php'; 
 require_once __DIR__ . '/../../helpers/audit_helper.php';
 
-// --- 1. AUTHENTICATION & SECURITY CHECK ---
-// Ensure only Superadmins (0) or Admins (1) can access this API
+// --- INTERNAL HELPERS (Replacing AppUtility) ---
+function toMoney($amount) {
+    return number_format((float)($amount ?? 0), 2, '.', '');
+}
+
+// Auth Check
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['usertype'], [0, 1])) {
     http_response_code(403);
     echo json_encode(['status' => 'error', 'message' => 'Unauthorized access.']);
     exit;
 }
 
-if (!isset($pdo)) {
-    echo json_encode([
-        'draw' => 1, 
-        'recordsTotal' => 0, 
-        'recordsFiltered' => 0, 
-        'data' => [], 
-        'error' => 'Database connection failed.'
-    ]);
-    exit;
-}
-
 $action = $_GET['action'] ?? '';
-$draw = (int)($_GET['draw'] ?? 1);
 
-// Category mapping for automated iteration
-$categories = [
-    'Savings'      => ['bal_key' => 'savings_bal', 'amort_key' => 'savings_contrib'],
-    'SSS_Loan'     => ['bal_key' => 'sss_bal',     'amort_key' => 'sss_amort'],
-    'Pagibig_Loan' => ['bal_key' => 'pagibig_bal', 'amort_key' => 'pagibig_amort'],
-    'Company_Loan' => ['bal_key' => 'company_bal', 'amort_key' => 'company_amort'],
-    'Cash_Assist'  => ['bal_key' => 'cash_bal',    'amort_key' => 'cash_amort'],
+// Mapping: Category Name (for Ledger) => Database Columns (in tbl_financial_records)
+$financial_map = [
+    'Savings'      => ['bal' => 'savings_bal', 'amort' => 'savings_contrib'],
+    'SSS_Loan'     => ['bal' => 'sss_bal',     'amort' => 'sss_amort'],
+    'Pagibig_Loan' => ['bal' => 'pagibig_bal', 'amort' => 'pagibig_amort'],
+    'Company_Loan' => ['bal' => 'company_bal', 'amort' => 'company_amort'],
+    'Cash_Assist'  => ['bal' => 'cash_bal',    'amort' => 'cash_amort'],
 ];
 
 // =================================================================================
-// ACTION: FETCH OVERVIEW (DataTables Server-Side)
+// 1. FETCH OVERVIEW
 // =================================================================================
 if ($action === 'fetch_overview') {
     try {
-        // Count Total Active Employees
-        $totalStmt = $pdo->query("SELECT COUNT(id) FROM tbl_employees WHERE employment_status < 5");
-        $recordsTotal = (int)$totalStmt->fetchColumn();
-
-        $search = $_GET['search']['value'] ?? '';
+        $draw   = (int)($_GET['draw'] ?? 1);
         $start  = (int)($_GET['start'] ?? 0);
         $length = (int)($_GET['length'] ?? 10);
+        $search = $_GET['search']['value'] ?? '';
 
-        // Base Query using Correlated Subqueries to get the LATEST balance for each category
-        $sql = "SELECT e.id, e.employee_id, e.firstname, e.lastname, e.position,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Savings' ORDER BY id DESC LIMIT 1), 0) as savings_bal,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'SSS_Loan' ORDER BY id DESC LIMIT 1), 0) as sss_bal,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Pagibig_Loan' ORDER BY id DESC LIMIT 1), 0) as pagibig_bal,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Company_Loan' ORDER BY id DESC LIMIT 1), 0) as company_bal,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Cash_Assist' ORDER BY id DESC LIMIT 1), 0) as cash_bal
+        $sql = "SELECT e.employee_id, e.firstname, e.lastname, e.position,
+                c.daily_rate, 
+                COALESCE(fr.savings_bal, 0) as savings_bal,
+                COALESCE(fr.sss_bal, 0) as sss_bal,
+                COALESCE(fr.pagibig_bal, 0) as pagibig_bal,
+                COALESCE(fr.company_bal, 0) as company_bal,
+                COALESCE(fr.cash_bal, 0) as cash_bal
                 FROM tbl_employees e
-                WHERE e.employment_status < 5 ";
+                LEFT JOIN tbl_compensation c ON e.employee_id = c.employee_id
+                LEFT JOIN tbl_financial_records fr ON e.employee_id = fr.employee_id
+                WHERE e.employment_status < 5";
 
         $params = [];
         if (!empty($search)) {
@@ -69,13 +61,10 @@ if ($action === 'fetch_overview') {
             $params = ["%$search%", "%$search%", "%$search%"];
         }
 
-        // Count Filtered Records
-        $countSql = "SELECT COUNT(id) FROM tbl_employees e WHERE e.employment_status < 5" . (!empty($search) ? " AND (e.lastname LIKE ? OR e.firstname LIKE ? OR e.employee_id LIKE ?)" : "");
-        $filteredStmt = $pdo->prepare($countSql);
-        $filteredStmt->execute($params);
-        $recordsFiltered = (int)$filteredStmt->fetchColumn();
+        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM tbl_employees e WHERE e.employment_status < 5" . (!empty($search) ? " AND (e.lastname LIKE ? OR e.firstname LIKE ? OR e.employee_id LIKE ?)" : ""));
+        $countStmt->execute($params);
+        $totalRecords = $countStmt->fetchColumn();
 
-        // Ordering & Final Execution
         $sql .= " ORDER BY e.lastname ASC LIMIT $start, $length";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -83,52 +72,52 @@ if ($action === 'fetch_overview') {
 
         echo json_encode([
             "draw" => $draw,
-            "recordsTotal" => $recordsTotal,
-            "recordsFiltered" => $recordsFiltered,
+            "recordsTotal" => $totalRecords,
+            "recordsFiltered" => $totalRecords,
             "data" => $data
         ]);
 
     } catch (Exception $e) {
-        error_log("Financial Overview Error: " . $e->getMessage());
-        echo json_encode(["draw" => $draw, "recordsTotal" => 0, "recordsFiltered" => 0, "data" => [], "error" => "Fetch error."]);
+        echo json_encode(['error' => $e->getMessage()]);
     }
     exit;
 }
 
 // =================================================================================
-// ACTION: GET FINANCIAL RECORD (For Modal Population)
+// 2. GET SINGLE RECORD
 // =================================================================================
 if ($action === 'get_financial_record') {
-    $emp_id = trim($_POST['employee_id'] ?? '');
-
-    if (empty($emp_id)) {
-        echo json_encode(['status' => 'error', 'message' => 'Employee ID is required.']);
-        exit;
-    }
+    $emp_id = $_POST['employee_id'] ?? '';
 
     try {
-        $sql = "SELECT e.employee_id, e.firstname, e.lastname, 
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Savings' ORDER BY id DESC LIMIT 1), 0) as savings_bal,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'SSS_Loan' ORDER BY id DESC LIMIT 1), 0) as sss_bal,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Pagibig_Loan' ORDER BY id DESC LIMIT 1), 0) as pagibig_bal,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Company_Loan' ORDER BY id DESC LIMIT 1), 0) as company_bal,
-                COALESCE((SELECT running_balance FROM tbl_employee_ledger WHERE employee_id = e.employee_id AND category = 'Cash_Assist' ORDER BY id DESC LIMIT 1), 0) as cash_bal,
-                COALESCE((SELECT monthly_amount FROM tbl_payroll_contributions WHERE employee_id = e.employee_id AND category = 'Savings' LIMIT 1), 0) as savings_contrib,
-                COALESCE((SELECT monthly_amount FROM tbl_payroll_contributions WHERE employee_id = e.employee_id AND category = 'SSS_Loan' LIMIT 1), 0) as sss_amort,
-                COALESCE((SELECT monthly_amount FROM tbl_payroll_contributions WHERE employee_id = e.employee_id AND category = 'Pagibig_Loan' LIMIT 1), 0) as pagibig_amort,
-                COALESCE((SELECT monthly_amount FROM tbl_payroll_contributions WHERE employee_id = e.employee_id AND category = 'Company_Loan' LIMIT 1), 0) as company_amort,
-                COALESCE((SELECT monthly_amount FROM tbl_payroll_contributions WHERE employee_id = e.employee_id AND category = 'Cash_Assist' LIMIT 1), 0) as cash_amort
-                FROM tbl_employees e WHERE e.employee_id = ?";
+        $sql = "SELECT 
+                e.employee_id, e.firstname, e.lastname,
+                c.daily_rate, c.monthly_rate, c.food_allowance, c.transpo_allowance,
+                COALESCE(fr.savings_bal, 0) as savings_bal,
+                COALESCE(fr.savings_contrib, 0) as savings_contrib,
+                COALESCE(fr.sss_bal, 0) as sss_bal,
+                COALESCE(fr.sss_amort, 0) as sss_amort,
+                COALESCE(fr.pagibig_bal, 0) as pagibig_bal,
+                COALESCE(fr.pagibig_amort, 0) as pagibig_amort,
+                COALESCE(fr.company_bal, 0) as company_bal,
+                COALESCE(fr.company_amort, 0) as company_amort,
+                COALESCE(fr.cash_bal, 0) as cash_bal,
+                COALESCE(fr.cash_amort, 0) as cash_amort
+                FROM tbl_employees e
+                LEFT JOIN tbl_compensation c ON e.employee_id = c.employee_id
+                LEFT JOIN tbl_financial_records fr ON e.employee_id = fr.employee_id
+                WHERE e.employee_id = ?";
         
         $stmt = $pdo->prepare($sql);
         $stmt->execute([$emp_id]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($data) {
-            echo json_encode(['status' => 'success', 'data' => $data]);
-        } else {
-            echo json_encode(['status' => 'error', 'message' => 'Record not found.']);
+        if (!$data) {
+            echo json_encode(['status' => 'error', 'message' => 'Employee not found.']);
+            exit;
         }
+
+        echo json_encode(['status' => 'success', 'data' => $data]);
     } catch (Exception $e) {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
@@ -136,103 +125,104 @@ if ($action === 'get_financial_record') {
 }
 
 // =================================================================================
-// ACTION: UPDATE FINANCIAL RECORD (Manual Adjustment)
+// 3. UPDATE RECORD
 // =================================================================================
-if ($action === 'update_financial_record' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($action === 'update_financial_record') {
     $emp_id = trim($_POST['employee_id'] ?? '');
+    $remarks = trim($_POST['adjustment_remarks'] ?? 'Manual Adjustment');
 
     if (empty($emp_id)) {
-        echo json_encode(['status' => 'error', 'message' => 'Employee ID required.']);
+        echo json_encode(['status' => 'error', 'message' => 'Employee ID missing.']);
         exit;
     }
 
     try {
         $pdo->beginTransaction();
 
-        // Fetch current states for balance comparison and detailed logging
-        $checkSql = "SELECT category, running_balance FROM tbl_employee_ledger t1 
-                     WHERE id = (SELECT MAX(id) FROM tbl_employee_ledger t2 WHERE t1.category = t2.category AND employee_id = ?)";
-        $checkStmt = $pdo->prepare($checkSql);
-        $checkStmt->execute([$emp_id]);
-        $current_balances = $checkStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        // A. Update Compensation
+        $compSql = "INSERT INTO tbl_compensation (employee_id, daily_rate, monthly_rate, food_allowance, transpo_allowance)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE 
+                    daily_rate=VALUES(daily_rate), monthly_rate=VALUES(monthly_rate), 
+                    food_allowance=VALUES(food_allowance), transpo_allowance=VALUES(transpo_allowance)";
+        $stmt = $pdo->prepare($compSql);
+        $stmt->execute([
+            $emp_id, 
+            toMoney($_POST['daily_rate']), 
+            toMoney($_POST['monthly_rate']), 
+            toMoney($_POST['food_allowance']), 
+            toMoney($_POST['transpo_allowance'])
+        ]);
 
-        $remarks = trim($_POST['adjustment_remarks'] ?? 'Manual Admin Adjustment');
-        $audit_changes = []; // ⭐ Array to track specific changes for the audit log
+        // B. Update Financial Records
+        $oldStmt = $pdo->prepare("SELECT * FROM tbl_financial_records WHERE employee_id = ?");
+        $oldStmt->execute([$emp_id]);
+        $oldData = $oldStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-        foreach ($categories as $cat_name => $keys) {
-            $new_bal   = (float)($_POST[$keys['bal_key']]   ?? 0);
-            $new_amort = (float)($_POST[$keys['amort_key']] ?? 0);
-            $old_bal   = (float)($current_balances[$cat_name] ?? 0);
+        $finSql = "INSERT INTO tbl_financial_records (employee_id, savings_bal, savings_contrib, sss_bal, sss_amort, pagibig_bal, pagibig_amort, company_bal, company_amort, cash_bal, cash_amort)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON DUPLICATE KEY UPDATE 
+                   savings_bal=VALUES(savings_bal), savings_contrib=VALUES(savings_contrib),
+                   sss_bal=VALUES(sss_bal), sss_amort=VALUES(sss_amort),
+                   pagibig_bal=VALUES(pagibig_bal), pagibig_amort=VALUES(pagibig_amort),
+                   company_bal=VALUES(company_bal), company_amort=VALUES(company_amort),
+                   cash_bal=VALUES(cash_bal), cash_amort=VALUES(cash_amort)";
+        
+        $finParams = [$emp_id];
+        
+        foreach ($financial_map as $cat => $keys) {
+            $new_bal   = toMoney($_POST['adjust_' . $keys['bal']] ?? 0);
+            $new_amort = toMoney($_POST['adjust_' . $keys['amort']] ?? 0);
             
-            // Only log to ledger if the balance itself has changed
-            if (round($new_bal, 2) !== round($old_bal, 2)) {
+            $finParams[] = $new_bal;
+            $finParams[] = $new_amort;
+
+            $old_bal = (float)($oldData[$keys['bal']] ?? 0);
+            if (abs($new_bal - $old_bal) > 0.01) {
                 $diff = $new_bal - $old_bal;
-                $led = $pdo->prepare("INSERT INTO tbl_employee_ledger (employee_id, category, transaction_type, amount, amortization, running_balance, transaction_date, remarks) VALUES (?, ?, 'Adjustment', ?, ?, ?, NOW(), ?)");
-                $led->execute([$emp_id, $cat_name, abs($diff), $new_amort, $new_bal, $remarks]);
-                
-                // ⭐ Track change for audit trail
-                $audit_changes[] = "$cat_name: " . number_format($old_bal, 2) . " -> " . number_format($new_bal, 2);
+                $transType = ($diff > 0) ? 'Loan_Grant' : 'Loan_Payment'; 
+                if($cat == 'Savings') $transType = ($diff > 0) ? 'Deposit' : 'Withdrawal';
+
+                $ledSql = "INSERT INTO tbl_employee_ledger (employee_id, category, transaction_type, amount, amortization, running_balance, transaction_date, remarks)
+                           VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)";
+                $ledStmt = $pdo->prepare($ledSql);
+                $ledStmt->execute([$emp_id, $cat, $transType, abs($diff), $new_amort, $new_bal, $remarks]);
             }
-            
-            // Always sync the Payroll Contributions table for amortization settings
-            $pay = $pdo->prepare("INSERT INTO tbl_payroll_contributions (employee_id, category, monthly_amount) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE monthly_amount = VALUES(monthly_amount)");
-            $pay->execute([$emp_id, $cat_name, $new_amort]);
         }
 
-        // ⭐ RECORD AUDIT LOG IF CHANGES OCCURRED
-        if (!empty($audit_changes)) {
-            $change_details = "Manual financial adjustment for Employee ID: $emp_id. Changes: " . implode(", ", $audit_changes) . ". Remarks: $remarks";
-            
-            // Assuming logAudit(pdo, user_id, usertype, action_type, details)
-            logAudit(
-                $pdo, 
-                $_SESSION['user_id'], 
-                $_SESSION['usertype'], 
-                'UPDATE_FINANCIAL_LEDGER', 
-                $change_details
-            );
-        }
+        $stmt = $pdo->prepare($finSql);
+        $stmt->execute($finParams);
 
         $pdo->commit();
-        echo json_encode(['status' => 'success', 'message' => 'Financial profile updated and audited.']);
+        echo json_encode(['status' => 'success', 'message' => 'Record updated successfully.']);
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        error_log("Financial Update Error: " . $e->getMessage());
-        echo json_encode(['status' => 'error', 'message' => 'Transaction failed: ' . $e->getMessage()]);
-    }
-    exit;
-}
-
-// =================================================================================
-// ACTION: FETCH LEDGER HISTORY
-// =================================================================================
-if ($action === 'fetch_ledger') {
-    $emp_id = trim($_GET['employee_id'] ?? '');
-    $filter = trim($_GET['category'] ?? 'All');
-
-    if (empty($emp_id)) {
-        echo json_encode(['status' => 'error', 'message' => 'Missing Employee ID.']);
-        exit;
-    }
-
-    try {
-        $sql = "SELECT * FROM tbl_employee_ledger WHERE employee_id = ?";
-        $params = [$emp_id];
-
-        if ($filter !== 'All') {
-            $sql .= " AND category = ?";
-            $params[] = $filter;
-        }
-
-        // Ordered by date and then ID to ensure sequence is correct for same-day logs
-        $sql .= " ORDER BY transaction_date DESC, id DESC"; 
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        
-        echo json_encode(['status' => 'success', 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
-    } catch (Exception $e) {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
     exit;
 }
+
+// =================================================================================
+// 4. FETCH LEDGER HISTORY
+// =================================================================================
+if ($action === 'fetch_ledger') {
+    $emp_id = $_GET['employee_id'] ?? '';
+    $cat    = $_GET['category'] ?? 'All';
+
+    $sql = "SELECT * FROM tbl_employee_ledger WHERE employee_id = ?";
+    $params = [$emp_id];
+
+    if ($cat !== 'All') {
+        $sql .= " AND category = ?";
+        $params[] = $cat;
+    }
+
+    $sql .= " ORDER BY transaction_date DESC, id DESC";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    
+    echo json_encode(['status' => 'success', 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    exit;
+}
+?>
