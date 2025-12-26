@@ -5,32 +5,39 @@
 let attendanceTable;
 window.isProcessing = false; // ⭐ The "Lock"
 
-// 1. MASTER REFRESHER HOOK
+// ==========================================================================
+// 1. MASTER REFRESHER HOOK (Called by Footer)
+// ==========================================================================
 window.refreshPageContent = function(isManual = false) {
+    // 1. Block if already loading
     if (window.isProcessing) return; 
 
     if (attendanceTable && $.fn.DataTable.isDataTable('#todayTable')) {
+        // 2. Lock the process
         window.isProcessing = true; 
-        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+
+        // 3. Show "Syncing..." text ONLY if clicked manually
+        // (If auto-refresh, we keep it silent)
+        if (isManual && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
+        }
         
-        attendanceTable.ajax.reload(function(json) {
-            // Stats card update logic is handled by drawCallback below
-            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
-            window.isProcessing = false; 
-        }, false);
+        // 4. Reload Data (null = callback, false = keep current page)
+        // We do NOT put the callback here anymore. We let 'drawCallback' handle the success state.
+        attendanceTable.ajax.reload(null, false);
     }
 };
 
 $(document).ready(function() {
-    // 1. CLEANUP
+    // 2. CLEANUP (Prevent duplicate tables)
     if ($.fn.DataTable.isDataTable('#todayTable')) {
         $('#todayTable').DataTable().destroy();
         $('#todayTable').empty();
         $('#todayTable').append('<thead class="bg-light text-gray-600 text-xs font-weight-bold text-uppercase"><tr><th>Employee Name</th><th>Clock In</th><th>Clock Out</th><th class="text-center">Log Status</th><th class="text-end">Duration</th></tr></thead><tbody></tbody>');
     }
 
-    // 2. INITIALIZATION
-    window.isProcessing = true; 
+    // 3. INITIALIZATION
+    window.isProcessing = true; // Lock during initial load
 
     attendanceTable = $('#todayTable').DataTable({
         destroy: true,
@@ -38,26 +45,22 @@ $(document).ready(function() {
             url: API_ROOT + '/admin/attendance_live.php',
             dataSrc: 'logs'
         },
-        // 'B' initializes buttons, 'f' search, 'r' processing, 't' table, 'i' info, 'p' pagination
         dom: 'Bfrtip', 
         buttons: [{
             extend: 'csvHtml5',
-            className: 'd-none', // Hidden, triggered by custom UI button
+            className: 'd-none',
             title: 'Attendance_Report_' + new Date().toISOString().slice(0, 10),
             exportOptions: { 
                 columns: [0, 1, 2, 3, 4],
                 format: {
-                    header: function (data) {
-                        // Strips the HTML sorting spans from the header text
-                        return data.replace(/<[^>]*>?/gm, '').trim();
-                    },
+                    header: function (data) { return data.replace(/<[^>]*>?/gm, '').trim(); },
                     body: function (data, rowIdx, columnIdx) {
                         const rowData = attendanceTable.row(rowIdx).data();
                         const raw = rowData.raw_data;
                         switch(columnIdx) {
                             case 0: return raw.name;
                             case 1: return raw.clock_in;
-                            case 2: return raw.clock_out; // Now contains "No Time Out" if flagged
+                            case 2: return raw.clock_out; 
                             case 3: return raw.status;
                             case 4: return raw.duration;
                             default: return data;
@@ -71,9 +74,13 @@ $(document).ready(function() {
                        "----------------------------------\n" + csv;
             }
         }],
-        // ⭐ AUTO-UPDATE STATS CARDS
+        
+        // ⭐ AUTO-UPDATE STATS & HANDLE UNLOCKING
+        // This runs automatically after every load/reload
         drawCallback: function(settings) {
             const json = settings.json;
+            
+            // A. Update Top Cards
             if (json && json.stats) {
                 $('#val-present').text(json.stats.present);
                 $('#val-total').text(json.stats.total_employees);
@@ -81,8 +88,13 @@ $(document).ready(function() {
                 $('#val-late').text(json.stats.late);
                 $('#val-ontime').text(json.stats.ontime);
             }
-            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
-            window.isProcessing = false; 
+
+            // B. Unlock & Update Sync Status
+            // We use a small timeout to ensure the UI feels smooth
+            setTimeout(() => {
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
+                window.isProcessing = false; // Unlock for next cycle
+            }, 200);
         },
         order: [[1, "desc"]],
         pageLength: 25,
@@ -97,13 +109,9 @@ $(document).ready(function() {
                             </div>
                         </div>`;
             }},
-            // Column 2: Time In (Time Only)
             { data: 'time_in', className: 'fw-bold align-middle' },
-            
-            // Column 3: Clock Out (Handles "No Time Out" Logic)
             { data: null, className: 'align-middle', render: d => {
                 if (d.is_missing_out) {
-                    // ⭐ FIXED SCHEDULE + PAST 6PM TRIGGER
                     return `<span class="badge bg-soft-danger text-danger border fw-bold animate__animated animate__flash animate__slow animate__infinite">No Time Out</span>`;
                 } else if (d.is_active) {
                     return `<span class="badge bg-soft-teal text-teal border fw-normal">Working</span>`;
@@ -111,7 +119,6 @@ $(document).ready(function() {
                     return `<span class="fw-bold text-dark">${d.time_out}</span>`;
                 }
             }},
-            
             { data: 'status', className: 'text-center align-middle', render: function(d, t, row) {
                 let s = (d || '').toLowerCase();
                 let h = '';
@@ -121,11 +128,11 @@ $(document).ready(function() {
                 if(row.is_active) h += '<span class="badge bg-soft-success text-success border border-success px-2 rounded-pill"><i class="fa-solid fa-circle-play fa-fade me-1"></i>Active</span>';
                 return h || '<span class="text-muted small">--</span>';
             }},
-            { data: 'hours', className: 'fw-bold text-end text-dark align-middle font-monospace' }
+            { data: 'hours', className: 'fw-bold text-end align-middle' }
         ]
     });
 
-    // 3. EVENT BINDINGS
+    // 4. EVENT BINDINGS
     $('#btn-export-csv').on('click', function(e) {
         e.preventDefault();
         attendanceTable.button('.buttons-csv').trigger();
@@ -135,8 +142,9 @@ $(document).ready(function() {
         attendanceTable.search(this.value).draw(); 
     });
 
+    // Manual Refresh Button
     $('#btn-refresh').on('click', function(e) {
         e.preventDefault();
-        window.refreshPageContent(true);
+        window.refreshPageContent(true); // true = Manual
     });
 });

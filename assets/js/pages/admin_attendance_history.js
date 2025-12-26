@@ -52,7 +52,7 @@ $(document).ready(function() {
             pageLength: 25,
             dom: 'rtip', 
             ajax: {
-                url: "../api/admin/attendance_ssp.php", 
+                url: API_ROOT + "/admin/attendance_ssp.php", 
                 type: "GET",
                 data: function (d) {
                     // Inject custom filters into the SSP request

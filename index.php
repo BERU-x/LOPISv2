@@ -159,14 +159,16 @@ if ($session_active) {
                                 <button class="btn btn-outline-secondary" type="button" id="toggle-password"><i class="fas fa-eye"></i></button>
                             </div>
                         </div>
-                        
+
+                        <div id="caps-warning" class="caps-warning d-none">Caps Lock is ON!</div>
+
                         <div class="d-flex justify-content-between align-items-center mb-4">
                             <div class="form-check">
                                 <input type="checkbox" class="form-check-input" id="remember" name="remember">
                                 <label class="form-check-label small" for="remember">Keep me Signed In</label>
                             </div>
                             <?php if ($allow_forgot_password == 1): ?>
-                                <a href="process/forgot_password.php" class="small text-decoration-none">Forgot?</a>
+                                <a href="process/forgot_password.php" class="small text-decoration-none">Forgot Password?</a>
                             <?php endif; ?>
                         </div>
 

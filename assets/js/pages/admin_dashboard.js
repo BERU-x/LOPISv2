@@ -9,6 +9,7 @@
 // ==============================================================================
 let payrollChart = null; 
 let deptChart = null;    
+let attendanceChart = null; // [NEW] Variable for attendance chart
 
 // ==============================================================================
 // 2. UI HELPERS (Greetings)
@@ -38,6 +39,56 @@ function updateMetrics(metrics) {
     // Attendance Progress
     $('#val-attendance-today').text(metrics.attendance_today);
     $('#val-attendance-total').text(metrics.active_employees);
+}
+
+/**
+ * [NEW] Renders the 7-Day Attendance Trend Bar Chart
+ */
+function renderAttendanceChart(trendData) {
+    const canvas = document.getElementById("attendanceTrendChart");
+    if(!canvas) return; // Exit if canvas doesn't exist in HTML
+    
+    const ctx = canvas.getContext('2d');
+    if(attendanceChart) attendanceChart.destroy();
+
+    attendanceChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: trendData.labels, // e.g., ["Oct 20", "Oct 21"]
+            datasets: [{
+                label: "Present",
+                data: trendData.data, // e.g., [15, 18]
+                backgroundColor: "#0CC0DF ",
+                hoverBackgroundColor: "#218597ff ",
+                borderColor: "#0CC0DF ",
+                borderRadius: 4, // Rounded corners on bars
+                barPercentage: 0.6,
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(item) {
+                            return ` ${item.raw} Employees Present`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { precision: 0 }, // No decimals for people count
+                    grid: { borderDash: [2], drawBorder: false, color: "#eaecf4" }
+                },
+                x: {
+                    grid: { display: false, drawBorder: false }
+                }
+            }
+        }
+    });
 }
 
 function renderPayrollChart(history) {
@@ -242,9 +293,17 @@ function loadDashboardData(isManual = false) {
         success: function(response) {
             if (response.status === 'success') {
                 updateMetrics(response.metrics);
+                
+                // Render Charts
                 renderPayrollChart(response.payroll_history);
                 renderDeptChart(response.dept_data);
                 
+                // [NEW] Render Attendance Chart if data exists
+                if(response.attendance_trend) {
+                    renderAttendanceChart(response.attendance_trend);
+                }
+
+                // Render Lists
                 if (typeof renderLeavesList === "function") renderLeavesList(response.upcoming_leaves);
                 if (typeof renderHolidaysList === "function") renderHolidaysList(response.upcoming_holidays);
                 

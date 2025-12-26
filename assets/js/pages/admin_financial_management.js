@@ -1,37 +1,32 @@
 /**
  * Financial Management Controller
- * Standardized to match Attendance Live Controller architecture.
- * Features: Mutex Locking, Auto-Sync Status, and Global Refresh Hook.
+ * Updated: Matches Footer Auto-Sync Architecture
  */
 
 var financialTable;
 var currentViewedEmployeeId = null;
 window.isProcessing = false; // ⭐ The "Lock"
-const API_URL = '../api/admin/financial_action.php'; // Local constant for clarity
+const API_URL = '../api/admin/financial_action.php'; 
 
 // ==============================================================================
-// 1. MASTER REFRESHER HOOK (Standardized)
+// 1. MASTER REFRESHER HOOK (Called by Footer)
 // ==============================================================================
 window.refreshPageContent = function(isManual = false) {
-    // 1. Check Mutex Lock
+    // 1. Block if already loading
     if (window.isProcessing) return; 
 
-    // 2. Trigger Reload
     if (financialTable && $.fn.DataTable.isDataTable('#financialTable')) {
         window.isProcessing = true; 
         
-        // Use Global AppUtility if available, else fallback to console/silent
-        if (window.AppUtility) {
-            window.AppUtility.updateSyncStatus('loading');
-        } else {
-            // Fallback UI update if AppUtility is missing on this specific page
+        // 2. UI Feedback (Only if manual click)
+        if (isManual) {
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
             $('#refreshIcon').addClass('fa-spin');
         }
         
-        financialTable.ajax.reload(function(json) {
-            // Status update handled in drawCallback, but we ensure lock is released here just in case
-            // window.isProcessing = false; // (Left to drawCallback for consistency)
-        }, false);
+        // 3. Reload Data (null = no callback, false = keep paging)
+        // We let 'drawCallback' below handle the unlocking/success state
+        financialTable.ajax.reload(null, false);
     }
 };
 
@@ -48,7 +43,7 @@ function formatCurrency(amount) {
 }
 
 // ==============================================================================
-// 3. BUSINESS LOGIC (View/Edit)
+// 3. BUSINESS LOGIC (View/Edit) - Kept exactly as provided
 // ==============================================================================
 window.manageFinancialRecord = function(id, encodedName) {
     currentViewedEmployeeId = id;
@@ -60,7 +55,6 @@ window.manageFinancialRecord = function(id, encodedName) {
         didOpen: () => { Swal.showLoading(); } 
     });
 
-    // Parallel fetch for current balances and ledger history
     const recordFetch = $.ajax({
         url: API_URL + '?action=get_financial_record',
         type: 'POST',
@@ -160,7 +154,7 @@ $(document).ready(function() {
     }
 
     // 2. INITIALIZATION
-    window.isProcessing = true; 
+    window.isProcessing = true; // Lock immediately on load
 
     financialTable = $('#financialTable').DataTable({
         processing: true,
@@ -171,14 +165,15 @@ $(document).ready(function() {
             url: API_URL + "?action=fetch_overview", 
             type: "GET"
         },
-        // ⭐ DRAW CALLBACK (Releases Mutex Lock & Updates Status)
+        // ⭐ CENTRALIZED UNLOCKING
+        // Runs after Initial Load, Search, Sort, or Refresh
         drawCallback: function(settings) {
             if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
             
-            // Local UI Cleanup
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
-            
-            window.isProcessing = false; // Unlock
+            setTimeout(() => {
+                $('#refreshIcon').removeClass('fa-spin');
+                window.isProcessing = false; // 🔓 Release lock
+            }, 500);
         },
         columns: [
             { 
@@ -228,7 +223,7 @@ $(document).ready(function() {
         financialTable.search(this.value).draw(); 
     });
 
-    // Uses the locked refresh function
+    // Manual Refresh Button
     $('#refreshIcon').parent().on('click', function(e) {
         e.preventDefault();
         window.refreshPageContent(true);
@@ -238,11 +233,8 @@ $(document).ready(function() {
     $('#adjustmentForm').on('submit', function(e) {
         e.preventDefault();
 
-        // 1. Create FormData from the form
         let formData = new FormData(this);
 
-        // 2. FORCE the Employee ID from the global variable
-        // This acts as a safety net in case the HTML input is empty
         if (currentViewedEmployeeId) {
             formData.set('employee_id', currentViewedEmployeeId);
         } else {
@@ -255,7 +247,7 @@ $(document).ready(function() {
         $.ajax({
             url: API_URL + '?action=update_financial_record',
             type: 'POST',
-            data: new FormData(this),
+            data: new FormData(this), // Re-grab form data to ensure updates
             processData: false,
             contentType: false,
             dataType: 'json',
@@ -263,7 +255,7 @@ $(document).ready(function() {
                 if(res.status === 'success') {
                     Swal.fire('Updated', res.message, 'success');
                     $('#combinedFinancialModal').modal('hide');
-                    window.refreshPageContent(true);
+                    window.refreshPageContent(true); // Force refresh
                 } else {
                     Swal.fire('Error', res.message, 'error');
                 }

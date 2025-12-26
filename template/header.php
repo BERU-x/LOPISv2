@@ -76,9 +76,8 @@ $page_title ??= 'LOPISv2 Portal';
     <link href="../assets/vendor/fa6/css/all.min.css" rel="stylesheet" type="text/css">
     <link href="../assets/vendor/bs5/css/bootstrap.min.css" rel="stylesheet">
 
-    <link href="../assets/css/dataTables.min.css" rel="stylesheet"> 
-    
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.1.8/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/3.2.0/css/buttons.bootstrap5.min.css">
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Dropify/0.2.2/css/dropify.min.css">

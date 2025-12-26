@@ -1,10 +1,10 @@
 /**
  * Employee Management Controller
- * Updated: Fixed Form Selector, Global API_ROOT, Mutex Locking, AppUtility Sync, and Compensation Removed.
+ * Updated to prevent double-fetching on load
  */
 
 var employeesTable; 
-window.isProcessing = false; // ⭐ The "Lock"
+window.isProcessing = false; 
 window.currentPhotoUrl = null; 
 
 // ==============================================================================
@@ -16,41 +16,30 @@ window.refreshPageContent = function(isManual = false) {
     if (employeesTable && $.fn.DataTable.isDataTable('#employeesTable')) {
         window.isProcessing = true; 
         
-        if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
-        if (isManual) $('#refreshIcon').addClass('fa-spin');
+        if (isManual) {
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+            $('#refreshIcon').addClass('fa-spin');
+        }
 
-        employeesTable.ajax.reload(function() {
-            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
-            window.isProcessing = false; // 🔓 Release lock
-        }, false);
+        // Reload: null = no callback, false = stay on current page
+        employeesTable.ajax.reload(null, false);
     }
 };
 
-/**
- * 1.1 HELPER: Dropify Re-initialization
- */
+// ... (Keep resetDropify and editEmployee functions exactly as they were) ...
 function resetDropify(targetId, defaultFile = null) {
     const $dropify = $(`#${targetId}`);
-    if ($dropify.data('dropify')) {
-        $dropify.dropify('destroy'); 
-    }
-    
+    if ($dropify.data('dropify')) $dropify.dropify('destroy'); 
     $dropify.removeAttr('data-default-file'); 
-    if (defaultFile) {
-        $dropify.attr('data-default-file', defaultFile);
-    }
-    
+    if (defaultFile) $dropify.attr('data-default-file', defaultFile);
     const $wrapper = $dropify.closest('.dropify-wrapper').parent();
     if ($wrapper.length) {
         $wrapper.html($dropify.prop('outerHTML')); 
         const newId = targetId + '_temp_' + Date.now();
         $(`#${targetId}`).attr('id', newId).removeClass('dropify-touched'); 
-        
         const $newDropify = $(`#${newId}`);
         $newDropify.attr('name', 'photo'); 
         if (defaultFile) $newDropify.attr('data-default-file', defaultFile);
-        
         $newDropify.dropify();
         $newDropify.attr('id', targetId);
     } else {
@@ -58,14 +47,9 @@ function resetDropify(targetId, defaultFile = null) {
     }
 }
 
-// ==============================================================================
-// 2. DATA FETCHING (Edit Modal)
-// ==============================================================================
-
 window.editEmployee = function(id) {
     Swal.fire({ title: 'Loading Profile...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
     window.currentPhotoUrl = null; 
-
     $.ajax({
         url: API_ROOT + '/admin/employee_action.php?action=get_details',
         type: 'POST',
@@ -77,7 +61,6 @@ window.editEmployee = function(id) {
                 const data = response.data;
                 const form = $('#editEmployeeForm');
                 
-                // Populate Identity & Info
                 $('#edit_employee_id_hidden').val(data.employee_id);
                 $('#edit_employee_id_display').val(data.employee_id);
                 form.find('#edit_firstname').val(data.firstname);
@@ -91,14 +74,9 @@ window.editEmployee = function(id) {
                 form.find('#edit_position').val(data.position);
                 form.find('#edit_department').val(data.department);
                 form.find('#edit_employment_status').val(data.employment_status);
-
-                // Financials
                 form.find('#edit_bank_name').val(data.bank_name);
                 form.find('#edit_account_number').val(data.account_number);
-
-                // Photo Handling
                 window.currentPhotoUrl = data.photo ? `${WEB_ROOT}/assets/images/users/${data.photo}` : null;
-                
                 $('#editModal').modal('show'); 
             } else {
                 Swal.fire('Error', response.message || 'Fetch failed.', 'error');
@@ -109,13 +87,14 @@ window.editEmployee = function(id) {
 };
 
 // ==============================================================================
-// 3. INITIALIZATION & EVENTS
+// 3. INITIALIZATION
 // ==============================================================================
 
 $(document).ready(function() {
 
-    // 3.1 Initialize DataTable
-    window.isProcessing = true; 
+    // 1. Initial UI State (Visual only, since footer won't trigger it anymore)
+    if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
+    window.isProcessing = true; // Lock immediately
 
     employeesTable = $('#employeesTable').DataTable({
         processing: true,
@@ -126,10 +105,14 @@ $(document).ready(function() {
             url: API_ROOT + "/admin/employee_action.php?action=fetch", 
             type: "GET"
         },
+        // Unlock only when drawing is totally complete
         drawCallback: function() {
             if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
-            window.isProcessing = false; 
+            
+            setTimeout(() => {
+                $('#refreshIcon').removeClass('fa-spin');
+                window.isProcessing = false; // 🔓 Release lock
+            }, 500);
         },
         columns: [
             { data: 'employee_id', className: 'fw-bold text-dark align-middle' },
@@ -172,15 +155,12 @@ $(document).ready(function() {
         order: [[ 1, "asc" ]]
     });
 
-    // 3.2 Form Submissions (Create/Update)
-    // ⭐ KEY FIX: Target the IDs explicitly because the class was missing
+    // Form Submissions
     $('#addEmployeeForm, #editEmployeeForm').on('submit', function(e) {
-        e.preventDefault(); // Stop the page from reloading
-        
+        e.preventDefault(); 
         const formId = $(this).attr('id');
         const action = formId === 'addEmployeeForm' ? 'create' : 'update';
         const formData = new FormData(this);
-        
         Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
         $.ajax({
@@ -200,27 +180,17 @@ $(document).ready(function() {
                 }
             },
             error: function(xhr, status, error) { 
-                console.error(xhr.responseText); // Log error for debugging
+                console.error(xhr.responseText); 
                 Swal.fire('Error', 'Server error. Check console.', 'error'); 
             }
         });
     });
 
-    // 3.3 Modal UI Handling
-    $('#editModal').on('shown.bs.modal', function() {
-        resetDropify('photo_edit', window.currentPhotoUrl);
-    });
+    // Modal Events
+    $('#editModal').on('shown.bs.modal', function() { resetDropify('photo_edit', window.currentPhotoUrl); });
+    $('#addModal').on('hidden.bs.modal', function() { $(this).find('form')[0].reset(); resetDropify('photo'); });
 
-    $('#addModal').on('hidden.bs.modal', function() {
-        $(this).find('form')[0].reset();
-        resetDropify('photo');
-    });
-
-    // 3.4 Search & Refresh
+    // Search & Manual Refresh
     $('#customSearch').on('keyup', function() { employeesTable.search(this.value).draw(); });
-    
-    $('#btn-refresh').on('click', function(e) { 
-        e.preventDefault(); 
-        window.refreshPageContent(true); 
-    });
+    $('#btn-refresh').on('click', function(e) { e.preventDefault(); window.refreshPageContent(true); });
 });

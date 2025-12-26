@@ -37,7 +37,7 @@
 
                 <li class="nav-item dropdown no-arrow mx-1">
                     
-                    <a class="nav-link dropdown-toggle" href="#" id="alertsDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <a class="nav-link" href="#" id="alertsDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <i class="fas fa-bell fa-fw"></i>
                         <span class="badge bg-danger badge-counter" id="notif-badge" style="<?php echo ($notif_count > 0) ? '' : 'display:none;'; ?>">
                             <?php echo $notif_count > 9 ? '9+' : $notif_count; ?>
@@ -57,17 +57,7 @@
                         <div id="notif-list" style="max-height: 300px; overflow-y: auto;">
                             <?php if (!empty($notifications)): ?>
                                 <?php foreach ($notifications as $notif): ?>
-                                    <?php 
-                                        $type = strtolower($notif['type']);
-                                        $icon_bg = 'bg-primary'; $icon = 'fa-info-circle';
 
-                                        if (strpos($type, 'payroll') !== false) { $icon_bg = 'bg-success'; $icon = 'fa-file-invoice-dollar'; }
-                                        elseif (strpos($type, 'leave') !== false) { $icon_bg = 'bg-warning'; $icon = 'fa-calendar-times'; }
-                                        elseif (strpos($type, 'warning') !== false || strpos($type, 'alert') !== false) { $icon_bg = 'bg-danger'; $icon = 'fa-exclamation-triangle'; }
-                                        elseif (strpos($type, 'system') !== false) { $icon_bg = 'bg-info'; $icon = 'fa-server'; }
-                                        
-                                        $link = $notif['link']; 
-                                    ?>
                                     <a class="dropdown-item d-flex align-items-center" href="#" onclick="markAsRead(<?php echo $notif['id']; ?>, '<?php echo $link; ?>'); return false;">
                                         <div class="me-3">
                                             <div class="icon-circle <?php echo $icon_bg; ?>">
@@ -87,7 +77,7 @@
                             <?php endif; ?>
                         </div>
 
-                        <a class="dropdown-item text-center small text-gray-500" href="<?php echo isset($base_link) ? $base_link : ''; ?>notifications.php">
+                        <a class="dropdown-item text-center small text-gray-500" href="<?php echo isset($base_link) ? $base_link : ''; ?>../app/notifications.php">
                             Show All Alerts
                         </a>
                     </div>

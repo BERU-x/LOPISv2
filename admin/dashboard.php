@@ -55,6 +55,7 @@ require '../template/topbar.php';
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs" id="status-pending-ca">
+                        <a href="ca_management.php" class="text-decoration-none text-muted">Details &rarr;</a>
                     </div>
                 </div>
             </div>
@@ -73,7 +74,7 @@ require '../template/topbar.php';
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
-                        <a href="leave_management.php" class="text-decoration-none text-muted">View details &rarr;</a>
+                        <a href="leave_management.php" class="text-decoration-none text-muted">Details &rarr;</a>
                     </div>
                 </div>
             </div>
@@ -87,8 +88,7 @@ require '../template/topbar.php';
                         <div>
                             <div class="text-label">Today Attendance</div>
                             <div class="text-value h4 font-weight-bold mb-0">
-                                <span id="val-attendance-today"><i
-                                        class="fas fa-spinner fa-spin text-muted text-xs"></i></span>
+                                <span id="val-attendance-today"><i class="fas fa-spinner fa-spin text-muted text-xs"></i></span>
                                 <span class="text-muted" style="font-size: 0.6em;">
                                     / <span id="val-attendance-total">0</span>
                                 </span>
@@ -96,7 +96,7 @@ require '../template/topbar.php';
                         </div>
                     </div>
                     <div class="mt-3 mb-0 text-muted text-xs">
-                        <a href="today_attendance.php" class="text-decoration-none text-muted">View details &rarr;</a>
+                        <a href="today_attendance.php" class="text-decoration-none text-muted">Details &rarr;</a>
                     </div>
                 </div>
             </div>
@@ -104,20 +104,38 @@ require '../template/topbar.php';
     </div>
 
     <div class="row mb-4">
-        <div class="col-xl-8 col-lg-7">
-            <div class="card h-100 shadow">
-                <div class="card-header bg-transparent border-0">
-                    <h6 class="m-0 font-weight-bold text-label">Payroll History (Last 6 Months)</h6>
+        
+        <div class="col-xl-6 col-lg-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 font-weight-bold text-label">Attendance Trends (Last 7 Days)</h6>
+                    <a href="attendance_reports.php" class="text-decoration-none text-sm text-muted">Details &rarr;</a>
                 </div>
-                <div class="card-body pt-0">
-                    <div class="chart-area" style="height: 320px;">
-                        <canvas id="payrollHistoryChart"></canvas>
+                <div class="card-body">
+                    <div class="chart-area" style="height: 300px;">
+                        <canvas id="attendanceTrendChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-4 col-lg-5">
+        <div class="col-xl-6 col-lg-6 mb-4">
+            <div class="card h-100 shadow">
+                <div class="card-header bg-transparent border-0">
+                    <h6 class="m-0 font-weight-bold text-label">Payroll History (Last 6 Months)</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area" style="height: 300px;">
+                        <canvas id="payrollHistoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        
+        <div class="col-xl-4 col-lg-6 mb-4">
             <div class="card h-100 shadow">
                 <div class="card-header bg-transparent border-0 pb-0">
                     <h6 class="m-0 font-weight-bold text-label">Employees by Dept</h6>
@@ -126,38 +144,37 @@ require '../template/topbar.php';
                     <div class="chart-pie" style="height: 250px;">
                         <canvas id="deptDistributionChart"></canvas>
                     </div>
-                    <div class="mt-4 text-center small text-muted">Hover over sections to see counts</div>
+                    <div class="mt-4 text-center small text-muted" id="dept-summary-list">
+                        Hover over sections to see counts
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="row mb-4">
-        <div class="col-xl-6 col-lg-6 mb-4">
+        <div class="col-xl-4 col-lg-6 mb-4">
             <div class="card h-100 shadow">
-                <div
-                    class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-label">Upcoming Approved Leaves</h6>
-                    <a href="leave_management.php" class="text-decoration-none text-sm text-muted">See All &rarr;</a>
+                <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-label">Upcoming Leaves</h6>
+                    <a href="leave_management.php" class="text-decoration-none text-sm text-muted">All &rarr;</a>
                 </div>
-                <div class="card-body pt-0" id="list-upcoming-leaves">
+                <div class="card-body pt-0" id="list-upcoming-leaves" style="height: 320px; overflow-y: auto;">
                     <div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x"></i></div>
                 </div>
             </div>
         </div>
 
-        <div class="col-xl-6 col-lg-6 mb-4">
+        <div class="col-xl-4 col-lg-12 mb-4">
             <div class="card h-100 shadow">
-                <div
-                    class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-label">Upcoming Company Holidays</h6>
+                <div class="card-header bg-transparent border-0 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-label">Holidays</h6>
                     <a href="holidays.php" class="text-decoration-none text-sm text-muted">Manage &rarr;</a>
                 </div>
-                <div class="card-body pt-0" id="list-upcoming-holidays">
+                <div class="card-body pt-0" id="list-upcoming-holidays" style="height: 320px; overflow-y: auto;">
                     <div class="text-center py-5 text-muted"><i class="fas fa-spinner fa-spin fa-2x"></i></div>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 

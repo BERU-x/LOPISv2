@@ -162,3 +162,28 @@ body {
     margin-right: 0.5rem;
 }
 
+    /* Modern Styling for Caps Lock Warning */
+    .caps-warning {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        margin-top: 0;
+        margin-bottom: 1rem;
+        background-color: #ffe6e6; /* Light red background */
+        border: 1px solid #ffcccc; /* Light red border */
+        border-radius: 0.375rem; /* Rounded corners */
+        color: #842029; /* Darker red text color */
+        font-weight: 500; /* Semi-bold font weight */
+        font-size: 0.875rem; /* Slightly smaller font size */
+    }
+
+    .caps-warning::before {
+        content: "\26A0"; /* Warning sign character */
+        margin-right: 0.5rem;
+        font-size: 1rem;
+    }
+
+    /* Hide utility class (if you're not using Bootstrap) */
+    .d-none {
+        display: none;
+    }

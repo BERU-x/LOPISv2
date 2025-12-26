@@ -144,6 +144,44 @@ function get_upcoming_holidays($pdo, $limit = 5) {
     }
 }
 
+/**
+ * NEW: Data for Attendance Trends (Last 7 Days)
+ * Returns labels (dates) and data (employee counts)
+ */
+function get_attendance_trends($pdo) {
+    $trend = ['labels' => [], 'data' => [], 'late' => [], 'on_time' => []];
+    
+    try {
+        // Get dates for the last 7 days
+        // We use a subquery or simply group by date where date is recent
+        $sql = "SELECT 
+                    date, 
+                    COUNT(DISTINCT employee_id) as total_present,
+                    SUM(CASE WHEN attendance_status LIKE '%Late%' THEN 1 ELSE 0 END) as late_count,
+                    SUM(CASE WHEN attendance_status LIKE '%On Time%' OR attendance_status = 'Present' THEN 1 ELSE 0 END) as on_time_count
+                FROM tbl_attendance 
+                WHERE date >= DATE_SUB(CURRENT_DATE, INTERVAL 6 DAY)
+                GROUP BY date 
+                ORDER BY date ASC";
+                
+        $stmt = $pdo->query($sql);
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fill in data
+        foreach ($results as $row) {
+            $trend['labels'][] = date("M d", strtotime($row['date'])); // e.g., "Oct 25"
+            $trend['data'][] = (int)$row['total_present'];
+            $trend['late'][] = (int)$row['late_count'];     // Optional: if you want a stacked bar chart
+            $trend['on_time'][] = (int)$row['on_time_count']; // Optional
+        }
+        
+    } catch (PDOException $e) {
+        error_log("Attendance Trend Error: " . $e->getMessage());
+    }
+    
+    return $trend;
+}
+
 // =================================================================================
 // 4. EXECUTE AND RETURN
 // =================================================================================
@@ -154,6 +192,10 @@ try {
         'metrics' => get_admin_dashboard_metrics($pdo),
         'dept_data' => get_dept_distribution_data($pdo),
         'payroll_history' => get_payroll_history($pdo),
+        
+        // ADD THE NEW DATA HERE
+        'attendance_trend' => get_attendance_trends($pdo), 
+        
         'upcoming_leaves' => get_upcoming_leaves($pdo),
         'upcoming_holidays' => get_upcoming_holidays($pdo),
         'last_updated' => date('Y-m-d H:i:s')
