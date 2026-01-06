@@ -1,44 +1,18 @@
 /**
  * Cash Advance Management Controller
- * Handles Cash Advance approvals, rejections, and real-time status syncing.
+ * Handles Cash Advance approvals, rejections, and standardized UI syncing.
  */
 
 // ==============================================================================
-// 1. GLOBAL STATE & UI HELPERS
+// 1. GLOBAL STATE & REFRESHER
 // ==============================================================================
 var caTable;
 var currentCAId;
 
-/**
- * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
-// 1.2 MASTER REFRESHER TRIGGER
 window.refreshPageContent = function(isManual = false) {
     if (caTable) {
-        if(isManual) {
-            $('#refreshIcon').addClass('fa-spin');
-            updateSyncStatus('loading');
+        if(isManual && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
         caTable.ajax.reload(null, false);
     }
@@ -78,7 +52,7 @@ function renderCAModalBody(data, statusHtml, amountFormatted) {
                 <div class="mt-2">${statusHtml}</div>
             </div>
             <div class="col-md-7 ps-4">
-                <h6 class="fw-bold text-gray-600 mb-3 small uppercase">Transaction Details</h6>
+                <h6 class="fw-bold text-muted mb-3 small text-uppercase">Transaction Details</h6>
                 <table class="table table-sm table-borderless small">
                     <tr><td class="text-muted">Date Filed:</td><td class="fw-bold text-end">${data.date_requested}</td></tr>
                     <tr><td class="text-muted">Requested:</td><td class="fw-bold text-end text-teal">${amountFormatted}</td></tr>
@@ -87,7 +61,7 @@ function renderCAModalBody(data, statusHtml, amountFormatted) {
             </div>
         </div>
         <hr class="my-3">
-        <h6 class="fw-bold text-gray-600 mb-2 small uppercase">Employee Justification</h6>
+        <h6 class="fw-bold text-muted mb-2 small text-uppercase">Employee Justification</h6>
         <div class="bg-light p-3 rounded border small font-italic">${data.remarks || 'No justification provided.'}</div>
     `;
 }
@@ -133,7 +107,7 @@ window.processCA = function(type) {
 
     Swal.fire({
         title: type === 'approve' ? 'Approve Cash Advance?' : 'Reject this Request?',
-        text: type === 'approve' ? `You are approving a disbursement of ₱${parseFloat(amount).toLocaleString()}.` : "This will cancel the request and notify the employee.",
+        text: type === 'approve' ? `Confirming disbursement of ₱${parseFloat(amount).toLocaleString()}.` : "This will cancel the request and notify the employee.",
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: type === 'approve' ? '#1cc88a' : '#e74a3b',
@@ -143,7 +117,7 @@ window.processCA = function(type) {
             Swal.fire({ title: 'Processing...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
             $.post('../api/admin/cash_advance_action.php?action=process', { id: currentCAId, type: type, amount: amount }, function(res) {
                 if(res.status === 'success') {
-                    Swal.fire('Success', res.message, 'success');
+                    Swal.fire('Updated', res.message, 'success');
                     $('#viewCAModal').modal('hide');
                     window.refreshPageContent(true);
                 } else {
@@ -162,19 +136,19 @@ $(document).ready(function() {
     caTable = $('#caTable').DataTable({
         processing: true,
         serverSide: true,
-        ordering: true, 
-        dom: 'rtip',
         ajax: {
             url: "../api/admin/cash_advance_action.php?action=fetch",
             type: "GET",
             data: function (d) {
                 d.start_date = $('#filter_start_date').val();
                 d.end_date = $('#filter_end_date').val();
+            },
+            error: function() {
+                if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
             }
         },
         drawCallback: function() {
-            updateSyncStatus('success');
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+            if(window.AppUtility) window.AppUtility.updateSyncStatus('success');
         },
         columns: [
             { 
@@ -183,7 +157,7 @@ $(document).ready(function() {
                     let imgPath = row.photo ? `../assets/images/users/${row.photo}` : `../assets/images/users/default.png`;
                     return `
                         <div class="d-flex align-items-center">
-                            <img src="${imgPath}" class="rounded-circle me-3 border" style="width: 38px; height: 38px; object-fit: cover;" onerror="this.src='../assets/images/users/default.png'">
+                            <img src="${imgPath}" class="rounded-circle me-3 border shadow-sm" style="width: 38px; height: 38px; object-fit: cover;" onerror="this.src='../assets/images/users/default.png'">
                             <div>
                                 <div class="fw-bold text-dark mb-0">${row.firstname} ${row.lastname}</div>
                                 <div class="small text-muted font-monospace">${row.employee_id}</div>
@@ -215,11 +189,12 @@ $(document).ready(function() {
                 data: 'id', 
                 orderable: false,
                 className: 'text-center align-middle',
-                render: d => `<button class="btn btn-sm btn-outline-teal fw-bold shadow-sm" onclick="viewCA(${d})"><i class="fa-solid fa-eye me-1"></i> Review</button>`
+                render: d => `<button class="btn btn-sm btn-outline-teal fw-bold" onclick="viewCA(${d})"><i class="fa-solid fa-eye me-1"></i> Review</button>`
             }
         ]
     });
 
+    // Custom Search with debounce
     $('#customSearch').on('keyup', function() { 
         clearTimeout(window.searchTimer);
         window.searchTimer = setTimeout(() => { caTable.search(this.value).draw(); }, 400); 
@@ -231,5 +206,8 @@ $(document).ready(function() {
         caTable.search('').draw(); 
         window.refreshPageContent(true);
     });
-    $('#btn-refresh').on('click', (e) => { e.preventDefault(); window.refreshPageContent(true); });
+    $('#btn-refresh').on('click', (e) => { 
+        e.preventDefault(); 
+        window.refreshPageContent(true); 
+    });
 });

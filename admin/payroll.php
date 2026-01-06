@@ -92,19 +92,9 @@ require '../template/topbar.php';
         <div class="card-header py-3 d-flex flex-column flex-md-row align-items-center justify-content-between bg-white">
             <div class="d-flex align-items-center mb-2 mb-md-0">
                 <h6 class="m-0 font-weight-bold text-gray-800 me-3"><i class="fas fa-list-alt me-2"></i>Payroll History</h6>
-                <div class="dropdown no-arrow">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" type="button" id="batchDropdown" data-bs-toggle="dropdown">
-                        <i class="fas fa-check-square me-1"></i> Batch Actions
-                    </button>
-                    <div class="dropdown-menu shadow animated--fade-in" aria-labelledby="batchDropdown">
-                        <a class="dropdown-item" href="javascript:void(0);" id="btnBatchApprove">
-                            <i class="fas fa-check text-success me-2"></i> Approve Selected
-                        </a>
-                        <a class="dropdown-item" href="javascript:void(0);" id="btnBatchEmail">
-                            <i class="fas fa-envelope text-primary me-2"></i> Send Payslips
-                        </a>
-                    </div>
-                </div>
+                <button class="btn btn-sm btn-outline-secondary fw-bold shadow-sm" type="button" onclick="performBatchAction('approve')">
+                    <i class="fas fa-check-double me-1"></i> Approve Selected
+                </button>
             </div>
             
             <div class="input-group" style="max-width: 250px;">

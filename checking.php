@@ -19,6 +19,16 @@ if (empty(session_id())) {
     session_start();
 }
 
+// Top of user/request_leave.php (or in your global auth check)
+if (!isset($_SESSION['user_id'])) {
+    // Get the current relative path
+    $current_page = $_SERVER['REQUEST_URI']; 
+    
+    // Redirect to login with the 'redirect' parameter
+    header("Location: " . BASE_URL . "index.php?redirect=" . urlencode($current_page));
+    exit();
+}
+
 // =========================================================
 // PART A: FETCH SYSTEM SETTINGS (Cached in Session)
 // =========================================================

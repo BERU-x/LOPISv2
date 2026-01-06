@@ -1,6 +1,6 @@
 /**
  * Leave Management Controller
- * Singleton Pattern with Mutex Locking
+ * Updated for Credit Deduction & Real-time Balance Checking
  */
 
 if (window.LeaveControllerLoaded) {
@@ -13,11 +13,10 @@ if (window.LeaveControllerLoaded) {
     const LEAVE_API = '../api/admin/leave_action.php';
 
     // ==============================================================================
-    // 2. REFRESHER & DROPDOWN HELPERS
+    // 2. REFRESHER & CREDIT HELPERS
     // ==============================================================================
     window.refreshPageContent = function(isManual = false) {
         if (window.isProcessing) return;
-
         if (leaveTable && $.fn.DataTable.isDataTable('#leaveTable')) {
             window.isProcessing = true;
             if(isManual && window.AppUtility) {
@@ -26,6 +25,29 @@ if (window.LeaveControllerLoaded) {
             }
             leaveTable.ajax.reload(null, false);
         }
+    };
+
+    const fetchEmployeeCredits = (empId) => {
+        const display = $('#creditDisplay');
+        if (!empId) {
+            display.addClass('d-none');
+            return;
+        }
+
+        $.ajax({
+            url: LEAVE_API + '?action=get_employee_credits',
+            type: 'POST',
+            data: { employee_id: empId },
+            dataType: 'json',
+            success: function(res) {
+                if (res.status === 'success') {
+                    $('#val_vl').text(res.credits.vacation_leave_total);
+                    $('#val_sl').text(res.credits.sick_leave_total);
+                    $('#val_el').text(res.credits.emergency_leave_total);
+                    display.removeClass('d-none').hide().fadeIn();
+                }
+            }
+        });
     };
 
     const loadEmployeeDropdown = () => {
@@ -49,8 +71,49 @@ if (window.LeaveControllerLoaded) {
     };
 
     // ==============================================================================
-    // 3. ACTION LOGIC
+    // 3. ACTION LOGIC: UPDATE STATUS (Approve/Reject)
     // ==============================================================================
+    window.updateStatus = function(id, action) {
+        const verb = action === 'approve' ? 'approve' : 'reject';
+        const color = action === 'approve' ? '#28a745' : '#dc3545';
+        const confirmText = action === 'approve' 
+            ? "This will deduct credits from the employee's balance." 
+            : "This request will be marked as rejected.";
+
+        Swal.fire({
+            title: `Are you sure you want to ${verb}?`,
+            text: confirmText,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: color,
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: `Yes, ${verb} it!`
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Updating...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+
+                $.ajax({
+                    url: LEAVE_API + '?action=update_status',
+                    type: 'POST',
+                    data: { id: id, status_action: action },
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res.status === 'success') {
+                            Swal.fire('Success', res.message, 'success');
+                            $('#detailsModal').modal('hide'); // Close view modal if open
+                            window.refreshPageContent(true);
+                        } else {
+                            Swal.fire('Failed', res.message, 'error');
+                        }
+                    },
+                    error: function() {
+                        Swal.fire('Error', 'Internal Server Error', 'error');
+                    }
+                });
+            }
+        });
+    };
+
     window.viewDetails = function(id) {
         const content = $('#leave-details-content');
         const footer = $('#modal-footer-actions');
@@ -70,6 +133,7 @@ if (window.LeaveControllerLoaded) {
                         <div class="col-md-4 text-center border-end">
                             <img src="../assets/images/users/${d.photo || 'default.png'}" class="rounded-circle border shadow-sm mb-2" style="width: 85px; height: 85px; object-fit: cover;">
                             <h6 class="fw-bold mb-0">${d.firstname} ${d.lastname}</h6>
+                            <small class="text-muted">${d.employee_id}</small>
                         </div>
                         <div class="col-md-8 ps-4">
                             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -87,7 +151,7 @@ if (window.LeaveControllerLoaded) {
                 if(d.status == 0) {
                     footer.prepend(`
                         <button onclick="updateStatus(${d.id}, 'reject')" class="btn btn-outline-danger btn-action fw-bold me-auto">Reject</button>
-                        <button onclick="updateStatus(${d.id}, 'approve')" class="btn btn-success btn-action fw-bold shadow-sm">Approve Request</button>
+                        <button onclick="updateStatus(${d.id}, 'approve')" class="btn btn-success btn-action fw-bold shadow-sm">Approve & Deduct</button>
                     `);
                 }
             }
@@ -99,6 +163,10 @@ if (window.LeaveControllerLoaded) {
     // ==============================================================================
     $(document).ready(function() {
         loadEmployeeDropdown();
+
+        $('#empDropdown').on('change', function() {
+            fetchEmployeeCredits($(this).val());
+        });
 
         if ($('#leaveTable').length) {
             window.isProcessing = true;
@@ -127,15 +195,16 @@ if (window.LeaveControllerLoaded) {
                 },
                 columns: [
                     { data: null, render: function(data, type, row) {
-                        return `<div class="fw-bold text-dark">${row.lastname}, ${row.firstname}</div>`;
+                        return `<div class="fw-bold text-dark">${row.lastname}, ${row.firstname}</div><small class="text-muted">${row.employee_id}</small>`;
                     }},
                     { data: null, render: function(data, type, row) {
-                        return `<span class="badge bg-light text-primary border">${row.leave_type}</span><br><small>${row.start_date}</small>`;
+                        return `<span class="badge bg-light text-primary border">${row.leave_type}</span><br><small class="text-muted"><i class="far fa-calendar-alt me-1"></i>${row.start_date}</small>`;
                     }},
                     { data: "days_count", className: "text-center fw-bold" },
                     { data: "status", className: "text-center", render: function(data) {
                         if(data == 0) return '<span class="badge bg-soft-warning text-warning border px-3 rounded-pill">Pending</span>';
-                        return '<span class="badge bg-soft-success text-success border px-3 rounded-pill">Approved</span>';
+                        if(data == 1) return '<span class="badge bg-soft-success text-success border px-3 rounded-pill">Approved</span>';
+                        return '<span class="badge bg-soft-danger text-danger border px-3 rounded-pill">Rejected</span>';
                     }},
                     { data: null, className: "text-center", render: function(data, type, row) {
                         return `<button onclick="viewDetails(${row.leave_id})" class="btn btn-sm btn-outline-secondary fw-bold"><i class="fa-solid fa-eye me-1"></i> Details</button>`;
@@ -144,25 +213,42 @@ if (window.LeaveControllerLoaded) {
             });
         }
 
-        // --- ⭐ SUBMIT HANDLER ---
+        // --- SUBMIT HANDLER ---
         $('#applyLeaveForm').off('submit').on('submit', function(e) {
             e.preventDefault();
-            Swal.fire({ title: 'Filing Leave...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+            
+            Swal.fire({ 
+                title: 'Processing Leave...', 
+                text: 'Deducting credits and notifying employee',
+                allowOutsideClick: false, 
+                didOpen: () => { Swal.showLoading(); } 
+            });
 
             $.ajax({
                 url: LEAVE_API + '?action=create',
-                type: 'POST', // Ensure this is POST
+                type: 'POST',
                 data: $(this).serialize(),
                 dataType: 'json',
                 success: function(res) {
                     if(res.status === 'success') {
                         $('#applyLeaveModal').modal('hide');
                         $('#applyLeaveForm')[0].reset();
-                        Swal.fire('Success', res.message, 'success');
+                        $('#creditDisplay').addClass('d-none');
+                        
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Leave Filed',
+                            text: res.message,
+                            confirmButtonColor: '#0cc0df'
+                        });
+                        
                         window.refreshPageContent(true);
                     } else {
-                        Swal.fire('Error', res.message, 'error');
+                        Swal.fire('Filing Failed', res.message, 'error');
                     }
+                },
+                error: function() {
+                    Swal.fire('Server Error', 'Could not reach the server.', 'error');
                 }
             });
         });

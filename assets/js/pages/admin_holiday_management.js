@@ -1,56 +1,34 @@
 /**
  * Holiday Management Controller
  * Handles Holiday CRUD, automated payroll multipliers, and real-time UI syncing.
+ * Standardized with AppUtility for Sync Status.
  */
 
 // ==============================================================================
-// 1. GLOBAL STATE & UI HELPERS
+// 1. GLOBAL STATE & MASTER REFRESHER
 // ==============================================================================
 var holidayTable;
-let currentHolidayId = null;
+window.currentHolidayId = null;
 
 /**
- * 1.1 HELPER: Updates the Topbar Status (Text + Dot Color)
+ * MASTER REFRESHER TRIGGER
+ * Integrates with AppUtility to show the Syncing/Synced state
  */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
-// 1.2 MASTER REFRESHER TRIGGER
 window.refreshPageContent = function(isManual = false) {
     if (holidayTable) {
-        if(isManual) {
-            $('#refreshIcon').addClass('fa-spin');
-            updateSyncStatus('loading');
+        if (isManual && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
         holidayTable.ajax.reload(null, false);
     }
 };
 
 // ==============================================================================
-// 2. BUSINESS LOGIC (Modal, Multiplier, Delete)
+// 2. BUSINESS LOGIC (Attached to window for global access)
 // ==============================================================================
 
 /**
  * 2.1 Map Philippine Holiday Types to standard payroll multipliers
- * Includes support for Double Pay and Premium rules.
  */
 function getMultiplier(type) {
     const rates = {
@@ -62,16 +40,20 @@ function getMultiplier(type) {
     return rates[type] || rates['Default'];
 }
 
-// 2.2 Function triggered by the Holiday Type dropdown change
-function updateMultiplier() {
+/**
+ * 2.2 Function triggered by the Holiday Type dropdown change
+ */
+window.updateMultiplier = function() {
     const selectedType = $('#holiday_type').val();
     const multiplier = getMultiplier(selectedType);
     $('#payroll_multiplier').val(multiplier.toFixed(2));
-}
+};
 
-// 2.3 Function to reset and open the Add/Edit Modal
-function openModal(id = null) {
-    currentHolidayId = id;
+/**
+ * 2.3 Function to reset and open the Add/Edit Modal
+ */
+window.openModal = function(id = null) {
+    window.currentHolidayId = id;
     const $form = $('#holidayForm');
     const $modal = $('#holidayModal');
     
@@ -107,13 +89,15 @@ function openModal(id = null) {
             Swal.fire('Error', 'Network error occurred.', 'error');
         });
     } else {
-        updateMultiplier(); 
+        window.updateMultiplier(); 
         $modal.modal('show');
     }
-}
+};
 
-// 2.4 Function to delete a holiday
-function deleteHoliday(id) {
+/**
+ * 2.4 Function to delete a holiday
+ */
+window.deleteHoliday = function(id) {
     Swal.fire({
         title: 'Delete Holiday?',
         text: "This may affect payroll calculations for this date range.",
@@ -134,7 +118,7 @@ function deleteHoliday(id) {
             }, 'json');
         }
     });
-}
+};
 
 // ==============================================================================
 // 3. INITIALIZATION
@@ -146,18 +130,17 @@ $(document).ready(function() {
         processing: true,
         serverSide: true,
         ordering: true, 
-        stateSave: true, // Remembers user pagination/search
+        stateSave: true,
         dom: 'rtip',
         ajax: {
             url: "../api/admin/holiday_action.php?action=fetch",
             type: "GET",
             error: function() {
-                updateSyncStatus('error');
+                if (window.AppUtility) window.AppUtility.updateSyncStatus('error');
             }
         },
         drawCallback: function() {
-            updateSyncStatus('success');
-            setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('success');
         },
         columns: [
             { 
@@ -182,11 +165,10 @@ $(document).ready(function() {
                 className: 'text-center align-middle',
                 render: d => `<button class="btn btn-sm btn-outline-teal fw-bold shadow-sm" onclick="openModal(${d})"><i class="fa-solid fa-pen-to-square me-1"></i> Edit</button>`
             }
-        ],
-        language: { emptyTable: "No holidays configured in the system." }
+        ]
     });
 
-    // 3.2 FORM SUBMISSION (With Debouncing)
+    // 3.2 FORM SUBMISSION
     let isSubmitting = false;
     $('#holidayForm').on('submit', function(e) {
         e.preventDefault();
@@ -220,12 +202,12 @@ $(document).ready(function() {
     });
 
     // 3.3 Event Bindings
-    $('#holiday_type').on('change', updateMultiplier);
+    $('#holiday_type').on('change', window.updateMultiplier);
     
     $('#deleteHolidayBtn').on('click', function() {
-        if(currentHolidayId) {
+        if(window.currentHolidayId) {
             $('#holidayModal').modal('hide');
-            deleteHoliday(currentHolidayId);
+            window.deleteHoliday(window.currentHolidayId);
         }
     });
 

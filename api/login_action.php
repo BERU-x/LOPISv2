@@ -124,11 +124,26 @@ try {
         logAudit($pdo, $user['id'], $user['usertype'], 'LOGIN_SUCCESS', $log_msg);
 
         // g. REDIRECT
-        $redirect_url = $force_password_reset ? 'process/force_password_reset.php' : match((int)$user['usertype']) {
+        $default_redirect = match((int)$user['usertype']) {
             0 => 'superadmin/dashboard.php',
             1 => 'admin/dashboard.php',
             default => 'user/dashboard.php'
         };
+
+        // Check if a specific redirect URL was requested
+        $requested_redirect = $_POST['redirect_to'] ?? '';
+        
+        // If force_password_reset is true, that takes priority
+        if ($force_password_reset) {
+            $redirect_url = 'process/force_password_reset.php';
+        } 
+        // If there's a requested redirect, use it, otherwise use default
+        elseif (!empty($requested_redirect)) {
+            $redirect_url = $requested_redirect;
+        } 
+        else {
+            $redirect_url = $default_redirect;
+        }
         
         echo json_encode(['status' => 'success', 'message' => 'Login successful!', 'redirect' => $redirect_url]);
 

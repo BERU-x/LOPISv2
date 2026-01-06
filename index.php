@@ -101,15 +101,23 @@ if ($maintenance_mode == 1 && $session_active && !$is_super_admin) {
 }
 
 // --- FINAL REDIRECTION ---
+// At the bottom of the PHP block in index.php
 if ($session_active) {
-    $redirect_url = match((int)$_SESSION['usertype']) {
-        0 => 'superadmin/dashboard.php',
-        1 => 'admin/dashboard.php',
-        default => 'user/dashboard.php'
-    };
-    header("Location: $redirect_url");
+    $target = $_GET['redirect'] ?? null;
+    
+    if ($target) {
+        header("Location: $target");
+    } else {
+        $redirect_url = match((int)$_SESSION['usertype']) {
+            0 => 'superadmin/dashboard.php',
+            1 => 'admin/dashboard.php',
+            default => 'user/dashboard.php'
+        };
+        header("Location: $redirect_url");
+    }
     exit;
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -145,18 +153,24 @@ if ($session_active) {
                     </div>
 
                     <form id="login-form">
-                        <div class="mb-3">
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-user-circle"></i></span>
-                                <input type="text" class="form-control" id="login_id" name="login_id" placeholder="Email or Employee ID" required>
+                        <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($_GET['redirect'] ?? ''); ?>">
+                        
+                        <div class="mb-4">
+                            <div class="input-group-modern">
+                                <input type="text" class="form-input" id="login_id" name="login_id" placeholder=" " required>
+                                <label class="floating-label" for="login_id">Email or Employee ID</label>
+                                <span class="input-icon"><i class="fas fa-user-circle"></i></span>
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
-                                <button class="btn btn-outline-secondary" type="button" id="toggle-password"><i class="fas fa-eye"></i></button>
+                            <div class="input-group-modern">
+                                <input type="password" class="form-input" id="password" name="password" placeholder=" " required>
+                                <label class="floating-label" for="password">Password</label>
+                                <span class="input-icon"><i class="fas fa-lock"></i></span>
+                                <button class="btn-outline-secondary" type="button" id="toggle-password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
                             </div>
                         </div>
 
@@ -187,6 +201,6 @@ if ($session_active) {
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="assets/vendor/bs5/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="scripts/login_scripts.js"></script>
+    <script src="assets/js/pages/login_scripts.js"></script>
 </body>
 </html>

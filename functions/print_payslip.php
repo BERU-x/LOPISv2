@@ -195,8 +195,8 @@ try {
     // ==========================================
     $company_name = 'Lendell Outsourcing Solutions, Inc.';
     
-    $image_path = __DIR__ . '/../../assets/images/LOPISv2_payslip.jpg'; 
-    $png_path = __DIR__ . '/../../assets/images/LOPISv2.png'; 
+    $image_path = __DIR__ . '/../assets/images/LOPISv2_payslip.jpg'; 
+    $png_path = __DIR__ . '/../assets/images/LOPISv2.png'; 
     if (!file_exists($image_path) && file_exists($png_path)) $image_path = $png_path;
     
     $img_html = '';

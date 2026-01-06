@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Git: Add",
+      "type": "shell",
+      "command": "git add .",
+      "group": "git"
+    },
+    {
+      "label": "Git: Commit",
+      "type": "shell",
+      "command": "git commit -m 'Automated commit'",
+      "group": "git"
+    },
+    {
+      "label": "Git: Push",
+      "type": "shell",
+      "command": "git push origin main",
+      "group": "git"
+    },
+    {
+      "label": "Git: Update",
+      "type": "shell",
+      "command": "git add . && git commit -m 'Automated update' && git push origin main",
+      "group": "git"
+    }
+  ]
+}

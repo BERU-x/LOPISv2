@@ -1,50 +1,23 @@
 /**
  * Payroll Management Controller
- * Handles SSP DataTables, Batch Approvals, and Real-time Financial Stats.
+ * Handles SSP DataTables, Batch Approvals, and AppUtility Syncing.
  */
 
 // ==============================================================================
-// 1. GLOBAL STATE & UI HELPERS
+// 1. GLOBAL STATE & MASTER REFRESHER
 // ==============================================================================
 var payrollTable;
 
-/**
- * 1.1 HELPER: Updates the Topbar Status (Sync Dot & Time)
- */
-function updateSyncStatus(state) {
-    const $dot = $('.live-dot');
-    const $text = $('#last-updated-time');
-    const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-    $dot.removeClass('text-success text-warning text-danger');
-
-    if (state === 'loading') {
-        $text.text('Syncing...');
-        $dot.addClass('text-warning'); 
-    } 
-    else if (state === 'success') {
-        $text.text(`Synced: ${time}`);
-        $dot.addClass('text-success'); 
-    } 
-    else {
-        $text.text(`Failed: ${time}`);
-        $dot.addClass('text-danger');  
-    }
-}
-
-// 1.2 MASTER REFRESHER TRIGGER
 window.refreshPageContent = function(isManual = false) {
     if (payrollTable) {
-        if(isManual) {
-            $('#refreshIcon').addClass('fa-spin');
-            updateSyncStatus('loading');
+        if(isManual && window.AppUtility) {
+            window.AppUtility.updateSyncStatus('loading');
         }
         payrollTable.ajax.reload(null, false);
     }
-    loadStats(); // Silently update dashboard cards
+    loadStats(); 
 };
 
-// 1.3 Helper: Load Financial Stats (Payout vs Pending)
 function loadStats() {
     $.getJSON('../api/admin/payroll_action.php?action=stats', function(res) {
         if(res.status === 'success') {
@@ -58,7 +31,7 @@ function loadStats() {
 // 2. BATCH ACTIONS & PRINTING
 // ==============================================================================
 
-function performBatchAction(subAction) {
+window.performBatchAction = function(subAction) {
     let selectedIds = [];
     $('.payroll-checkbox:checked').each(function() { selectedIds.push($(this).val()); });
 
@@ -72,6 +45,7 @@ function performBatchAction(subAction) {
         text: `Applying this action to ${selectedIds.length} employees. This updates financial ledgers.`,
         icon: 'question',
         showCancelButton: true,
+        confirmButtonColor: subAction === 'approve' ? '#0cc0df' : '#4e73df',
         confirmButtonText: 'Confirm'
     }).then((result) => {
         if (result.isConfirmed) {
@@ -91,9 +65,9 @@ function performBatchAction(subAction) {
             }, 'json');
         }
     });
-}
+};
 
-function printBatchPayslips() {
+window.printBatchPayslips = function() {
     let start = $('#filter_start_date').val();
     let end = $('#filter_end_date').val();
     if(!start || !end) {
@@ -101,16 +75,59 @@ function printBatchPayslips() {
         return;
     }
     window.open(`functions/print_batch_payslips.php?start=${start}&end=${end}`, '_blank');
+};
+
+// ==============================================================================
+// 3. PAYROLL GENERATION (Modal Handler)
+// ==============================================================================
+
+function initPayrollGeneration() {
+    $('#generatePayrollForm').on('submit', function(e) {
+        e.preventDefault();
+
+        Swal.fire({
+            title: 'Generating Payroll',
+            text: 'Calculating attendance, holidays, and taxes. Please wait...',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+
+        $.ajax({
+            url: 'functions/create_payroll.php',
+            type: 'POST',
+            data: $(this).serialize(),
+            dataType: 'json',
+            success: function(res) {
+                if (res.status === 'success') {
+                    Swal.fire('Generated!', res.message, 'success');
+                    $('#generatePayrollModal').modal('hide');
+                    window.refreshPageContent(true);
+                } else {
+                    // Show detailed error (useful for Debug Mode)
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Generation Failed',
+                        text: res.message,
+                        footer: 'Check attendance logs or employee compensation settings.'
+                    });
+                }
+            },
+            error: function(xhr) {
+                Swal.fire('System Error', 'Could not contact the payroll engine.', 'error');
+                console.error(xhr.responseText);
+            }
+        });
+    });
 }
 
 // ==============================================================================
-// 3. INITIALIZATION
+// 4. INITIALIZATION
 // ==============================================================================
 $(document).ready(function() {
     
     loadStats();
+    initPayrollGeneration();
 
-    // 3.1 Initialize SSP DataTable
     payrollTable = $('#payrollTable').DataTable({
         processing: true,
         serverSide: true,
@@ -122,10 +139,13 @@ $(document).ready(function() {
             data: function(d) {
                 d.filter_start_date = $('#filter_start_date').val();
                 d.filter_end_date = $('#filter_end_date').val();
+            },
+            error: function() {
+                if(window.AppUtility) window.AppUtility.updateSyncStatus('error');
             }
         },
         drawCallback: function() {
-            updateSyncStatus('success');
+            if(window.AppUtility) window.AppUtility.updateSyncStatus('success');
             setTimeout(() => $('#refreshIcon').removeClass('fa-spin'), 500);
         },
         columns: [
@@ -179,13 +199,13 @@ $(document).ready(function() {
         order: [[ 1, "asc" ]]
     });
 
-    // 3.2 Search Debouncing
+    // Search Debouncing
     $('#customSearch').on('keyup', function() { 
         clearTimeout(window.searchTimer);
         window.searchTimer = setTimeout(() => { payrollTable.search(this.value).draw(); }, 400); 
     });
 
-    // 3.3 Filters & Refresh
+    // Filters
     $('#applyFilterBtn').on('click', () => window.refreshPageContent(true)); 
     $('#clearFilterBtn').on('click', () => {
         $('#filter_start_date, #filter_end_date, #customSearch').val('');
@@ -193,11 +213,14 @@ $(document).ready(function() {
         window.refreshPageContent(true); 
     });
 
-    // 3.4 Select All Logic
+    // Select All
     $('#selectAll').on('click', function(){
         $('.payroll-checkbox').prop('checked', this.checked);
     });
 
-    // 3.5 Manual Action Refresh
-    $('#btn-refresh').on('click', (e) => { e.preventDefault(); window.refreshPageContent(true); });
+    // Refresh
+    $('#btn-refresh').on('click', (e) => { 
+        e.preventDefault(); 
+        window.refreshPageContent(true); 
+    });
 });

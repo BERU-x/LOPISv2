@@ -83,25 +83,26 @@ $api_root = isset($api_root) ? $api_root : '../api';
     window.isProcessing = false;
 
     // ==========================================================================
-    // 2. UI UTILITY (The "Syncing..." Indicator)
+    // 2. UI UTILITY (Enhanced with Selection & Refresh Status)
     // ==========================================================================
     window.AppUtility = {
         /**
          * Updates the Topbar Sync Indicator
-         * @param {string} state - 'loading', 'success', or 'error'
+         * @param {string} state - 'loading', 'success', 'error', or 'paused'
          */
         updateSyncStatus: function(state) {
             const dot = document.querySelector('.live-dot');
             const text = document.getElementById('last-updated-time');
             const icon = document.getElementById('refresh-spinner');
+            const liveBadge = document.getElementById('refreshStatus'); // From your PHP view
 
             if (!dot || !text || !icon) return;
 
-            // 1. Reset all classes
+            // Reset all classes
             dot.classList.remove('text-success', 'text-warning', 'text-danger');
             icon.classList.remove('fa-spin', 'text-teal', 'text-danger', 'text-gray-400');
+            if(liveBadge) liveBadge.classList.add('d-none');
 
-            // 2. Apply new state
             if (state === 'loading') {
                 text.innerText = 'Syncing...';
                 dot.classList.add('text-warning');
@@ -112,7 +113,13 @@ $api_root = isset($api_root) ? $api_root : '../api';
                 text.innerText = `Synced: ${time}`;
                 dot.classList.add('text-success');
                 icon.classList.add('text-gray-400');
+                if(liveBadge) liveBadge.classList.remove('d-none');
             } 
+            else if (state === 'paused') {
+                text.innerText = 'Refresh Paused (Selection Active)';
+                dot.classList.add('text-warning');
+                icon.classList.add('text-gray-400');
+            }
             else if (state === 'error') {
                 const time = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
                 text.innerText = `Failed: ${time}`;
@@ -123,10 +130,17 @@ $api_root = isset($api_root) ? $api_root : '../api';
     };
 
     // ==========================================================================
-    // 3. THE SYNC ENGINE (Universal Refresher)
+    // 3. THE SYNC ENGINE (Universal Refresher with Selection Pause)
     // ==========================================================================
     function runGlobalSync(isManual = false) {
-        // [LOCK CHECK]: Stop if system is busy
+        // [PAUSE CHECK]: Stop if user has selected rows for bulk action
+        // 'selectedIds' is the global array we defined in superadmin_attendance.js
+        if (window.selectedIds && window.selectedIds.length > 0) {
+            if (window.AppUtility) window.AppUtility.updateSyncStatus('paused');
+            return;
+        }
+
+        // [LOCK CHECK]: Stop if system is busy with a specific process
         if (window.isProcessing === true) {
             if(isManual) console.warn("Sync skipped: System is busy.");
             return;
@@ -135,21 +149,20 @@ $api_root = isset($api_root) ? $api_root : '../api';
         // 1. Update UI
         if (window.AppUtility) window.AppUtility.updateSyncStatus('loading');
 
-        // 2. Fetch Notifications (Always runs)
-        fetchNotifications();
+        // 2. Fetch Notifications
+        if (typeof fetchNotifications === "function") fetchNotifications();
 
         // 3. Trigger Page-Specific Logic (The Hook)
-        // Checks if the current page has defined a custom refresh function
         if (typeof window.refreshPageContent === "function") {
             window.refreshPageContent(isManual);
         }
         
         // 4. Sync Generic DataTables
-        // Refreshes any standard DataTable that IS NOT the main table handled by step 3
         if ($.fn.DataTable) {
             $('.dataTable').each(function() {
-                // Ignore specific tables we know are handled by the page controller
-                if (this.id !== 'leaveTable' && this.id !== 'todayTable' && this.id !== 'employeesTable') {
+                // Include our new superAttendanceTable in the manual exclusions if necessary,
+                // but generally, it's handled by refreshPageContent
+                if (!['leaveTable', 'todayTable', 'employeesTable', 'superAttendanceTable'].includes(this.id)) {
                     var dt = $(this).DataTable();
                     if (dt.ajax && dt.ajax.url()) {
                         dt.ajax.reload(null, false); 
@@ -158,11 +171,16 @@ $api_root = isset($api_root) ? $api_root : '../api';
             });
         }
 
-        // 5. Fallback Cleanup
-        // If the page doesn't have complex logic to unlock itself, we do it here after 1s
+        // 5. Success UI Update
+        // Delay slightly to show the "Syncing" state to the user
         setTimeout(() => { 
-            if (window.isProcessing === false && window.AppUtility) {
-                window.AppUtility.updateSyncStatus('success');
+            if (!window.isProcessing && window.AppUtility) {
+                // Double check selection hasn't happened during the timeout
+                if (!window.selectedIds || window.selectedIds.length === 0) {
+                    window.AppUtility.updateSyncStatus('success');
+                } else {
+                    window.AppUtility.updateSyncStatus('paused');
+                }
             }
         }, 1000);
     }

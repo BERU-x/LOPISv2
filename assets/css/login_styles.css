@@ -1,189 +1,194 @@
-/* style.css - Modern & Sleek Redesign */
-
-/* ================================================= */
-/* GLOBAL STYLES & LAYOUT */
-/* ================================================= */
+/* style.css - Unified Modern Redesign */
 
 :root {
-    --primary-color: #007bff; /* Bootstrap's primary blue */
-    --success-color: #28a745; /* Bootstrap's success green */
-    --background-light: #eef2f6; /* Very light, cool background */
-    --text-dark: #343a40;
-    --text-muted: #6c757d;
-    --border-light: #dee2e6;
-    --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.08);
-    --shadow-hover: 0 15px 35px rgba(0, 0, 0, 0.12);
+    --accent-color: #00c2e0; /* Vibrant Cyan */
+    --accent-hover: #00acc7;
+    --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    --card-bg: rgba(255, 255, 255, 0.9);
+    
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    
+    --radius-lg: 1.25rem;
+    --radius-md: 0.85rem;
+    
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.05), 0 8px 10px -6px rgb(0 0 0 / 0.05);
 }
 
 body { 
-    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    background-color: var(--background-light);
-    display: flex; /* Use flexbox for perfect centering */
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg-gradient);
+    display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh; /* Ensure it takes full viewport height */
+    min-height: 100vh;
     margin: 0;
-    color: var(--text-dark);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
 } 
 
+/* ================================================= */
+/* CARD & GLASSMORPHISM */
+/* ================================================= */
+
 .card {
-    border: none;
-    border-radius: 1.5rem; /* More pronounced rounded corners */
-    background-color: #ffffff;
-    box-shadow: var(--shadow-soft); /* Softer initial shadow */
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Smoother overall card transition */
-    overflow: hidden; /* Ensures internal elements stay within rounded corners */
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: var(--radius-lg);
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    box-shadow: var(--shadow-xl);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* Subtle lift and shadow on card hover */
 .card:hover {
-    box-shadow: var(--shadow-hover);
-    transform: translateY(-3px); /* Slight lift */
-}
-
-.text-center img {
-    max-height: 120px; /* Slightly larger logo */
-    margin-bottom: 1rem;
-    transition: transform 0.3s ease-in-out;
-}
-
-.text-muted {
-    color: var(--text-muted) !important;
-    font-size: 0.95rem;
-    margin-top: -0.5rem; /* Pull closer to logo */
+    transform: translateY(-5px);
 }
 
 /* ================================================= */
-/* INPUT & ICON STYLING */
+/* MODERN FLOATING INPUTS */
 /* ================================================= */
 
-.input-group {
-    margin-bottom: 1.5rem; /* Increased space between input groups */
-    transition: all 0.2s ease-in-out;
+.input-group-modern {
+    position: relative;
+    margin-bottom: 1.5rem;
+    background: #ffffff;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
 }
 
-.input-group-text {
-    background-color: var(--background-light);
-    border: 1px solid var(--border-light);
-    border-right: none;
-    border-top-left-radius: 0.75rem; /* Match input curve */
-    border-bottom-left-radius: 0.75rem;
-    color: var(--text-muted); /* Muted icon color */
-    padding: 0.8rem 1rem;
-    font-size: 1.1rem; /* Slightly larger icons */
-    transition: all 0.2s ease-in-out;
+.input-group-modern:focus-within {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 4px rgba(0, 194, 224, 0.1);
 }
 
-.form-control {
-    border: 1px solid var(--border-light);
-    /* border-left: none; */
-    border-top-right-radius: 0.75rem; /* Match input group text curve */
-    border-top-left-radius: 0.75rem; /* Match input group text curve */
-    border-bottom-right-radius: 0.75rem;
-    border-bottom-left-radius: 0.75rem;
-    padding: 0.8rem 1rem;
-    height: auto; /* Allow padding to control height */
+.form-input {
+    width: 100%;
+    padding: 1.3rem 1rem 0.7rem 3rem; /* Adjusted for floating label and icon */
+    border: none;
+    outline: none;
+    background: transparent;
     font-size: 1rem;
-    color: var(--text-dark);
-    transition: all 0.2s ease-in-out;
+    font-weight: 500;
+    color: var(--text-main);
+    z-index: 2;
 }
 
-/* Input Focus/Active State */
-.form-control:focus {
-    border-color: #0cc0df; 
-    box-shadow: 0 0 0 0.1rem #0cc0df;
-    z-index: 2; /* Keep it above the input-group-text */
+/* Floating Label Logic */
+.floating-label {
+    position: absolute;
+    left: 3rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #ffffff;
+    padding: 0 6px;
+    color: var(--text-muted);
+    font-size: 1rem;
+    font-weight: 500;
+    pointer-events: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 3;
 }
 
-/* Icon change on input focus */
-.input-group-text:has(+ .form-control:focus) {
-    border-color: #0cc0df;
-    box-shadow: 0 0 0 0.1rem #0cc0df;
-    color: white;
-    background-color: #0cc0df; 
+/* Label Movement */
+.form-input:focus ~ .floating-label,
+.form-input:not(:placeholder-shown) ~ .floating-label,
+.form-input:valid ~ .floating-label {
+    top: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    letter-spacing: 0.5px;
+}
+
+/* Icon Positioning */
+.input-icon {
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    transition: color 0.3s ease;
+    z-index: 3;
+}
+
+.form-input:focus ~ .input-icon {
+    color: var(--accent-color);
+}
+
+/* Password Eye Toggle Specifics */
+#toggle-password {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 4;
+    padding: 0.5rem;
+    color: var(--text-muted);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+#toggle-password:hover {
+    color: var(--accent-color);
 }
 
 /* ================================================= */
-/* BUTTON STYLING */
+/* CHECKBOX & BUTTONS */
 /* ================================================= */
 
-.btn-primary {
-    background-color: white;
-    border-color: #0cc0df;
-    color: black;
-}
-
-.btn-lg {
-    font-weight: 600;
-    padding: 0.8rem 1.5rem; /* Adjusted padding */
-    border-radius: 0.75rem; /* Match input field curvature */
-    font-size: 1.1rem; /* Slightly larger text */
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Smoother transition */
-}
-
-.btn-lg:hover {
-    background-color: #0cc0df;
-    border-color: #0cc0df;
-    transform: translateY(-3px); /* Subtle lift */
-    box-shadow: 0 8px 18px rgba(0, 123, 255, 0.2); /* Primary color shadow */
-    filter: brightness(105%); /* Gentle brightness increase */
-}
-
-.btn-lg:active {
-    transform: translateY(0); /* "Press" effect */
-    box-shadow: 0 3px 8px rgba(0, 123, 255, 0.2);
+.form-check-input {
+    width: 1.2rem;
+    height: 1.2rem;
+    cursor: pointer;
+    border: 2px solid var(--border-color);
+    border-radius: 0.4rem;
+    appearance: none;
+    background-color: #fff;
+    transition: all 0.2s;
 }
 
 .form-check-input:checked {
-    background-color: #0cc0df;
-    border-color: #0cc0df;
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
 }
 
-.btn-outline-secondary {
-    border-color: var(--border-light);
-    border-radius: 0.75rem;
+.btn-primary {
+    background: var(--accent-color);
+    border: none;
+    color: white;
+    font-weight: 700;
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 194, 224, 0.2);
 }
 
-.btn-outline-secondary:hover {
-    background-color: #0cc0df;
-    border-color: #0cc0df;
-
+.btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 194, 224, 0.3);
 }
 
-.btn-outline-secondary:focus {
-    box-shadow: 0 0 0 0.1rem #0cc0df;
+/* ================================================= */
+/* ALERTS & UTILS */
+/* ================================================= */
+
+.caps-warning {
+    background-color: #fff1f2;
+    border: 1px solid #ffe4e6;
+    color: #be123c;
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
-
-/* Spinner and Icon */
-.btn .spinner-border {
-    margin-right: 0.5rem;
-}
-.btn .fa-sign-in-alt {
-    margin-right: 0.5rem;
-}
-
-    /* Modern Styling for Caps Lock Warning */
-    .caps-warning {
-        display: flex;
-        align-items: center;
-        padding: 0.75rem 1rem;
-        margin-top: 0;
-        margin-bottom: 1rem;
-        background-color: #ffe6e6; /* Light red background */
-        border: 1px solid #ffcccc; /* Light red border */
-        border-radius: 0.375rem; /* Rounded corners */
-        color: #842029; /* Darker red text color */
-        font-weight: 500; /* Semi-bold font weight */
-        font-size: 0.875rem; /* Slightly smaller font size */
-    }
-
-    .caps-warning::before {
-        content: "\26A0"; /* Warning sign character */
-        margin-right: 0.5rem;
-        font-size: 1rem;
-    }
-
-    /* Hide utility class (if you're not using Bootstrap) */
-    .d-none {
-        display: none;
-    }

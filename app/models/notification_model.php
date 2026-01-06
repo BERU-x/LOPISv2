@@ -8,15 +8,18 @@ require_once __DIR__ . '/../../db_connection.php';
 require_once __DIR__ . '/../../helpers/email_handler.php'; 
 
 // --------------------------------------------------------------------------
-// --- HELPER: SEND EMAIL ALERT ---
+// --- HELPER: SEND EMAIL ALERT (Updated to use Queue) ---
 // --------------------------------------------------------------------------
 function send_email_alert($pdo, $to_email, $subject, $html_body) {
     if (empty($to_email)) return false;
     
-    $plain_body = strip_tags($html_body);
-    // Assumes send_email() exists in email_handler.php
-    $status = send_email($pdo, $to_email, $subject, $plain_body, $html_body);
-    return ($status === 'sent');
+    // Get the User ID from session if available, otherwise 0 for System
+    $user_id = $_SESSION['employee_id'] ?? 0;
+
+    // We call queueEmail() because that is what is defined in email_handler.php
+    $status = queueEmail($pdo, (int)$user_id, $to_email, $subject, $html_body, 'NOTIFICATION');
+    
+    return $status; // Returns true if inserted into tbl_pending_emails
 }
 
 // --------------------------------------------------------------------------
@@ -75,18 +78,34 @@ function send_notification($pdo, $target_user_id, $target_role, $type, $message,
             }
 
             if (!empty($recipient_emails)) {
-                // Use the constant BASE_URL we defined in db_connection.php
-                $full_link = defined('BASE_URL') ? BASE_URL . $link : $link;
+                // 1. Ensure BASE_URL exists and clean up the link
+                $base = defined('BASE_URL') ? BASE_URL : 'http://localhost/LOPISv2/';
+                
+                // Trim slashes from both ends to prevent double slashes (e.g., //user/request)
+                $clean_link = ltrim($link, '/');
+                $full_link = $base . $clean_link;
 
                 $subject = "LOPISv2 Alert: {$type}";
+                
+                // 2. The Global HTML Template
                 $email_html = "
-                    <div style='font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;'>
-                        <h3 style='color: #4e73df;'>New Notification from {$sender_name}</h3>
-                        <p><strong>Type:</strong> {$type}</p>
-                        <p><strong>Message:</strong> {$message}</p>
-                        <hr>
-                        <p><a href='{$full_link}' style='background-color: #4e73df; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px;'>View Details</a></p>
-                        <p style='font-size: 12px; color: #888;'>This is an automated message.</p>
+                    <div style='font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; max-width: 600px;'>
+                        <h3 style='color: #4e73df; margin-top: 0;'>LOPISv2 System Notification</h3>
+                        <p>Hello,</p>
+                        <p>You have a new <strong>{$type}</strong> update from <strong>{$sender_name}</strong>.</p>
+                        <div style='background: #f8f9fc; padding: 15px; border-left: 4px solid #4e73df; margin: 15px 0;'>
+                            {$message}
+                        </div>
+                        <p style='text-align: center; margin-top: 25px;'>
+                            <a href='{$full_link}' style='background-color: #4e73df; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;'>
+                                View in System
+                            </a>
+                        </p>
+                        <hr style='border: 0; border-top: 1px solid #eee; margin: 20px 0;'>
+                        <p style='font-size: 11px; color: #a1a1a1;'>
+                            Link: <a href='{$full_link}'>{$full_link}</a><br>
+                            This is an automated system notification. Please do not reply.
+                        </p>
                     </div>
                 ";
 

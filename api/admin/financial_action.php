@@ -1,8 +1,8 @@
 <?php
 /**
  * api/admin/financial_action.php
- * Strictly uses: tbl_employees, tbl_compensation, tbl_financial_records, tbl_employee_ledger
- * REMOVED: AppUtility dependency to prevent Fatal Errors.
+ * Strictly uses: employee_id for all relationships and lookups.
+ * Integrated: helpers/audit_helper.php for security tracking.
  */
 
 session_start();
@@ -10,21 +10,24 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../db_connection.php'; 
 require_once __DIR__ . '/../../helpers/audit_helper.php';
 
-// --- INTERNAL HELPERS (Replacing AppUtility) ---
+// --- INTERNAL HELPERS ---
 function toMoney($amount) {
     return number_format((float)($amount ?? 0), 2, '.', '');
 }
 
 // Auth Check
-if (!isset($_SESSION['user_id']) || !in_array($_SESSION['usertype'], [0, 1])) {
+if (!isset($_SESSION['employee_id']) || !in_array($_SESSION['usertype'], [0, 1])) {
     http_response_code(403);
     echo json_encode(['status' => 'error', 'message' => 'Unauthorized access.']);
     exit;
 }
 
+// Variable used for audit logging
+$log_user = $_SESSION['employee_id']; 
+$usertype = $_SESSION['usertype'];
 $action = $_GET['action'] ?? '';
 
-// Mapping: Category Name (for Ledger) => Database Columns (in tbl_financial_records)
+// ENUM Compliant Mapping: Category (Ledger) => Database Columns (Financial Records)
 $financial_map = [
     'Savings'      => ['bal' => 'savings_bal', 'amort' => 'savings_contrib'],
     'SSS_Loan'     => ['bal' => 'sss_bal',     'amort' => 'sss_amort'],
@@ -43,6 +46,7 @@ if ($action === 'fetch_overview') {
         $length = (int)($_GET['length'] ?? 10);
         $search = $_GET['search']['value'] ?? '';
 
+        // Selecting data strictly via employee_id relationships
         $sql = "SELECT e.employee_id, e.firstname, e.lastname, e.position,
                 c.daily_rate, 
                 COALESCE(fr.savings_bal, 0) as savings_bal,
@@ -87,23 +91,10 @@ if ($action === 'fetch_overview') {
 // 2. GET SINGLE RECORD
 // =================================================================================
 if ($action === 'get_financial_record') {
-    $emp_id = $_POST['employee_id'] ?? '';
+    $emp_id = $_POST['employee_id'] ?? ''; // Strictly using unique employee_id
 
     try {
-        $sql = "SELECT 
-                e.employee_id, e.firstname, e.lastname,
-                c.daily_rate, c.monthly_rate, c.food_allowance, c.transpo_allowance,
-                COALESCE(fr.savings_bal, 0) as savings_bal,
-                COALESCE(fr.savings_contrib, 0) as savings_contrib,
-                COALESCE(fr.sss_bal, 0) as sss_bal,
-                COALESCE(fr.sss_amort, 0) as sss_amort,
-                COALESCE(fr.pagibig_bal, 0) as pagibig_bal,
-                COALESCE(fr.pagibig_amort, 0) as pagibig_amort,
-                COALESCE(fr.company_bal, 0) as company_bal,
-                COALESCE(fr.company_amort, 0) as company_amort,
-                COALESCE(fr.cash_bal, 0) as cash_bal,
-                COALESCE(fr.cash_amort, 0) as cash_amort
-                FROM tbl_employees e
+        $sql = "SELECT e.employee_id, e.firstname, e.lastname, c.*, fr.* FROM tbl_employees e 
                 LEFT JOIN tbl_compensation c ON e.employee_id = c.employee_id
                 LEFT JOIN tbl_financial_records fr ON e.employee_id = fr.employee_id
                 WHERE e.employee_id = ?";
@@ -139,7 +130,7 @@ if ($action === 'update_financial_record') {
     try {
         $pdo->beginTransaction();
 
-        // A. Update Compensation
+        // A. Update Compensation (Keyed by employee_id)
         $compSql = "INSERT INTO tbl_compensation (employee_id, daily_rate, monthly_rate, food_allowance, transpo_allowance)
                     VALUES (?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE 
@@ -154,7 +145,7 @@ if ($action === 'update_financial_record') {
             toMoney($_POST['transpo_allowance'])
         ]);
 
-        // B. Update Financial Records
+        // B. Update Financial Records (Keyed by employee_id)
         $oldStmt = $pdo->prepare("SELECT * FROM tbl_financial_records WHERE employee_id = ?");
         $oldStmt->execute([$emp_id]);
         $oldData = $oldStmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -169,7 +160,8 @@ if ($action === 'update_financial_record') {
                    cash_bal=VALUES(cash_bal), cash_amort=VALUES(cash_amort)";
         
         $finParams = [$emp_id];
-        
+        $change_summary = []; 
+
         foreach ($financial_map as $cat => $keys) {
             $new_bal   = toMoney($_POST['adjust_' . $keys['bal']] ?? 0);
             $new_amort = toMoney($_POST['adjust_' . $keys['amort']] ?? 0);
@@ -180,8 +172,10 @@ if ($action === 'update_financial_record') {
             $old_bal = (float)($oldData[$keys['bal']] ?? 0);
             if (abs($new_bal - $old_bal) > 0.01) {
                 $diff = $new_bal - $old_bal;
-                $transType = ($diff > 0) ? 'Loan_Grant' : 'Loan_Payment'; 
-                if($cat == 'Savings') $transType = ($diff > 0) ? 'Deposit' : 'Withdrawal';
+                $change_summary[] = "$cat: $old_bal to $new_bal";
+
+                // Determine transaction type for Ledger
+                $transType = ($diff > 0) ? (($cat == 'Savings') ? 'Deposit' : 'Loan_Grant') : (($cat == 'Savings') ? 'Withdrawal' : 'Loan_Payment');
 
                 $ledSql = "INSERT INTO tbl_employee_ledger (employee_id, category, transaction_type, amount, amortization, running_balance, transaction_date, remarks)
                            VALUES (?, ?, ?, ?, ?, ?, NOW(), ?)";
@@ -192,6 +186,10 @@ if ($action === 'update_financial_record') {
 
         $stmt = $pdo->prepare($finSql);
         $stmt->execute($finParams);
+
+        // AUDIT: Detailed log of financial modification
+        $audit_details = "Updated Employee ID: $emp_id. Remarks: $remarks. Changes: " . implode(', ', $change_summary);
+        logAudit($pdo, $log_user, $usertype, 'UPDATE_FINANCIAL_RECORD', $audit_details);
 
         $pdo->commit();
         echo json_encode(['status' => 'success', 'message' => 'Record updated successfully.']);
@@ -209,6 +207,14 @@ if ($action === 'update_financial_record') {
 if ($action === 'fetch_ledger') {
     $emp_id = $_GET['employee_id'] ?? '';
     $cat    = $_GET['category'] ?? 'All';
+
+    if (empty($emp_id)) {
+        echo json_encode(['status' => 'error', 'message' => 'Employee ID is required for ledger.']);
+        exit;
+    }
+
+    // FIX: Changed $user_id to $log_user to match variable defined on line 23
+    logAudit($pdo, $log_user, $usertype, 'VIEW_FINANCIAL_LEDGER', "Viewed ledger history for Employee ID: $emp_id, Category: $cat");
 
     $sql = "SELECT * FROM tbl_employee_ledger WHERE employee_id = ?";
     $params = [$emp_id];

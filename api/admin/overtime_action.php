@@ -16,7 +16,8 @@ if (!isset($_SESSION['usertype']) || !in_array($_SESSION['usertype'], [0, 1])) {
 }
 
 require_once __DIR__ . '/../../db_connection.php'; 
-require_once __DIR__ . '/../../app/models/global_app_model.php'; 
+require_once __DIR__ . '/../../helpers/email_handler.php'; 
+require_once __DIR__ . '/../../app/models/notification_model.php'; 
 require_once __DIR__ . '/../../helpers/audit_helper.php';
 
 if (!isset($pdo)) {
@@ -106,7 +107,7 @@ if ($action === 'fetch') {
 }
 
 // =================================================================================
-// ACTION 2: UPDATE STATUS (Approve/Reject)
+// ACTION 2: UPDATE STATUS (Handled via Notification Model)
 // =================================================================================
 if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int)($_POST['id'] ?? 0);
@@ -121,7 +122,8 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
 
-        $stmt_info = $pdo->prepare("SELECT employee_id, ot_date, hours_requested FROM tbl_overtime WHERE id = ? FOR UPDATE");
+        // 1. Fetch Request Details
+        $stmt_info = $pdo->prepare("SELECT employee_id, ot_date FROM tbl_overtime WHERE id = ? FOR UPDATE");
         $stmt_info->execute([$id]);
         $ot_info = $stmt_info->fetch(PDO::FETCH_ASSOC);
 
@@ -131,33 +133,79 @@ if ($action === 'update_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
+        // 2. Update Database Status
         if ($status_action === 'approve') {
             $sql = "UPDATE tbl_overtime SET status = 'Approved', hours_approved = ?, updated_at = NOW() WHERE id = ?";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$approved_hrs, $id]);
-            $notif_type = 'APPROVED';
+            $status_label = 'APPROVED';
         } else {
             $sql = "UPDATE tbl_overtime SET status = 'Rejected', hours_approved = 0, updated_at = NOW() WHERE id = ?";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([$id]);
-            $notif_type = 'REJECTED';
+            $status_label = 'REJECTED';
         }
 
-        // Audit Trail
-        logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'OVERTIME_ACTION', "OT ID $id marked as $notif_type. Approved hrs: $approved_hrs");
-
-        // Notification Integration
+        // 3. Trigger Notification (Handled by Model)
         $date_formatted = date('M d, Y', strtotime($ot_info['ot_date']));
-        $notif_msg = "Your Overtime request for {$date_formatted} has been {$notif_type} (" . ($status_action === 'approve' ? $approved_hrs : 0) . " hrs).";
-        
-        // Use global notification model (Role 2 = Employee)
-        send_notification($pdo, $ot_info['employee_id'], 2, 'Overtime Update', $notif_msg, 'pages/my_overtime.php');
+        $notif_msg = "Your Overtime request for {$date_formatted} has been {$status_label}. " . 
+                     ($status_action === 'approve' ? "Approved: {$approved_hrs} hrs." : "");
+
+        /**
+         * send_notification handles:
+         * 1. Database insertion into tbl_notifications
+         * 2. Automatic Email Queueing (if the model's $send_email is true)
+         */
+        send_notification(
+            $pdo, 
+            $ot_info['employee_id'], 
+            2, 
+            'Overtime Update', 
+            $notif_msg, 
+            'user/file_overtime.php'
+        );
+
+        // 4. Audit Trail
+        logAudit($pdo, $_SESSION['user_id'], $_SESSION['usertype'], 'OVERTIME_ACTION', "OT ID $id marked as $status_label.");
 
         $pdo->commit();
-        echo json_encode(['status' => 'success', 'message' => "Overtime request processed successfully."]);
+        echo json_encode(['status' => 'success', 'message' => "Request processed successfully."]);
 
     } catch (Exception $e) {
         if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// =================================================================================
+// ACTION 3: GET DETAILS (Updated with Biometric Link)
+// =================================================================================
+if ($action === 'get_details' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id = (int)($_POST['id'] ?? 0);
+
+    try {
+        // We join tbl_attendance to get the actual biometric 'overtime_hr'
+        $sql = "SELECT 
+                    ot.*, 
+                    e.firstname, e.lastname, e.photo, e.department, e.position,
+                    COALESCE(att.overtime_hr, 0) AS raw_biometric_ot
+                FROM tbl_overtime ot
+                LEFT JOIN tbl_employees e ON ot.employee_id = e.employee_id
+                LEFT JOIN tbl_attendance att ON ot.employee_id = att.employee_id 
+                    AND ot.ot_date = att.date
+                WHERE ot.id = ?";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$id]);
+        $details = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($details) {
+            echo json_encode(['status' => 'success', 'details' => $details]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Overtime record not found.']);
+        }
+    } catch (PDOException $e) {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
     exit;

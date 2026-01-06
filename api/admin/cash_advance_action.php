@@ -16,7 +16,8 @@ if (!isset($_SESSION['usertype']) || !in_array($_SESSION['usertype'], [0, 1])) {
 }
 
 require_once __DIR__ . '/../../db_connection.php'; 
-require_once __DIR__ . '/../../app/models/global_app_model.php'; // Integrated notification model
+require_once __DIR__ . '/../../helpers/email_handler.php'; 
+require_once __DIR__ . '/../../app/models/notification_model.php'; 
 require_once __DIR__ . '/../../helpers/audit_helper.php';
 
 if (!isset($pdo)) {
@@ -161,7 +162,7 @@ if ($action === 'process' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // 2. Trigger Global Notification (Database + Email via global_app_model)
         // target_user_id, target_role (2=Employee), type, message, link
-        send_notification($pdo, $ca_info['employee_id'], 2, $notif_type, $notif_msg, 'pages/my_cash_advance.php');
+        send_notification($pdo, $ca_info['employee_id'], 2, $notif_type, $notif_msg, 'user/request_ca.php');
 
         $pdo->commit();
         echo json_encode(['status' => 'success', 'message' => ($type === 'approve' ? 'Request Approved' : 'Request Cancelled')]);
@@ -169,6 +170,32 @@ if ($action === 'process' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (Exception $e) {
         if ($pdo->inTransaction()) { $pdo->rollBack(); }
         echo json_encode(['status' => 'error', 'message' => 'Processing Error: ' . $e->getMessage()]);
+    }
+    exit;
+}
+
+// =================================================================================
+// ACTION 3: GET DETAILS (For Review Modal)
+// =================================================================================
+if ($action === 'get_details' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id = (int)($_POST['id'] ?? 0);
+
+    try {
+        $sql = "SELECT a.*, e.firstname, e.lastname, e.photo, e.department 
+                FROM tbl_cash_advances a 
+                LEFT JOIN tbl_employees e ON a.employee_id = e.employee_id 
+                WHERE a.id = ?";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$id]);
+        $details = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($details) {
+            echo json_encode(['status' => 'success', 'details' => $details]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Record not found.']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
     exit;
 }

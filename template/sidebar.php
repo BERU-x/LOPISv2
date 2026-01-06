@@ -30,6 +30,13 @@ function isActive($page_name, $current_page) {
             </a>
         </li>
 
+        <li class="nav-item <?php echo isActive('attendance_logs', $current_page); ?>">
+            <a class="nav-link" href="<?php echo $base_link; ?>attendance_management.php">
+                <i class="fas fa-fw fa-clipboard-list"></i>
+                <span>Attendance Logs</span>
+            </a>
+        </li>
+
         <li class="nav-item <?php echo isActive('pending_emails', $current_page); ?>">
             <a class="nav-link" href="<?php echo $base_link; ?>pending_emails.php">
                 <i class="fa-solid fa-fw fa-envelope"></i>

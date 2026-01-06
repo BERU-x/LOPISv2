@@ -5,18 +5,18 @@ header('Content-Type: application/json');
 session_start();
 
 // --- 1. SECURITY & AUTHORIZATION ---
-// Adjust the relative path to your database connection file
-require_once '../models/db.php'; 
+require_once __DIR__ . '/../db_connection.php'; // Verify this path!
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['status' => 'error', 'message' => 'Unauthorized access.']);
+// Use 'usertype' (no underscore) to match your view_payslip.php
+$user_type = $_SESSION['usertype'] ?? 2; 
+
+// Check if user is logged in (using your app's actual login check)
+if (!isset($_SESSION['employee_id'])) {
+    echo json_encode(['status' => 'error', 'message' => 'Unauthorized access. Please log in again.']);
     exit;
 }
 
-// Check User Type: Only Superadmin (0) and Admin (1) can update
-// User Type 2 (Employee) is strictly forbidden
-$user_type = $_SESSION['user_type'] ?? 2; 
+// User Type 0 = Superadmin, 1 = Admin. Both should be allowed.
 if ($user_type == 2) {
     echo json_encode(['status' => 'error', 'message' => 'Permission denied. Employees cannot edit payslips.']);
     exit;

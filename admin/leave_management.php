@@ -112,40 +112,52 @@ require '../template/topbar.php';
             </div>
             <form id="applyLeaveForm">
                 <div class="modal-body">
-                    <p class="text-muted small mb-4">Submit a leave request on behalf of an employee.</p>
+                    <p class="text-muted small mb-4">Submit a leave request on behalf of an employee. Credits will be deducted automatically.</p>
+                    
                     <div class="mb-3">
                         <label class="form-label fw-bold text-xs text-uppercase">Select Employee</label>
                         <select name="employee_id" id="empDropdown" class="form-select" required>
-                            <option value="">Loading...</option>
+                            <option value="">-- Select Employee --</option>
                         </select>
+                        <div id="creditDisplay" class="mt-2 small d-none">
+                            <span class="badge bg-light text-dark border">VL: <span id="val_vl">0</span></span>
+                            <span class="badge bg-light text-dark border">SL: <span id="val_sl">0</span></span>
+                            <span class="badge bg-light text-dark border">EL: <span id="val_el">0</span></span>
+                        </div>
                     </div>
+
                     <div class="mb-3">
                         <label class="form-label fw-bold text-xs text-uppercase">Leave Type</label>
-                        <select name="leave_type" class="form-select" required> 
+                        <select name="leave_type" id="leaveTypeSelect" class="form-select" required> 
                             <option value="">-- Select Type --</option>
-                            <option value="Vacation Leave">Vacation Leave</option>
-                            <option value="Sick Leave">Sick Leave</option>
-                            <option value="Emergency Leave">Emergency Leave</option>
+                            <option value="Vacation">Vacation Leave</option>
+                            <option value="Sick">Sick Leave</option>
+                            <option value="Emergency">Emergency Leave</option>
                             <option value="Maternity/Paternity">Maternity/Paternity</option>
-                            <option value="Unpaid Leave">Unpaid Leave (LWOP)</option>
+                            <option value="Unpaid">Unpaid Leave (LWOP)</option>
                         </select>
                     </div>
+
                     <div class="row">
                         <div class="col-6 mb-3">
                             <label class="form-label fw-bold text-xs text-uppercase">Start Date</label>
-                            <input type="date" name="start_date" class="form-control" required>
+                            <input type="date" name="start_date" id="startDate" class="form-control" required>
                         </div>
                         <div class="col-6 mb-3">
                             <label class="form-label fw-bold text-xs text-uppercase">End Date</label>
-                            <input type="date" name="end_date" class="form-control" required>
+                            <input type="date" name="end_date" id="endDate" class="form-control" required>
                         </div>
                     </div>
+
                     <div class="mb-3">
                         <label class="form-label fw-bold text-xs text-uppercase">Reason / Notes</label>
                         <textarea name="reason" class="form-control" rows="3" placeholder="Enter reason..." required></textarea>
                     </div>
+
                     <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-teal fw-bold shadow-sm py-2">Submit Request</button>
+                        <button type="submit" class="btn btn-teal fw-bold shadow-sm py-2" id="submitLeaveBtn">
+                            Submit & Deduct Credits
+                        </button>
                     </div>
                 </div>
             </form>
